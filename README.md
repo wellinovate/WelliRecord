@@ -7,7 +7,7 @@ This API endpoint allows users to onboard by submitting identity information (NI
 - **Method**: `POST`
 - **Authentication**: None (relies on connected wallet for DID extraction)
 - **Content-Type**: `application/json`
-- **Rate Limiting**: Not specified (implement client-side throttling if needed)
+
 
 ## Request Body
 The request body must be a JSON object containing the required identity fields. The `dids` field should be the Ethereum address extracted from the user's connected wallet (e.g., via Web3 provider like MetaMask).
