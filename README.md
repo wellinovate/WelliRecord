@@ -36,6 +36,7 @@ The request body must be a JSON object containing the required identity fields. 
 ### Success (HTTP 200)
 The response includes a `success` flag, the generated Verifiable Credential (`vc`), a hash of the VC (`vcHash`), a digital signature (`signature`), and an optional IPFS CID if pinned.
 
+
 #### Schema
 | Field       | Type     | Description                                                                 |
 |-------------|----------|-----------------------------------------------------------------------------|
