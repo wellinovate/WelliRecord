@@ -11,6 +11,7 @@ import {
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
+
   return jwt.sign(
     {
       id: user._id,
@@ -177,7 +178,7 @@ export const loginUser = async (req, res) => {
       token,
     });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 // Logout user
@@ -209,7 +210,7 @@ export const editUserImage = async (req, res) => {
   const userId = req.params.userId;
 
   try {
-    const user = await userModel.findById(userId);
+    const user = await userModel.findById({_id:userId});
     if (!user) return res.status(404).json({ message: "User not found" });
 
     // 1. Delete old image from Cloudinary (if exists)
