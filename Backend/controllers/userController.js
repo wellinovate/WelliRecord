@@ -244,3 +244,19 @@ export const editUserImage = async (req, res) => {
     res.status(500).json({ message: "Failed to update image" });
   }
 };
+
+
+export const fetchUserByEmail = async(req, res) => {
+  try {
+      const userProfile = await getUserByEmail(req.query.email)
+      if(userProfile){
+          res.status(200).json({profile:userProfile})
+      }else{
+        res.status(400).json({error:'User Not Found'})
+      }
+
+  } catch (error) {
+    res.status(500).json({msg:'fail to fetch profile'})
+  }
+
+}

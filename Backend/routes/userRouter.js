@@ -6,9 +6,11 @@ import {
   createUser,
   createUserProfile,
   editUserImage,
+  fetchUserByEmail,
   loginUser,
   logoutUser
 } from "../controllers/userController.js";
+import { getUserByEmail } from "../Models/userModel.js";
 
 
 const storage = multer.memoryStorage();
@@ -19,6 +21,7 @@ router.post("/users", createUser); // Register new user
 router.post("/login", loginUser); // Login user
 router.post("/logout", logoutUser); // Logout user
 router.put('/:userId/image', upload.single('file'), editUserImage);
+router.get("/profile", fetchUserByEmail)
 
 
 
