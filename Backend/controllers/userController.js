@@ -8,6 +8,7 @@ import {
   updateUserByEmail,
   userModel,
 } from "../Models/userModel.js";
+import { sendSMSNG } from "./notification.js";
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -192,6 +193,35 @@ export const logoutUser = (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
 };
 
+
+export const generateOTP = async(req, res)=>{
+  const {email} = req.body
+  console.log("🚀 ~ loginUser ~ email:", email)
+
+    if(!email){
+    res.status(401).json({
+      error:'email is required'
+    })
+  }
+
+  const user = await getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+      // generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    //save otp into the database
+     const newOTP = new OTPModel({ email, otp })
+      await newOTP.save();
+
+      await sendSMSNG(user.phone, otp)
+      res.status(200).json({
+        success: true,
+        mesage: `otp sent successfully`
+      })
+}
 
 cloudinary.config({
   cloud_name: "",

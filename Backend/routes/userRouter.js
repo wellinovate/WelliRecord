@@ -7,6 +7,7 @@ import {
   createUserProfile,
   editUserImage,
   fetchUserByEmail,
+  generateOTP,
   loginUser,
   logoutUser
 } from "../controllers/userController.js";
@@ -20,6 +21,7 @@ const router = express.Router();
 router.post("/users", createUser); // Register new user
 router.post("/login", loginUser); // Login user
 router.post("/logout", logoutUser); // Logout user
+router.post('/initiate', generateOTP)
 router.put('/:userId/image', upload.single('file'), editUserImage);
 router.get("/profile", fetchUserByEmail)
 
