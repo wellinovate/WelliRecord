@@ -195,6 +195,7 @@ export const logoutUser = (req, res) => {
 
 
 export const generateOTP = async(req, res)=>{
+  console.log('req body', req.body)
   const {email} = req.body
   console.log("🚀 ~ loginUser ~ email:", email)
 
