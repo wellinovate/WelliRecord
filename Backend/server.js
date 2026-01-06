@@ -24,6 +24,8 @@ const corsOptions = {
   ],
   credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
+  // Add this section 👇
+  allowedHeaders: ["Content-Type", "Authorization", "x-requested-with"], 
 };
 
 // app use
