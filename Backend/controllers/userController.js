@@ -89,6 +89,7 @@ const sendSuccess = (res, status, data, message = null) => {
 
 // CREATE: Register a new user (POST /api/users)
 export const createUser = async (req, res) => {
+  console.log('create user req body: ', req.body)
   try {
     const { firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin } = req.body;
     console.log("🚀 ~ createUser ~ firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin:", firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin)
@@ -229,6 +230,7 @@ export const verifyOTP = async (req, res) => {
   try {
     const {email, otp} = req.body
     const otpData = await OTPModel.findOne({email});
+    console.log('compare otp:', otp, otpData.otp)
     if(!otpData){
       console.error('user with this otp not found')
       res.status(401).json({message: 'user with this otp not found'})
