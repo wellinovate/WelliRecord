@@ -9,7 +9,8 @@ import {
   fetchUserByEmail,
   generateOTP,
   loginUser,
-  logoutUser
+  logoutUser,
+  verifyOTP
 } from "../controllers/userController.js";
 import { getUserByEmail } from "../Models/userModel.js";
 
@@ -22,6 +23,7 @@ router.post("/users", createUser); // Register new user
 router.post("/login", loginUser); // Login user
 router.post("/logout", logoutUser); // Logout user
 router.post('/initiate', generateOTP)
+router.post('/verify-otp', verifyOTP)
 router.put('/:userId/image', upload.single('file'), editUserImage);
 router.get("/profile", fetchUserByEmail)
 

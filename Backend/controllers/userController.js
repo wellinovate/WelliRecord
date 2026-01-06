@@ -225,6 +225,27 @@ export const generateOTP = async(req, res)=>{
       })
 }
 
+export const verifyOTP = async (req, res) => {
+  try {
+    const {email, otp} = req.body
+    const otpData = await OTPModel.findOne({email});
+    if(!otpData){
+      console.error('user with this otp not found')
+      res.status(401).json({message: 'user with this otp not found'})
+    }
+
+    if(otpData.otp===otp){
+      console.error('successful')
+      res.status(200).json({message: 'successful'})
+    }else{
+      console.error('Wrong otp')
+      res.status(402).json({error: 'Wrong otp'})
+    }
+  } catch (error) {
+    console.error('OTP verification error: ', error)
+  }
+}
+
 cloudinary.config({
   cloud_name: "",
   api_key: "",
