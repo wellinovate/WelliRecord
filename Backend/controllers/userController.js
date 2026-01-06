@@ -9,6 +9,7 @@ import {
   userModel,
 } from "../Models/userModel.js";
 import { sendSMSNG } from "./notification.js";
+import { OTPModel } from "../Models/otpModel.js";
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
