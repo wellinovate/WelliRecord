@@ -46,6 +46,10 @@ const userSchema = new Schema(
       type: Boolean,
       required: true
     },
+    nin:{
+      type: String,
+      required: true
+    },
     // Retained existing fields (img, telegramId, etc.) as they were not specified for removal
     img: {
       type: String,
