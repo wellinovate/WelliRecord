@@ -113,9 +113,7 @@ export const createUser = async (req, res) => {
       password, // Plain text; will be hashed
       phone,
       agreeToTerms,
-      nin,
-      img: img || '',
-      admin: admin || false,
+      nin
     });
 
     await newUser.save();
