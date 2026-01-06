@@ -92,7 +92,7 @@ export const createUser = async (req, res) => {
   console.log('create user req body: ', req.body)
   try {
     const { name, email, phone, password, nin, agreeToTerms } = req.body;
-    console.log("🚀 ~ createUser ~ firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin:", firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin)
+    // console.log("🚀 ~ createUser ~ firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin:", name, middleName, lastName,  email, password, gender, phone, homeAddress, img, admin)
 
     // Basic validation (expand with Joi or similar if needed)
     if (!name || !email || !password || !nin || !agreeToTerms || !phone) {
