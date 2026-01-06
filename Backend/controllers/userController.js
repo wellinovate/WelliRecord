@@ -89,9 +89,9 @@ const sendSuccess = (res, status, data, message = null) => {
 
 // CREATE: Register a new user (POST /api/users)
 export const createUser = async (req, res) => {
-  console.log('create user req body: ', req.body)
+  console.log('create user req body: ', req.body.formData)
   try {
-    const { name, email, phone, password, nin, agreeToTerms } = req.body;
+    const { name, email, phone, password, nin, agreeToTerms } = req.body.formData;
     // console.log("🚀 ~ createUser ~ firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin:", name, middleName, lastName,  email, password, gender, phone, homeAddress, img, admin)
 
     // Basic validation (expand with Joi or similar if needed)
