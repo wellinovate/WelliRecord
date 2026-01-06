@@ -1,11 +1,12 @@
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import crypto from "crypto";
+import { type } from "os";
 const Schema = mongoose.Schema;
 
 const userSchema = new Schema(
   {
-    firstName: {
+    name: {
       type: String,
       required: true,
     },
@@ -15,13 +16,9 @@ const userSchema = new Schema(
     },
     lastName: {
       type: String,
-      required: true,
+      default: '',
     },
-    username: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+
     email: {
       type: String,
       required: true,
@@ -31,12 +28,12 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-    gender: {
-      type: String,
-      required: false,
-      default: "Male",
-      enum: ["Male", "Female", "Other"], // Adjust enum as needed
-    },
+    // gender: {
+    //   type: String,
+    //   required: false,
+    //   default: "Male",
+    //   enum: ["Male", "Female", "Other"], // Adjust enum as needed
+    // },
     phone: {
       type: String,
       required: false,
@@ -44,6 +41,10 @@ const userSchema = new Schema(
     homeAddress: {
       type: String,
       required: false,
+    },
+    agreeToTerms:{
+      type: Boolean,
+      required: true
     },
     // Retained existing fields (img, telegramId, etc.) as they were not specified for removal
     img: {
@@ -60,7 +61,7 @@ const userSchema = new Schema(
 
 // Optional: Virtual for full name (computed from first, middle, last)
 userSchema.virtual("fullName").get(function () {
-  return `${this.firstName} ${this.middleName} ${this.lastName}`.replace(/\s+/g, " ").trim();
+  return `${this.name} ${this.middleName} ${this.lastName}`.replace(/\s+/g, " ").trim();
 });
 
 // Ensure virtuals are included in toObject/toJSON
@@ -91,7 +92,7 @@ export const userModel = mongoose.model("User", userSchema);
 // Utility functions
 export const getUsers = () => userModel.find();
 export const getUserByEmail = (email) => userModel.findOne({ email });
-export const getUserByUsername = (username) => userModel.findOne({ username }); // Added for username lookup
+export const getUserByUsername = (email) => userModel.findOne({ email }); // Added for username lookup
 export const createUser = async (values) => {
   const user = new userModel(values);
   await user.save();
@@ -99,10 +100,10 @@ export const createUser = async (values) => {
 };
 export const deleteUserByEmail = (email) =>
   userModel.findOneAndDelete({ email });
-export const deleteUserByUsername = (username) =>
-  userModel.findOneAndDelete({ username }); // Added for username deletion
+export const deleteUserByUsername = (email) =>
+  userModel.findOneAndDelete({ email }); // Added for username deletion
 
 export const updateUserByEmail = (email, values, newOption = true) =>
   userModel.findOneAndUpdate({ email }, values, { new: newOption });
-export const updateUserByUsername = (username, values, newOption = true) =>
-  userModel.findOneAndUpdate({ username }, values, { new: newOption }); // Added for username updates
+export const updateUserByUsername = (email, values, newOption = true) =>
+  userModel.findOneAndUpdate({ email }, values, { new: newOption }); // Added for username updates

@@ -91,16 +91,16 @@ const sendSuccess = (res, status, data, message = null) => {
 export const createUser = async (req, res) => {
   console.log('create user req body: ', req.body)
   try {
-    const { firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin } = req.body;
+    const { name, email, phone, password, nin, agreeToTerms } = req.body;
     console.log("🚀 ~ createUser ~ firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin:", firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin)
 
     // Basic validation (expand with Joi or similar if needed)
-    if (!firstName || !lastName || !username || !email || !password || !gender || !phone || !homeAddress) {
+    if (!name || !email || !password || !nin || !agreeToTerms || !phone) {
       return sendError(res, 400, 'Missing required fields');
     }
 
     // Check if user already exists by email or username
-    const existingUser = await userModel.findOne({ $or: [{ email }, { username }] });
+    const existingUser = await userModel.findOne({ $or: [{ email }, { phone }] });
     console.log("🚀 ~ createUser ~ existingUser:", existingUser)
     if (existingUser) {
       return sendError(res, 409, 'User with this email or username already exists');
@@ -108,15 +108,12 @@ export const createUser = async (req, res) => {
 
     // Create user (pre-save hooks will hash password and generate referralCode if applicable)
     const newUser = new userModel({
-      firstName,
-      middleName: middleName || '',
-      lastName,
-      username,
+      name,
       email,
       password, // Plain text; will be hashed
-      gender,
       phone,
-      homeAddress,
+      agreeToTerms,
+      nin,
       img: img || '',
       admin: admin || false,
     });
