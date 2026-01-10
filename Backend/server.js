@@ -20,6 +20,7 @@ connectDB();
 const corsOptions = {
   origin: [
     "http://localhost:3000",
+    "https://wellirecords.vercel.app",
     "https://welli-record.vercel.app"
   ],
   credentials: true,
