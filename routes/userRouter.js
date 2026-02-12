@@ -6,6 +6,7 @@ import {
   createUser,
   createUserProfile,
   editUserImage,
+  getUserProfile,
   loginUser,
   logoutUser,
   updateUserProfile
@@ -20,6 +21,7 @@ router.post("/users", createUser); // Register new user
 router.post("/login", loginUser); // Login user
 router.post("/logout", logoutUser); // Logout user
 router.put('/:userId/image', upload.single('file'), editUserImage);
+router.get("/profile/:Id",  getUserProfile);
 router.put("/profile", upload.single("img"), updateUserProfile);
 
 

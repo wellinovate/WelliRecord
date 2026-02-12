@@ -1,6 +1,9 @@
 {
-  "name": "WellRecord",
+  "name": "wellrecord",
   "version": "1.0.0",
+  "scripts": {
+    "dev": "nodemon server.js"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.0",
@@ -15,15 +18,29 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.4.0",
     "chai": "^4.5.0",
-    "ethers": "^6.15.0",
+    "dotenv": "^17.2.4",
+    "ethers": "^6.16.0",
     "hardhat": "^2.26.3",
     "hardhat-gas-reporter": "^2.3.0",
+    "nodemon": "^3.1.11",
     "solidity-coverage": "^0.8.16",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.4.0"
+    "@openzeppelin/contracts": "^5.4.0",
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.2",
+    "cloudinary": "^2.9.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "crypto-js": "^4.2.0",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.2.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "pinata": "^2.5.4"
   }
 }

@@ -75,79 +75,58 @@ const sendSuccess = (res, status, data, message = null) => {
 export const createUser = async (req, res) => {
   try {
     const {
-      firstName,
-      middleName,
-      lastName,
-      username,
+      name,
       email,
-      password,
-      gender,
       phone,
-      homeAddress,
-      img,
-      admin,
+      password,
+  
     } = req.body;
     console.log(
-      "🚀 ~ createUser ~ firstName, middleName, lastName, username, email, password, gender, phone, homeAddress, img, admin:",
-      firstName,
-      middleName,
-      lastName,
-      username,
+      "🚀 ~ createUser ~ name, email, password, phone,",
+      name,
       email,
-      password,
-      gender,
       phone,
-      homeAddress,
-      img,
-      admin,
+      password,
     );
 
     // Basic validation (expand with Joi or similar if needed)
-    if (
-      !firstName ||
-      !lastName ||
-      !username ||
-      !email ||
-      !password ||
-      !gender ||
-      !phone ||
-      !homeAddress
-    ) {
+    if (!name || !email || !password)
       return sendError(res, 400, "Missing required fields");
-    }
 
     // Check if user already exists by email or username
     const existingUser = await userModel.findOne({
-      $or: [{ email }, { username }],
+      $or: [{ email }, { phone }],
     });
     console.log("🚀 ~ createUser ~ existingUser:", existingUser);
     if (existingUser) {
       return sendError(
         res,
         409,
-        "User with this email or username already exists",
+        "User with this email or phone already exists",
       );
     }
 
     // Create user (pre-save hooks will hash password and generate referralCode if applicable)
     const newUser = new userModel({
-      firstName,
-      middleName: middleName || "",
-      lastName,
-      username,
+      // firstName,
+      // middleName: middleName || "",
+      // lastName,
+      name,
+      username: email.split("@")[0], // Simple username generation from email prefix
       email,
       password, // Plain text; will be hashed
-      gender,
+      // gender,
       phone,
-      homeAddress,
-      img: img || "",
-      admin: admin || false,
+      // homeAddress,
+      img: "",
+      // admin: true,
     });
 
     await newUser.save();
 
     // Exclude sensitive fields like password from response
-    const { password: _, ...userWithoutPassword } = newUser;
+    const userObj = newUser.toObject();
+    const { password: _, ...userWithoutPassword } = userObj;
 
     // return sendSuccess(res, 201, userWithoutPassword, 'User created successfully');
     res.status(201).json({ message: "User created successfully" });
@@ -216,6 +195,44 @@ export const logoutUser = (req, res) => {
   });
 
   res.status(200).json({ message: "Logged out successfully" });
+};
+
+export const getUserProfile = async (req, res) => {
+  try {
+    // Option 1: from auth middleware (recommended)
+    // const userId = req.user?.id;
+    const {Id} = req.params; 
+    const userId = Id; // from URL param (e.g. /profile/:Id)
+
+    // Option 2 fallback (if no auth middleware yet)
+    // const { userId } = req.params;
+
+    if (!userId) {
+      return sendError(res, 401, "Unauthorized");
+    }
+
+    const user = await userModel
+      .findById(userId)
+      .select("-password -__v");
+
+    if (!user) {
+      return sendError(res, 404, "User not found");
+    }
+
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        img: user.img,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Get User Profile Error:", error);
+    return sendError(res, 500, "Server error while fetching profile");
+  }
 };
 
 export const updateUserProfile = async (req, res) => {

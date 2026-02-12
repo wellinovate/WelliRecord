@@ -4,6 +4,7 @@ import connectDB from "./config/db.js";
 import bodyParse from "body-parser";
 import welliidRoutes from "./routes/welliidRoutes.js";
 import userRouter from "./routes/userRouter.js";
+import providerRoutes from "./routes/userRouter.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import http from "http";
@@ -37,6 +38,7 @@ app.use(cookieParser());
 // Routes
 app.use("/app", welliidRoutes);
 app.use("/api/v1/user", userRouter);
+app.use("/api/v1/provider", providerRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("WelliID Issuer Service is running..."));
