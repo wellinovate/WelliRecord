@@ -21,6 +21,7 @@ connectDB();
 const corsOptions = {
   origin: [
     "http://localhost:5173",
+    "https://wellirecord.com",
     "http://localhost:3000",
   ],
   credentials: true,
