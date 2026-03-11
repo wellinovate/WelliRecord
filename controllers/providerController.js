@@ -1,5 +1,5 @@
 // src/controllers/provider.controller.js
-import { Provider } from "../models/provider.model.js";
+import { Provider } from "../models/Provider.js";
 
 // POST /api/v1/providers
 export const createProviderController = async (req, res) => {

@@ -75,22 +75,24 @@ const sendSuccess = (res, status, data, message = null) => {
 export const createUser = async (req, res) => {
   try {
     const {
-      name,
+      profileType,
+      fullName,
       email,
       phone,
       password,
   
     } = req.body;
     console.log(
-      "🚀 ~ createUser ~ name, email, password, phone,",
-      name,
+      "🚀 ~ createUser ~ fullName, email, password, phone,",
+      profileType,
+      fullName,
       email,
       phone,
       password,
     );
 
     // Basic validation (expand with Joi or similar if needed)
-    if (!name || !email || !password)
+    if (!profileType || !fullName || !email || !password)
       return sendError(res, 400, "Missing required fields");
 
     // Check if user already exists by email or username
@@ -111,7 +113,8 @@ export const createUser = async (req, res) => {
       // firstName,
       // middleName: middleName || "",
       // lastName,
-      name,
+      profileType,
+      fullName,
       username: email.split("@")[0], // Simple username generation from email prefix
       email,
       password, // Plain text; will be hashed

@@ -1,14 +1,14 @@
-import dotenv from "dotenv";
-import express from "express";
-import connectDB from "./config/db.js";
 import bodyParse from "body-parser";
-import welliidRoutes from "./routes/welliidRoutes.js";
-import userRouter from "./routes/userRouter.js";
-import providerRoutes from "./routes/userRouter.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import http from "http";
+import dotenv from "dotenv";
+import express from "express";
 import morgan from "morgan";
+import connectDB from "./config/db.js";
+import recordRoutes from "./routes/recordRoutes.js";
+import providerRoutes from "./routes/providerRoutes.js";
+import userRouter from "./routes/userRouter.js";
+import welliidRoutes from "./routes/welliidRoutes.js";
 // import uploadRoute from "./routes/upload.js";
 
 dotenv.config();
@@ -40,6 +40,7 @@ app.use(cookieParser());
 app.use("/app", welliidRoutes);
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/provider", providerRoutes);
+app.use("/api/v1/health-record", recordRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("WelliID Issuer Service is running..."));

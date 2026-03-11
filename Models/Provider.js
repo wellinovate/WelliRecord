@@ -187,7 +187,6 @@ providerSchema.methods.comparePassword = async function (candidatePassword) {
 // Indexes for fast queries
 providerSchema.index({ primarySpecialty: 1 });
 providerSchema.index({ averageRating: -1 }); // for top-rated sorting
-providerSchema.index({ slug: 1 });
 providerSchema.index({ "acceptedInsurances": 1 }); // search by insurance
 
 export const Provider = mongoose.model("Provider", providerSchema);

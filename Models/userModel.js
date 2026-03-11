@@ -5,7 +5,11 @@ const Schema = mongoose.Schema;
 
 const userSchema = new Schema(
   {
-    name: {
+    ProfileType: {
+      type: String,
+      required: true,
+    },
+    fullName: {
       type: String,
       required: true,
     },
