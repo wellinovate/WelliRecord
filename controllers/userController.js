@@ -9,7 +9,7 @@ const generateToken = (user) => {
     {
       id: user._id,
       email: user.email,
-      manager: user.manager,
+      manager: user.profileType,
       admin: user.admin,
     },
     process.env.JWT_SECRET_KEY,
