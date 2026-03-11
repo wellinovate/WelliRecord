@@ -64,11 +64,11 @@ const userSchema = new Schema(
 );
 
 // Optional: Virtual for full name (computed from first, middle, last)
-userSchema.virtual("fullName").get(function () {
-  return `${this.firstName} ${this.middleName} ${this.lastName}`
-    .replace(/\s+/g, " ")
-    .trim();
-});
+// userSchema.virtual("fullName").get(function () {
+//   return `${this.firstName} ${this.middleName} ${this.lastName}`
+//     .replace(/\s+/g, " ")
+//     .trim();
+// });
 
 // Ensure virtuals are included in toObject/toJSON
 userSchema.set("toJSON", { virtuals: true });
