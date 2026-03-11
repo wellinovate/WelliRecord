@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 
 const userSchema = new Schema(
   {
-    ProfileType: {
+    userType: {
       type: String,
       required: true,
     },
@@ -13,7 +13,7 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-    username: { type: String, required: true, unique: true },
+    username: { type: String, required: true, unique: false }, // Added username field
     firstName: {
       type: String,
       required: false,
@@ -30,7 +30,7 @@ const userSchema = new Schema(
     email: {
       type: String,
       required: true,
-      // unique: true,
+      unique: true,
     },
     password: {
       type: String,
@@ -75,16 +75,11 @@ userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
 
 // Hash password before saving the user document
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next(); // Skip if password hasn't been modified
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
 
-  try {
-    const salt = await bcrypt.genSalt(10); // Generate salt
-    this.password = await bcrypt.hash(this.password, salt); // Hash the password
-    next();
-  } catch (error) {
-    next(error);
-  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Compare password for login

@@ -78,7 +78,6 @@ export const createUser = async (req, res) => {
       profileType,
       fullName,
       email,
-      phone,
       password,
   
     } = req.body;
@@ -87,7 +86,6 @@ export const createUser = async (req, res) => {
       profileType,
       fullName,
       email,
-      phone,
       password,
     );
 
@@ -97,7 +95,7 @@ export const createUser = async (req, res) => {
 
     // Check if user already exists by email or username
     const existingUser = await userModel.findOne({
-      $or: [{ email }, { phone }],
+      $or: [{ email }],
     });
     console.log("🚀 ~ createUser ~ existingUser:", existingUser);
     if (existingUser) {
@@ -108,21 +106,12 @@ export const createUser = async (req, res) => {
       );
     }
 
-    // Create user (pre-save hooks will hash password and generate referralCode if applicable)
     const newUser = new userModel({
-      // firstName,
-      // middleName: middleName || "",
-      // lastName,
-      profileType,
+      userType: profileType,
       fullName,
       username: email.split("@")[0], // Simple username generation from email prefix
       email,
-      password, // Plain text; will be hashed
-      // gender,
-      phone,
-      // homeAddress,
-      img: "",
-      // admin: true,
+      password,
     });
 
     await newUser.save();
