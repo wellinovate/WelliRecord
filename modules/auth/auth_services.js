@@ -9,6 +9,7 @@ import { createUserProfile } from "../users/users_services.js";
 import { createOrganizationProfile } from "../organizations/organizations_services.js";
 
 export const registerAccount = async (payload) => {
+  console.log("🚀 ~ registerAccount ~ payload:", payload)
   if (payload.profileType === "personal") {
     return registerUserAccount(payload);
   }
@@ -77,7 +78,7 @@ export const registerOrganizationAccount = async (payload) => {
     const account = await createAccount(
       {
         accountType: "organization",
-        role: payload.organizationType || "clinic",
+        role: null,
         email: payload.email,
         password: payload.password,
         phone: payload.phone,
@@ -93,7 +94,7 @@ export const registerOrganizationAccount = async (payload) => {
       {
         accountId: account._id,
         organizationName: payload.organizationName,
-        organizationType: payload.organizationType,
+        organizationType: payload.organizationMainType,
         officeAddress: payload.officeAddress,
         registrationNumber: payload.registrationNumber,
         licenseNumber: payload.licenseNumber,

@@ -71,6 +71,30 @@ const userProfileSchema = new Schema(
       default: null,
     },
 
+    logo: {
+      type: String,
+      default: null,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+
+    isLicensed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
     emergencyContacts: {
       type: [emergencyContactSchema],
       default: [],

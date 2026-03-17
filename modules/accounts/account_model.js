@@ -22,13 +22,11 @@ const accountSchema = new Schema(
         "caregiver",
         "staff",
         "admin",
-        "clinic",
-        "hospital",
-        "lab",
-        "pharmacy",
-        "insurer",
       ],
-      required: true,
+      required: function () {
+        return this.accountType === "user";
+      },
+      default: null,
       index: true,
     },
 

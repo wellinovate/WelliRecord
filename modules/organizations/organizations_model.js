@@ -22,13 +22,15 @@ const organizationProfileSchema = new Schema(
     organizationType: {
       type: String,
       enum: [
-        "clinic",
-        "hospital",
-        "laboratory",
-        "pharmacy",
-        "insurer",
-        "ngo",
-        "healthtech",
+        "healthcare_provider", // hospital + clinic + lab + pharmacy
+        "diagnostic", // standalone lab centers
+        "pharmacy", // standalone pharmacy chains
+        "insurance", // insurers / HMOs
+        "telehealth", // virtual care platforms
+        "government", // ministries, public health bodies
+        "ngo", // non-profits
+        "healthtech", // tech companies (like WelliRecord)
+        "vendor", // devices, wearables, suppliers
         "other",
       ],
       required: true,
@@ -57,6 +59,30 @@ const organizationProfileSchema = new Schema(
       type: String,
       trim: true,
       default: null,
+    },
+
+    logo: {
+      type: String,
+      default: null,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: null,
+    },
+
+    isLicensed: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
 
     contactPersonRole: {

@@ -14,15 +14,21 @@ const personalRegisterSchema = z.object({
 const organizationRegisterSchema = z.object({
   profileType: z.literal("organization"),
   organizationName: z.string().trim().min(2, "Organization name is required"),
+  organizationMainType: z
+    .string()
+    .trim()
+    .min(2, "Organization name is required"),
   organizationType: z.enum([
-    "clinic",
-    "hospital",
-    "laboratory",
-    "pharmacy",
-    "insurer",
-    "ngo",
-    "healthtech",
-    "other",
+    "organization(healthcare_provider)", // hospital + clinic + lab + pharmacy
+    "organization(diagnostic)", // standalone lab centers
+    "organization(pharmacy)", // standalone pharmacy chains
+    "organization(insurance)", // insurers / HMOs
+    "organization(telehealth)", // virtual care platforms
+    "organization(government)", // ministries, public health bodies
+    "organization(ngo)", // non-profits
+    "organization(healthtech)", // tech companies (like WelliRecord)
+    "organization(vendor)", // devices, wearables, suppliers
+    "organization(other)",
   ]),
   email: z
     .string()
@@ -43,9 +49,9 @@ const loginSchema = z.object({
 
 export const validateRegisterRequest = (req, res, next) => {
   const { profileType } = req.body;
-  
+
   let schema;
-  
+
   if (profileType === "personal") {
     schema = personalRegisterSchema;
   } else if (profileType === "organization") {
@@ -56,7 +62,7 @@ export const validateRegisterRequest = (req, res, next) => {
       message: "Invalid profile type",
     });
   }
-  
+
   const result = schema.safeParse(req.body);
 
   if (!result.success) {
