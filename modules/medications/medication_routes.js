@@ -1,40 +1,29 @@
 import express from "express";
-import { medicationController } from "./medication_controller.js";
+import { protect } from "../auth/auth_middleware.js";
+import { validate } from "../../shared/middlewares/validator.js";
 import {
-  validateCreateMedication,
-  validateUpdateMedication,
+  createMedicationController,
+  getPatientMedicationsController,
+} from "./medication_controller.js";
+import {
+  createMedicationSchema,
+  getPatientMedicationsParamsSchema,
 } from "./medications_validator.js";
-import {
-  validateBody,
-  validateParams,
-} from "../../shared/libs/validate_middleware.js";
-import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
 
 const router = express.Router();
 
 router.post(
   "/",
-  validateBody(validateCreateMedication),
-  medicationController.create,
-);
-
-router.get(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  medicationController.getById,
+  protect,
+  validate(createMedicationSchema),
+  createMedicationController,
 );
 
 router.get(
   "/patient/:patientId",
-  validateParams(validateObjectIdParam),
-  medicationController.getByPatientId,
-);
-
-router.patch(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  validateBody(validateUpdateMedication),
-  medicationController.update,
-);
+  protect,
+  validate(getPatientMedicationsParamsSchema, "params"),
+  getPatientMedicationsController,
+); 
 
 export default router;

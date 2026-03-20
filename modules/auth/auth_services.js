@@ -52,6 +52,7 @@ export const registerUserAccount = async (payload) => {
         firstName: payload.firstName,
         middleName: payload.middleName,
         lastName: payload.lastName,
+        email: payload.email,
         gender: payload.gender,
         homeAddress: payload.homeAddress,
       },

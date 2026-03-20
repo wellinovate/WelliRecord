@@ -80,6 +80,13 @@ const accountSchema = new Schema(
       index: true,
     },
 
+    patientIdentityId: {
+      type: Schema.Types.ObjectId,
+      ref: "PatientIdentity",
+      default: null,
+      index: true,
+    },
+
     lastLoginAt: {
       type: Date,
       default: null,

@@ -81,6 +81,12 @@ const userProfileSchema = new Schema(
       trim: true,
       default: null,
     },
+    patientIdentityId: {
+      type: Schema.Types.ObjectId,
+      ref: "PatientIdentity",
+      default: null,
+      index: true,
+    },
 
     email: {
       type: String,

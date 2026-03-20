@@ -135,7 +135,15 @@ export const clinicalMetadataFields = {
 export const clinicalMetadataPlugin = (
   schema,
   {
-    allowedSources = ["patient", "provider", "facility", "lab", "pharmacy", "device", "imported"],
+    allowedSources = [
+      "patient",
+      "provider",
+      "facility",
+      "lab",
+      "pharmacy",
+      "device",
+      "imported",
+    ],
     defaultSource = "patient",
     defaultCreatedContext = "patient-app",
     providerOwnedSources = ["provider", "facility", "lab", "pharmacy"],
@@ -150,50 +158,45 @@ export const clinicalMetadataPlugin = (
     schema.path("createdContext").defaultValue = defaultCreatedContext;
   }
 
-  schema.pre("validate", function (next) {
-    try {
-      const isProviderChart = this.createdContext === "provider-chart";
-      const isFacilityChart = this.createdContext === "facility-chart";
-      const isProviderOwnedSource = providerOwnedSources.includes(this.source);
+  schema.pre("validate", function () {
+    const isProviderChart = this.createdContext === "provider-chart";
+    const isFacilityChart = this.createdContext === "facility-chart";
+    const isProviderOwnedSource = providerOwnedSources.includes(this.source);
 
-      // Auto-infer providerId from recordedBy when sensible
-      if (!this.providerId && this.recordedBy) {
-        if (isProviderChart || this.source === "provider" || this.source === "facility") {
-          this.providerId = this.recordedBy;
-        }
+    if (!this.providerId && this.recordedBy) {
+      if (
+        isProviderChart ||
+        this.source === "provider" ||
+        this.source === "facility"
+      ) {
+        this.providerId = this.recordedBy;
+      }
+    }
+
+    if (isProviderChart && !this.providerId) {
+      throw new Error(
+        "providerId is required when createdContext is provider-chart",
+      );
+    }
+
+    if (isFacilityChart && !this.organizationId) {
+      throw new Error(
+        "organizationId is required when createdContext is facility-chart",
+      );
+    }
+
+    if (isProviderOwnedSource || isProviderChart || isFacilityChart) {
+      this.patientVisible = true;
+      this.providerRetainsAccess = true;
+      this.organizationRetainsAccess = Boolean(this.organizationId);
+
+      if (!this.ownershipType || this.ownershipType === "patient") {
+        this.ownershipType = "shared";
       }
 
-      // Ownership consistency
-      if (isProviderChart && !this.providerId) {
-        return next(
-          new Error("providerId is required when createdContext is provider-chart"),
-        );
+      if (this.visibility === "private") {
+        this.visibility = "shared";
       }
-
-      if (isFacilityChart && !this.organizationId) {
-        return next(
-          new Error("organizationId is required when createdContext is facility-chart"),
-        );
-      }
-
-      // Permanent provider/facility access for provider-originated treatment records
-      if (isProviderOwnedSource || isProviderChart || isFacilityChart) {
-        this.patientVisible = true;
-        this.providerRetainsAccess = true;
-        this.organizationRetainsAccess = Boolean(this.organizationId);
-
-        if (!this.ownershipType || this.ownershipType === "patient") {
-          this.ownershipType = "shared";
-        }
-
-        if (this.visibility === "private") {
-          this.visibility = "shared";
-        }
-      }
-
-      next();
-    } catch (error) {
-      next(error);
     }
   });
 

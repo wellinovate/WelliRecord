@@ -149,4 +149,4 @@ encounterSchema.index({ organizationId: 1, scheduledAt: 1, status: 1 });
 encounterSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
 encounterSchema.index({ patientId: 1, startedAt: -1 });
 
-export const encounterModel = mongoose.model("Encounter", encounterSchema);
+export const Encounter = mongoose.model("Encounter", encounterSchema);

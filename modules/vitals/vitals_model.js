@@ -123,33 +123,28 @@ vitalEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider"],
 });
 
-vitalEntrySchema.pre("save", function (next) {
-  try {
-    let weightKg = null;
-    let heightM = null;
+vitalEntrySchema.pre("save", function () {
+  let weightKg = null;
+  let heightM = null;
 
-    if (this.weight?.value) {
-      if (this.weight.unit === "kg") weightKg = this.weight.value;
-      if (this.weight.unit === "lb") weightKg = this.weight.value * 0.453592;
-    }
+  if (this.weight?.value) {
+    if (this.weight.unit === "kg") weightKg = this.weight.value;
+    if (this.weight.unit === "lb") weightKg = this.weight.value * 0.453592;
+  }
 
-    if (this.height?.value) {
-      if (this.height.unit === "m") heightM = this.height.value;
-      if (this.height.unit === "cm") heightM = this.height.value / 100;
-      if (this.height.unit === "ft") heightM = this.height.value * 0.3048;
-      if (this.height.unit === "in") heightM = this.height.value * 0.0254;
-    }
+  if (this.height?.value) {
+    if (this.height.unit === "m") heightM = this.height.value;
+    if (this.height.unit === "cm") heightM = this.height.value / 100;
+    if (this.height.unit === "ft") heightM = this.height.value * 0.3048;
+    if (this.height.unit === "in") heightM = this.height.value * 0.0254;
+  }
 
-    if (weightKg && heightM && heightM > 0) {
-      this.bmi = Number((weightKg / (heightM * heightM)).toFixed(2));
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (weightKg && heightM && heightM > 0) {
+    this.bmi = Number((weightKg / (heightM * heightM)).toFixed(2));
+  } else {
+    this.bmi = undefined;
   }
 });
-
 vitalEntrySchema.index({ patientId: 1, measuredAt: -1 });
 
 export const vitalModel = mongoose.model("Vital", vitalEntrySchema);

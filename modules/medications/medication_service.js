@@ -1,10 +1,165 @@
-import { BaseService } from "../../shared/libs/base_service.js";
+import mongoose from "mongoose";
 import { medicationModel } from "./medications_model.js";
+import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
+import { UserProfile } from "../users/user_profile_model.js";
 
-class MedicationService extends BaseService {
-  constructor() {
-    super(medicationModel);
+export const createMedicationService = async ({ payload, authUser }) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const recordedBy = authUser?._id || authUser?.sub || null;
+    const organizationId = authUser?.sub || payload.organizationId || null;
+
+    if (!recordedBy) {
+      const error = new Error("Authenticated user is required");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    // Optional: verify patient exists
+    const patientFromUserProfile = await UserProfile.findById(
+      payload.patientId,
+    ).session(session);
+    const patientFromPatientIdentity = await PatientIdentity.findById(
+      payload.patientId,
+    ).session(session);
+    const check = patientFromUserProfile || patientFromPatientIdentity;
+    if (!check) {
+      const error = new Error("Patient not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const docs = await medicationModel.create(
+      [
+        {
+          patientId: payload.patientId,
+          recordedBy,
+          providerId: recordedBy,
+          organizationId,
+          encounterId: payload.encounterId || null,
+
+          source: payload.source || "provider",
+          createdContext: payload.createdContext || "provider-chart",
+          ownershipType: payload.ownershipType || "shared",
+          visibility: payload.visibility || "shared",
+          patientAccess: payload.patientAccess || "full",
+          patientVisible:
+            payload.patientVisible !== undefined
+              ? payload.patientVisible
+              : true,
+
+          medicationName: payload.medicationName,
+          genericName: payload.genericName || undefined,
+          brandName: payload.brandName || undefined,
+          dosage: payload.dosage || undefined,
+          form: payload.form || "other",
+          route: payload.route || "oral",
+          frequency: payload.frequency || undefined,
+          indication: payload.indication || undefined,
+
+          prescribedBy: recordedBy,
+          prescribedAt: payload.prescribedAt || new Date(),
+          startDate: payload.startDate || null,
+          endDate: payload.endDate || null,
+          medicationStatus: payload.medicationStatus || "active",
+          adherence: payload.adherence || "unknown",
+
+          notes: payload.notes || undefined,
+        },
+      ],
+      { session },
+    );
+
+    const created = docs[0];
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return {
+      id: created._id,
+      patientId: created.patientId,
+      medicationName: created.medicationName,
+      genericName: created.genericName,
+      brandName: created.brandName,
+      dosage: created.dosage,
+      form: created.form,
+      route: created.route,
+      frequency: created.frequency,
+      indication: created.indication,
+      prescribedBy: created.prescribedBy,
+      prescribedAt: created.prescribedAt,
+      startDate: created.startDate,
+      endDate: created.endDate,
+      medicationStatus: created.medicationStatus,
+      adherence: created.adherence,
+      notes: created.notes,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+    };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-}
+};
 
-export const medicationService = new MedicationService();
+export const getPatientMedicationsService = async ({
+  patientId,
+  page = 1,
+  limit = 10,
+  authUser,
+}) => {
+  const organizationId = authUser?.sub || null;
+  const skip = (page - 1) * limit;
+
+  const filter = {
+    patientId,
+    recordStatus: "active",
+  };
+
+  if (organizationId) {
+    filter.organizationId = organizationId;
+  }
+
+  const [items, total] = await Promise.all([
+    medicationModel
+      .find(filter)
+      .sort({ prescribedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    medicationModel.countDocuments(filter),
+  ]);
+
+  return {
+    items: items.map((item) => ({
+      id: item._id,
+      patientId: item.patientId,
+      medicationName: item.medicationName,
+      genericName: item.genericName || null,
+      brandName: item.brandName || null,
+      dosage: item.dosage || null,
+      form: item.form || null,
+      route: item.route || null,
+      frequency: item.frequency || null,
+      indication: item.indication || null,
+      prescribedAt: item.prescribedAt || null,
+      startDate: item.startDate || null,
+      endDate: item.endDate || null,
+      medicationStatus: item.medicationStatus || null,
+      adherence: item.adherence || null,
+      notes: item.notes || null,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    })),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};

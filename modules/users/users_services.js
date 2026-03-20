@@ -13,12 +13,14 @@ export const createUserProfile = async (payload, session) => {
         firstName: payload.firstName || "",
         middleName: payload.middleName || "",
         lastName: payload.lastName || "",
+        email: payload.email,
         gender: payload.gender || null,
         homeAddress: payload.homeAddress || null,
       },
     ],
     { session }
   );
+  console.log("🚀 ~ createUserProfile ~ profile:", profile)
 
   return profile;
 };

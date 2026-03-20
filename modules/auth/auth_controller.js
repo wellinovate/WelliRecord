@@ -31,11 +31,9 @@ export const login = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Login successful",
+      accessToken: token,
       data: result,
-      // data: {
-      //   account: result.account,
-      //   profile: result.profile,
-      // },
+  
     });
   } catch (error) {
     next(error);

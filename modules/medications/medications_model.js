@@ -145,23 +145,17 @@ medicationEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider", "pharmacy"],
 });
 
-medicationEntrySchema.pre("save", function (next) {
-  try {
-    if (this.startDate && this.endDate && this.endDate < this.startDate) {
-      return next(new Error("endDate cannot be earlier than startDate"));
-    }
+medicationEntrySchema.pre("save", function () {
+  if (this.startDate && this.endDate && this.endDate < this.startDate) {
+    throw new Error("endDate cannot be earlier than startDate");
+  }
 
-    if (this.medicationStatus === "completed" && !this.endDate) {
-      this.endDate = new Date();
-    }
+  if (this.medicationStatus === "completed" && !this.endDate) {
+    this.endDate = new Date();
+  }
 
-    if (!this.providerId && this.prescribedBy) {
-      this.providerId = this.prescribedBy;
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (!this.providerId && this.prescribedBy) {
+    this.providerId = this.prescribedBy;
   }
 });
 
