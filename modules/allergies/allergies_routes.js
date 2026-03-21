@@ -1,22 +1,29 @@
 import express from "express";
-import { allergyController } from "./allergies_controller.js";
+import { protect } from "../auth/auth_middleware.js";
 import {
-  validateCreateAllergy,
-  validateUpdateAllergy,
+  createAllergyController,
+  getPatientAllergiesController,
+} from "./allergies_controller.js";
+import {
+  createAllergySchema,
+  getPatientAllergiesParamsSchema,
 } from "./allergies_validation.js";
-import { validateBody, validateParams } from "../../shared/libs/validate_middleware.js";
-import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
+import { validate } from "../../shared/middlewares/validator.js";
 
 const router = express.Router();
 
-router.post("/", validateBody(validateCreateAllergy), allergyController.create);
-router.get("/:id", validateParams(validateObjectIdParam), allergyController.getById);
-router.get("/patient/:patientId", validateParams(validateObjectIdParam), allergyController.getByPatientId);
-router.patch(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  validateBody(validateUpdateAllergy),
-  allergyController.update,
+router.post(
+  "/",
+  protect,
+  validate(createAllergySchema),
+  createAllergyController,
+);
+
+router.get(
+  "/patient/:patientId",
+  protect,
+  validate(getPatientAllergiesParamsSchema, "params"),
+  getPatientAllergiesController,
 );
 
 export default router;

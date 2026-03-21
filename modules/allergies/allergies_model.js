@@ -77,7 +77,12 @@ const allergyEntrySchema = new Schema(
 
     verificationStatus: {
       type: String,
-      enum: ["unverified", "patient-reported", "provider-verified", "lab-supported"],
+      enum: [
+        "unverified",
+        "patient-reported",
+        "provider-verified",
+        "lab-supported",
+      ],
       default: "unverified",
       index: true,
     },
@@ -92,27 +97,21 @@ allergyEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider", "lab"],
 });
 
-allergyEntrySchema.pre("save", function (next) {
-  try {
-    if (
-      this.onsetDate &&
-      this.lastReactionDate &&
-      this.lastReactionDate < this.onsetDate
-    ) {
-      return next(new Error("lastReactionDate cannot be earlier than onsetDate"));
-    }
+allergyEntrySchema.pre("save", function () {
+  if (
+    this.onsetDate &&
+    this.lastReactionDate &&
+    this.lastReactionDate < this.onsetDate
+  ) {
+    throw new Error("lastReactionDate cannot be earlier than onsetDate");
+  }
 
-    if (this.resolvedAt && this.onsetDate && this.resolvedAt < this.onsetDate) {
-      return next(new Error("resolvedAt cannot be earlier than onsetDate"));
-    }
+  if (this.resolvedAt && this.onsetDate && this.resolvedAt < this.onsetDate) {
+    throw new Error("resolvedAt cannot be earlier than onsetDate");
+  }
 
-    if (this.clinicalStatus === "resolved" && !this.resolvedAt) {
-      this.resolvedAt = new Date();
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (this.clinicalStatus === "resolved" && !this.resolvedAt) {
+    this.resolvedAt = new Date();
   }
 });
 

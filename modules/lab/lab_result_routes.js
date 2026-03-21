@@ -1,22 +1,29 @@
 import express from "express";
-import { labResultController } from "./lab_result_controller.js";
+import { protect } from "../auth/auth_middleware.js";
+import { validate } from "../../shared/middlewares/validator.js";
 import {
-  validateCreateLabResult,
-  validateUpdateLabResult,
+  createLabResultController,
+  getPatientLabResultsController,
+} from "./lab_result_controller.js";
+import {
+  createLabResultSchema,
+  getPatientLabResultsParamsSchema,
 } from "./lab_result_validation.js";
-import { validateBody, validateParams } from "../../shared/libs/validate_middleware.js";
-import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
 
 const router = express.Router();
 
-router.post("/", validateBody(validateCreateLabResult), labResultController.create);
-router.get("/:id", validateParams(validateObjectIdParam), labResultController.getById);
-router.get("/patient/:patientId", validateParams(validateObjectIdParam), labResultController.getByPatientId);
-router.patch(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  validateBody(validateUpdateLabResult),
-  labResultController.update,
+router.post(
+  "/",
+  protect,
+  validate(createLabResultSchema),
+  createLabResultController,
+);
+
+router.get(
+  "/patient/:patientId",
+  protect,
+  validate(getPatientLabResultsParamsSchema, "params"),
+  getPatientLabResultsController,
 );
 
 export default router;

@@ -124,23 +124,17 @@ labResultEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider", "lab"],
 });
 
-labResultEntrySchema.pre("save", function (next) {
-  try {
-    if (
-      this.collectedAt &&
-      this.resultedAt &&
-      this.resultedAt < this.collectedAt
-    ) {
-      return next(new Error("resultedAt cannot be earlier than collectedAt"));
-    }
+labResultEntrySchema.pre("save", function () {
+  if (
+    this.collectedAt &&
+    this.resultedAt &&
+    this.resultedAt < this.collectedAt
+  ) {
+    throw new Error("resultedAt cannot be earlier than collectedAt");
+  }
 
-    if (!this.providerId && this.performedBy) {
-      this.providerId = this.performedBy;
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (!this.providerId && this.performedBy) {
+    this.providerId = this.performedBy;
   }
 });
 

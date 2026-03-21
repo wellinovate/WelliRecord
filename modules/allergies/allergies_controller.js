@@ -1,10 +1,47 @@
-import { BaseController } from "../../shared/libs/base_controller.js";
-import { allergyService } from "./allergies_services.js";
+import {
+  createAllergyService,
+  getPatientAllergiesService,
+} from "./allergies_services.js";
+import { getPatientAllergiesQuerySchema } from "./allergies_validation.js";
 
-class AllergyController extends BaseController {
-  constructor() {
-    super(allergyService);
+export const createAllergyController = async (req, res, next) => {
+  try {
+    const payload = req.validated;
+    const authUser = req.user;
+
+    const result = await createAllergyService({
+      payload,
+      authUser,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Allergy record created successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
   }
-}
+};
 
-export const allergyController = new AllergyController();
+export const getPatientAllergiesController = async (req, res, next) => {
+  try {
+    const { patientId } = req.validated;
+    const { page = 1, limit = 10 } = getPatientAllergiesQuerySchema.parse(req.query);
+
+    const result = await getPatientAllergiesService({
+      patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient allergies fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

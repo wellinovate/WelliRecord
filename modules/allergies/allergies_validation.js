@@ -1,43 +1,54 @@
 import mongoose from "mongoose";
+import { z } from "zod";
 
-export const validateCreateAllergy = (body) => {
-  const errors = [];
+const objectIdSchema = z.string().refine((val) => mongoose.Types.ObjectId.isValid(val), {
+  message: "Invalid ObjectId",
+});
 
-  if (!body.patientId || !mongoose.Types.ObjectId.isValid(body.patientId)) {
-    errors.push("Valid patientId is required");
-  }
+export const createAllergySchema = z.object({
+  patientId: objectIdSchema,
+  encounterId: objectIdSchema.optional(),
 
-  if (!body.allergen || typeof body.allergen !== "string") {
-    errors.push("allergen is required");
-  }
+  source: z.enum(["patient", "provider", "lab", "imported"]).optional(),
+  createdContext: z
+    .enum([
+      "patient-app",
+      "provider-chart",
+      "facility-chart",
+      "device",
+      "imported",
+      "system",
+    ])
+    .optional(),
 
-  if (
-    !body.allergyType ||
-    !["drug", "food", "environment", "insect", "other"].includes(
-      body.allergyType,
-    )
-  ) {
-    errors.push("Valid allergyType is required");
-  }
+  ownershipType: z.enum(["patient", "provider", "shared"]).optional(),
+  visibility: z.enum(["private", "patient-visible", "provider-visible", "shared"]).optional(),
+  patientAccess: z.enum(["full", "limited", "hidden-until-reviewed"]).optional(),
+  patientVisible: z.boolean().optional(),
 
-  return errors;
-};
+  allergen: z.string().trim().min(1).max(200),
+  allergyType: z.enum(["drug", "food", "environment", "insect", "other"]),
+  reaction: z.string().trim().max(500).optional(),
+  severity: z.enum(["mild", "moderate", "severe", "life-threatening", "unknown"]).optional(),
+  clinicalStatus: z.enum(["active", "resolved", "entered-in-error"]).optional(),
 
-export const validateUpdateAllergy = (body) => {
-  const errors = [];
+  onsetDate: z.coerce.date().optional(),
+  lastReactionDate: z.coerce.date().optional(),
+  resolvedAt: z.coerce.date().optional(),
 
-  if (body.patientId && !mongoose.Types.ObjectId.isValid(body.patientId)) {
-    errors.push("Invalid patientId");
-  }
+  confirmed: z.boolean().optional(),
+  verificationStatus: z
+    .enum(["unverified", "patient-reported", "provider-verified", "lab-supported"])
+    .optional(),
 
-  if (
-    body.allergyType &&
-    !["drug", "food", "environment", "insect", "other"].includes(
-      body.allergyType,
-    )
-  ) {
-    errors.push("Invalid allergyType");
-  }
+  notes: z.string().trim().max(1500).optional(),
+});
 
-  return errors;
-};
+export const getPatientAllergiesParamsSchema = z.object({
+  patientId: objectIdSchema,
+});
+
+export const getPatientAllergiesQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1).optional(),
+  limit: z.coerce.number().min(1).max(100).default(10).optional(),
+});

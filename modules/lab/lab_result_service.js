@@ -1,10 +1,148 @@
-import { BaseService } from "../../shared/libs/base_service.js";
+import mongoose from "mongoose";
 import { labResultModel } from "./lab_model.js";
+import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 
-class LabResultService extends BaseService {
-  constructor() {
-    super(labResultModel);
+export const createLabResultService = async ({ payload, authUser }) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const recordedBy = authUser?._id || authUser?.sub || null;
+    const organizationId = authUser?.organizationId || payload.organizationId || null;
+
+    if (!recordedBy) {
+      const error = new Error("Authenticated user is required");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const patient = await PatientIdentity.findById(payload.patientId).session(session);
+    if (!patient) {
+      const error = new Error("Patient not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const docs = await labResultModel.create(
+      [
+        {
+          patientId: payload.patientId,
+          recordedBy,
+          providerId: recordedBy,
+          organizationId,
+          encounterId: payload.encounterId || null,
+
+          source: payload.source || "lab",
+          createdContext: payload.createdContext || "facility-chart",
+          ownershipType: payload.ownershipType || "shared",
+          visibility: payload.visibility || "shared",
+          patientAccess: payload.patientAccess || "full",
+          patientVisible:
+            payload.patientVisible !== undefined ? payload.patientVisible : true,
+
+          testName: payload.testName,
+          category: payload.category || "other",
+          specimen: payload.specimen || undefined,
+          resultValue: payload.resultValue || undefined,
+          unit: payload.unit || undefined,
+          referenceRange: payload.referenceRange || undefined,
+          interpretation: payload.interpretation || "unknown",
+
+          orderedBy: recordedBy,
+          performedBy: recordedBy,
+          collectedAt: payload.collectedAt || null,
+          resultedAt: payload.resultedAt || new Date(),
+
+          verificationStatus: payload.verificationStatus || "provider-reviewed",
+          notes: payload.notes || undefined,
+          attachments: payload.attachments || [],
+        },
+      ],
+      { session },
+    );
+
+    const created = docs[0];
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return {
+      id: created._id,
+      patientId: created.patientId,
+      testName: created.testName,
+      category: created.category,
+      specimen: created.specimen,
+      resultValue: created.resultValue,
+      unit: created.unit,
+      referenceRange: created.referenceRange,
+      interpretation: created.interpretation,
+      collectedAt: created.collectedAt,
+      resultedAt: created.resultedAt,
+      verificationStatus: created.verificationStatus,
+      attachments: created.attachments || [],
+      notes: created.notes,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+    };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-}
+};
 
-export const labResultService = new LabResultService();
+export const getPatientLabResultsService = async ({
+  patientId,
+  page = 1,
+  limit = 10,
+  authUser,
+}) => {
+  const organizationId = authUser?.organizationId || null;
+  const skip = (page - 1) * limit;
+
+  const filter = {
+    patientId,
+    recordStatus: "active",
+  };
+
+  if (organizationId) {
+    filter.organizationId = organizationId;
+  }
+
+  const [items, total] = await Promise.all([
+    labResultModel
+      .find(filter)
+      .sort({ resultedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    labResultModel.countDocuments(filter),
+  ]);
+
+  return {
+    items: items.map((item) => ({
+      id: item._id,
+      patientId: item.patientId,
+      testName: item.testName,
+      category: item.category || null,
+      specimen: item.specimen || null,
+      resultValue: item.resultValue || null,
+      unit: item.unit || null,
+      referenceRange: item.referenceRange || null,
+      interpretation: item.interpretation || null,
+      collectedAt: item.collectedAt || null,
+      resultedAt: item.resultedAt || null,
+      verificationStatus: item.verificationStatus || null,
+      attachments: item.attachments || [],
+      notes: item.notes || null,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    })),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};

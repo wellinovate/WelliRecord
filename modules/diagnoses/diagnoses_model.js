@@ -82,23 +82,17 @@ diagnosisEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider"],
 });
 
-diagnosisEntrySchema.pre("save", function (next) {
-  try {
-    if (this.resolvedAt && this.diagnosedAt && this.resolvedAt < this.diagnosedAt) {
-      return next(new Error("resolvedAt cannot be earlier than diagnosedAt"));
-    }
+diagnosisEntrySchema.pre("save", function () {
+  if (this.resolvedAt && this.diagnosedAt && this.resolvedAt < this.diagnosedAt) {
+    throw new Error("resolvedAt cannot be earlier than diagnosedAt");
+  }
 
-    if (this.clinicalStatus === "resolved" && !this.resolvedAt) {
-      this.resolvedAt = new Date();
-    }
+  if (this.clinicalStatus === "resolved" && !this.resolvedAt) {
+    this.resolvedAt = new Date();
+  }
 
-    if (!this.providerId && this.diagnosedBy) {
-      this.providerId = this.diagnosedBy;
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (!this.providerId && this.diagnosedBy) {
+    this.providerId = this.diagnosedBy;
   }
 });
 

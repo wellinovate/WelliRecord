@@ -1,22 +1,29 @@
 import express from "express";
-import { diagnosisController } from "./diagnoses_controller.js";
+import { protect } from "../auth/auth_middleware.js";
+import { validate } from "../../shared/middlewares/validator.js";
 import {
-  validateCreateDiagnosis,
-  validateUpdateDiagnosis,
+  createDiagnosisController,
+  getPatientDiagnosesController,
+} from "./diagnoses_controller.js";
+import {
+  createDiagnosisSchema,
+  getPatientDiagnosesParamsSchema,
 } from "./diagnosis_validation.js";
-import { validateBody, validateParams } from "../../shared/libs/validate_middleware.js";
-import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
 
 const router = express.Router();
 
-router.post("/", validateBody(validateCreateDiagnosis), diagnosisController.create);
-router.get("/:id", validateParams(validateObjectIdParam), diagnosisController.getById);
-router.get("/patient/:patientId", validateParams(validateObjectIdParam), diagnosisController.getByPatientId);
-router.patch(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  validateBody(validateUpdateDiagnosis),
-  diagnosisController.update,
+router.post(
+  "/",
+  protect,
+  validate(createDiagnosisSchema),
+  createDiagnosisController,
+);
+
+router.get(
+  "/patient/:patientId",
+  protect,
+  validate(getPatientDiagnosesParamsSchema, "params"),
+  getPatientDiagnosesController,
 );
 
 export default router;
