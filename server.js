@@ -7,6 +7,7 @@ import morgan from "morgan";
 import connectDB from "./config/db.js";
 import authRouter from "./modules/auth/auth_routes.js";
 // import welliidRoutes from "./routes/welliidRoutes.js";
+import userRoutes from "./modules/users/users_routes.js";
 import vitalRoutes from "./modules/vitals/vital_routes.js";
 import medicationRoutes from "./modules/medications/medication_routes.js";
 import organization from "./modules/organizations/organizations_routes.js";
@@ -54,6 +55,7 @@ app.use("/api/v1/lab-results", labResultRoutes);
 app.use("/api/v1/procedures", procedureRoutes);
 app.use("/api/v1/immunizations", immunizationRoutes);
 app.use("/api/v1/vitals", vitalRoutes);
+app.use("/api/v1/user", userRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("WelliID Issuer Service is running..."));

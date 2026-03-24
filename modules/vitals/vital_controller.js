@@ -21,6 +21,7 @@ export const createVitalController = async (req, res, next) => {
       payload,
       authUser,
     });
+    console.log("🚀 ~ createVitalController ~ result:", result)
 
     return res.status(201).json({
       success: true,
@@ -37,10 +38,14 @@ export const createVitalController = async (req, res, next) => {
 
 export const getPatientVitalsController = async (req, res, next) => {
   try {
-    const { patientId } = req.validated;
+    const { patientId: patientIds } = req.validated;
     const { page = 1, limit = 10 } = getPatientVitalsQuerySchema.parse(req.query);
 
     const authUser = req.user;
+    const patientId = patientIds ? patientIds : authUser.sub
+
+    
+
 
     const result = await getPatientVitalsService({
       patientId,
@@ -58,3 +63,33 @@ export const getPatientVitalsController = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getMyVitalsController = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = getPatientVitalsQuerySchema.parse(req.query);
+
+    const authUser = req.user;
+    const patientId = authUser.sub
+    console.log("🚀 ~ getMyVitalsController ~ patientId:", patientId)
+
+    
+
+
+    const result = await getPatientVitalsService({
+      patientId,
+      page,
+      limit,
+      authUser,
+    });
+    console.log("🚀 ~ getMyVitalsController ~ result:", result)
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient vitals fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

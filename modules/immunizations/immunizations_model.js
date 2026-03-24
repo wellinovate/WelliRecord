@@ -125,23 +125,17 @@ immunizationEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider", "facility"],
 });
 
-immunizationEntrySchema.pre("save", function (next) {
-  try {
-    if (
-      this.nextDueDate &&
-      this.administeredAt &&
-      this.nextDueDate < this.administeredAt
-    ) {
-      return next(new Error("nextDueDate cannot be earlier than administeredAt"));
-    }
+immunizationEntrySchema.pre("save", function () {
+  if (
+    this.nextDueDate &&
+    this.administeredAt &&
+    this.nextDueDate < this.administeredAt
+  ) {
+    throw new Error("nextDueDate cannot be earlier than administeredAt");
+  }
 
-    if (!this.providerId && this.administeredBy) {
-      this.providerId = this.administeredBy;
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (!this.providerId && this.administeredBy) {
+    this.providerId = this.administeredBy;
   }
 });
 

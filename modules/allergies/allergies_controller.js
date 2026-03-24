@@ -45,3 +45,27 @@ export const getPatientAllergiesController = async (req, res, next) => {
     next(error);
   }
 };
+
+
+export const getMyAllergiesController = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = getPatientAllergiesQuerySchema.parse(req.query);
+    const authUser = req.user;
+    const patientId = authUser.sub
+
+    const result = await getPatientAllergiesService({
+      patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient allergies fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

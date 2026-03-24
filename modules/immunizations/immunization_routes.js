@@ -1,22 +1,29 @@
 import express from "express";
-import { immunizationController } from "./immunization_controller.js";
+import { protect } from "../auth/auth_middleware.js";
+import { validate } from "../../shared/middlewares/validator.js";
 import {
-  validateCreateImmunization,
-  validateUpdateImmunization,
+  createImmunizationController,
+  getPatientImmunizationsController,
+} from "./immunization_controller.js";
+import {
+  createImmunizationSchema,
+  getPatientImmunizationsParamsSchema,
 } from "./immunization_validation.js";
-import { validateBody, validateParams } from "../../shared/libs/validate_middleware.js";
-import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
 
 const router = express.Router();
 
-router.post("/", validateBody(validateCreateImmunization), immunizationController.create);
-router.get("/:id", validateParams(validateObjectIdParam), immunizationController.getById);
-router.get("/patient/:patientId", validateParams(validateObjectIdParam), immunizationController.getByPatientId);
-router.patch(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  validateBody(validateUpdateImmunization),
-  immunizationController.update,
+router.post(
+  "/",
+  protect,
+  validate(createImmunizationSchema),
+  createImmunizationController,
+);
+
+router.get(
+  "/patient/:patientId",
+  protect,
+  validate(getPatientImmunizationsParamsSchema, "params"),
+  getPatientImmunizationsController,
 );
 
 export default router;

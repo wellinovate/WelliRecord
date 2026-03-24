@@ -50,5 +50,10 @@ router.get(
   validate(getPatientVitalsParamsSchema, "params"),
   getPatientVitalsController,
 );
+router.get(
+  "/patient/me",
+  protect,
+  getPatientVitalsController,
+);
 
 export default router;

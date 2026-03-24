@@ -1,45 +1,3 @@
-// import mongoose from "mongoose";
-// import { BaseService } from "../../shared/libs/base_service.js";
-// import { vitalModel } from "./vitals_model.js";
-
-
-// class VitalService extends BaseService {
-//   constructor() {
-//     super(vitalModel);
-//   }
-
-//   async getByPatientId(patientId, options = {}) {
-//     if (!mongoose.Types.ObjectId.isValid(patientId)) {
-//       throw new Error("Invalid patient id");
-//     }
-
-//     const {
-//       page = 1,
-//       limit = 20,
-//       sort = { measuredAt: -1 },
-//     } = options;
-
-//     const skip = (Number(page) - 1) * Number(limit);
-
-//     const [items, total] = await Promise.all([
-//       this.Model.find({ patientId }).sort(sort).skip(skip).limit(Number(limit)),
-//       this.Model.countDocuments({ patientId }),
-//     ]);
-
-//     return {
-//       items,
-//       pagination: {
-//         total,
-//         page: Number(page),
-//         limit: Number(limit),
-//         pages: Math.ceil(total / Number(limit)),
-//       },
-//     };
-//   }
-// }
-
-// export const vitalService = new VitalService();
-
 import mongoose from "mongoose";
 import { vitalModel } from "./vitals_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
@@ -52,45 +10,99 @@ export const createVitalService = async ({ payload, authUser }) => {
   session.startTransaction();
 
   try {
-    const organizationIdFromUser = authUser?.sub || null;
+    const { actor, patientId, isSelf } = await resolvePatientAccessContext({
+      patientId: payload.patientId,
+      authUser,
+    });
+    console.log("🚀 ~ createVitalService ~ isSelf:", isSelf);
+    console.log("🚀 ~ createVitalService ~ actor:", actor);
+    console.log("🚀 ~ createVitalService ~ patient:", patientId);
+
+    // if (payload) return;
+
+    // const organizationIdFromUser = authUser?.sub || null;
     const recordedBy = authUser?.sub || null;
 
-    if (!recordedBy) {
+    // if (!recordedBy) {
+    //   const error = new Error("Authenticated user is required");
+    //   error.statusCode = 401;
+    //   throw error;
+    // }
+
+    // Stronger safety: do not trust organizationId fully from client
+    // const organizationId =
+    //   payload.organizationId || organizationIdFromUser || null;
+
+    if (!actor.userId) {
       const error = new Error("Authenticated user is required");
       error.statusCode = 401;
       throw error;
     }
 
-    // Stronger safety: do not trust organizationId fully from client
-    const organizationId =
-      payload.organizationId || organizationIdFromUser || null;
+    if (actor.isPatientActor) {
+      if (!isSelf) {
+        const error = new Error("You can only create vitals for yourself");
+        error.statusCode = 403;
+        throw error;
+      }
+    }
 
-    // Optional: verify patient exists
-    const patientFromUserProfile = await UserProfile.findById(payload.patientId).session(session);
-    const patientFromPatientIdentity = await PatientIdentity.findById(payload.patientId).session(session);
-    const check =  patientFromUserProfile || patientFromPatientIdentity 
-    if (!check) {
+    // if (actor.isOrganizationActor) {
+    //   const canCreate = await hasOrganizationCreateAccess({
+    //     patientId: payload.patientId,
+    //     organizationId: actor.organizationId,
+    //   });
+
+    //   if (!canCreate) {
+    //     const error = new Error(
+    //       "Organization does not have permission to create vitals for this patient",
+    //     );
+    //     error.statusCode = 403;
+    //     throw error;
+    //   }
+    // }
+
+    const source = actor.isPatientActor
+      ? payload.source || "patient"
+      : payload.source || "provider";
+
+    const createdContext = actor.isPatientActor
+      ? payload.createdContext || "patient-app"
+      : payload.createdContext || "provider-chart";
+
+    const providerId = actor.isOrganizationActor ? actor.userId : null;
+    const organizationId = actor.isOrganizationActor ? actor.userId : null;
+
+    // const check = patientFromUserProfile || patientFromPatientIdentity;
+    if (!patientId) {
       const error = new Error("Patient not found");
       error.statusCode = 404;
       throw error;
     }
+
+    const provider =
+      actor.isOrganizationActor === true
+        ? payload.providerId || recordedBy
+        : null;
 
     const vital = await vitalModel.create(
       [
         {
           patientId: payload.patientId,
           recordedBy,
-          providerId: payload.providerId || recordedBy,
+          providerId: provider,
           organizationId,
           encounterId: payload.encounterId || null,
 
-          source: payload.source || "provider",
-          createdContext: payload.createdContext || "provider-chart",
+          source: source,
+          createdContext: createdContext,
           ownershipType: payload.ownershipType || "shared",
           visibility: payload.visibility || "shared",
           patientAccess: payload.patientAccess || "full",
           patientVisible:
-            payload.patientVisible !== undefined ? payload.patientVisible : true,
+            payload.patientVisible !== undefined
+              ? payload.patientVisible
+              : true,
 
           bloodPressure: payload.bloodPressure,
           heartRate: payload.heartRate,
@@ -143,23 +155,55 @@ export const createVitalService = async ({ payload, authUser }) => {
   }
 };
 
-
 export const getPatientVitalsService = async ({
   patientId,
   page = 1,
   limit = 10,
   authUser,
 }) => {
-  const organizationId = authUser?.organizationId || null;
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId,
+    authUser,
+  });
+  const organizationId =  actor.isOrganizationActor ? authUser?.sub || null : null;
   const skip = (page - 1) * limit;
 
   const filter = {
-    patientId,
+    patientId: patientIds,
     recordStatus: "active",
     clinicalStatus: "active",
   };
 
-  if (organizationId) {
+  // if (actor.isPatientActor) {
+  //   if (!isSelf) {
+  //     const error = new Error("You can only view your own vitals");
+  //     error.statusCode = 403;
+  //     throw error;
+  //   }
+  //   // patient sees all own vitals
+  // } else if (actor.isOrganizationActor) {
+  //   const hasFullAccess = await hasOrganizationFullReadAccess({
+  //     patientId: patientIds,
+  //     organizationId: organizationId,
+  //   });
+
+  //   if (hasFullAccess) {
+  //     // org sees all vitals
+  //   } else {
+  //     // org only sees vitals created by itself
+  //     filter.organizationId = actor.organizationId;
+  //   }
+  // } else {
+  //   const error = new Error("Unauthorized actor type");
+  //   error.statusCode = 403;
+  //   throw error;
+  // }
+
+  if (actor.isOrganizationActor) {
     filter.organizationId = organizationId;
   }
 
@@ -200,4 +244,148 @@ export const getPatientVitalsService = async ({
       totalPages: Math.ceil(total / limit),
     },
   };
+};
+
+const resolveActorContext = (authUser) => {
+  const userId = authUser?._id || authUser?.sub || null;
+  const accountType =
+    authUser?.accountType || authUser?.account?.accountType || null;
+  console.log("🚀 ~ resolveActorContext ~ accountType:", accountType);
+
+  const isOrganizationActor = accountType === "organization";
+  // accountType === "provider" ||
+
+  const isPatientActor = accountType === "user" || accountType === "patient";
+
+  const organizationId = (isOrganizationActor && authUser?.sub) || null;
+
+  return {
+    userId,
+    organizationId,
+    accountType,
+    isOrganizationActor,
+    isPatientActor,
+  };
+};
+
+export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
+  console.log("🚀 ~ resolvePatientAccessContext ~ patientId:", patientId)
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  const actor = resolveActorContext(authUser);
+
+  if (actor.isOrganizationActor === true) {
+    const patientFromPatientIdentity = await PatientIdentity.findById(
+      patientId,
+    ).session(session);
+    if (patientFromPatientIdentity) {
+      const isSelf =
+        actor.isPatientActor &&
+        String(patientId || "") === String(actor.userId || "");
+
+      return {
+        actor,
+        patientId,
+        isSelf,
+      };
+    } else {
+      const patientFromUserProfile = await UserProfile.findById(
+        patientId,
+      ).session(session);
+
+      if (!patientFromUserProfile) {
+        const error = new Error("Patient not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const isSelf =
+        actor.isPatientActor &&
+        String(patientId || "") === String(actor.userId || "");
+
+      return {
+        actor,
+        patientId,
+        isSelf,
+      };
+    }
+  }
+
+  if (actor.isPatientActor === true) {
+    const patientFromUserProfile = await UserProfile.findOne({
+      accountId: patientId,
+    }).session(session);
+    if (patientFromUserProfile) {
+      const isSelf =
+        actor.isPatientActor &&
+        String(patientFromUserProfile.accountId || "") === String(actor.userId || "");
+
+      return {
+        actor,
+        patientId: patientFromUserProfile._id,
+        isSelf,
+      };
+    }
+  }
+
+  const patientFromUserProfile = await UserProfile.findById(patientId).session(
+    session,
+  );
+  console.log(
+    "🚀 ~ resolvePatientAccessContext ~ patientFromUserProfile:",
+    patientFromUserProfile,
+  );
+
+  if (!patientFromUserProfile) {
+    const error = new Error("Patient not found");
+    error.statusCode = 404;
+    throw error;
+  }
+  const isSelf =
+    actor.isPatientActor &&
+    String(patientId || "") === String(actor.userId || "");
+
+  return {
+    actor,
+    patientId,
+    isSelf,
+  };
+
+  // Optional: verify patient exists
+
+  // Example: patient-owned account case
+  // Adapt this to your actual model relationship.
+};
+
+const hasOrganizationFullReadAccess = async ({ patientId, organizationId }) => {
+  if (!organizationId) return false;
+
+  // Replace this with your real consent/grant model
+  // Example:
+  // const grant = await ConsentGrant.findOne({
+  //   patientId,
+  //   organizationId,
+  //   status: "active",
+  //   scope: { $in: ["all-records", "vitals"] },
+  // }).lean();
+
+  // return Boolean(grant);
+
+  return false;
+};
+
+const hasOrganizationCreateAccess = async ({ patientId, organizationId }) => {
+  if (!organizationId) return false;
+
+  // Replace with your actual linkage/consent logic.
+  // Example:
+  // const relation = await PatientOrganization.findOne({
+  //   patientId,
+  //   organizationId,
+  //   status: "active",
+  // }).lean();
+  // return Boolean(relation);
+
+  return true;
 };
