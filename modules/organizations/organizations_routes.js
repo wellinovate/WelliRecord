@@ -12,7 +12,7 @@ const upload = multer({ storage });
 const router = express.Router();
 
 router.post("/register-patient", protect, registerPatientController);
-router.get("/patients", getPatientsController);
+router.get("/patients", protect, getPatientsController);
 router.get("/patients/:patientId", protect, getPatientDetailController);
 
 router.post(

@@ -33,7 +33,13 @@ const encounterSchema = new Schema(
 
     encounterType: {
       type: String,
-      enum: ["outpatient", "inpatient", "emergency", "telemedicine", "homecare"],
+      enum: [
+        "outpatient",
+        "inpatient",
+        "emergency",
+        "telemedicine",
+        "homecare",
+      ],
       default: "outpatient",
       index: true,
     },
@@ -129,19 +135,13 @@ const encounterSchema = new Schema(
   { timestamps: true },
 );
 
-encounterSchema.pre("save", function (next) {
-  try {
-    if (this.endedAt && this.startedAt && this.endedAt < this.startedAt) {
-      return next(new Error("endedAt cannot be earlier than startedAt"));
-    }
+encounterSchema.pre("save", function () {
+  if (this.endedAt && this.startedAt && this.endedAt < this.startedAt) {
+    throw new Error("endedAt cannot be earlier than startedAt");
+  }
 
-    if (this.scheduledAt && this.startedAt && this.startedAt < this.scheduledAt) {
-      // optional: allow earlier than schedule if walk-in? then remove this
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (this.scheduledAt && this.startedAt && this.startedAt < this.scheduledAt) {
+    // allow walk-in / early-start if needed
   }
 });
 

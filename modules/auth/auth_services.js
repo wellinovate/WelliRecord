@@ -136,8 +136,7 @@ export const loginAccount = async ({ email, password }) => {
   }
 
   let profile = null;
-  console.log("🚀 ~ loginAccount ~ profile:", profile)
-
+  
   if (account.accountType === "user") {
     profile = await UserProfile.findOne({ accountId: account._id });
   } else if (account.accountType === "organization") {
@@ -146,7 +145,8 @@ export const loginAccount = async ({ email, password }) => {
 
   account.lastLoginAt = new Date();
   await account.save();
-
+  // console.log("🚀 ~ loginAccount ~ profile:", profile)
+  
   return {
     account: account.toSafeObject() ? account.toSafeObject() : account.toObject(),
     profile: profile ? profile.toObject() : null,

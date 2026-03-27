@@ -98,7 +98,7 @@ const medicationEntrySchema = new Schema(
 
     prescribedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Account",
       default: null,
       index: true,
     },

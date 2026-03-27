@@ -19,7 +19,13 @@ export const login = async (req, res, next) => {
   try {
     const result = await loginAccount(req.validatedBody);
 
-    const token = signAccessToken(result.account);
+    const results = {
+      account: result.account,
+      profile: result.profile
+    }
+    
+
+    const token = signAccessToken(results);
 
     res.cookie("accessToken", token, {
       httpOnly: true,

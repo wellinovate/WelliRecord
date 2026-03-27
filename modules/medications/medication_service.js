@@ -124,8 +124,10 @@ export const getPatientMedicationsService = async ({
     ? authUser?.sub || null
     : null;
   const skip = (page - 1) * limit;
-    console.log("🚀 ~ getPatientMedicationsService ~ filter.patientIds:", patientIds)
-
+  console.log(
+    "🚀 ~ getPatientMedicationsService ~ filter.patientIds:",
+    patientIds,
+  );
 
   const filter = {
     patientId: patientIds,
@@ -140,6 +142,7 @@ export const getPatientMedicationsService = async ({
   const [items, total] = await Promise.all([
     medicationModel
       .find(filter)
+      .populate("prescribedBy", "firstName fullName lastName email")
       .sort({ prescribedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -160,6 +163,14 @@ export const getPatientMedicationsService = async ({
       route: item.route || null,
       frequency: item.frequency || null,
       indication: item.indication || null,
+      prescribedBy: item.prescribedBy?._id || null,
+      prescribedByName: item.prescribedBy
+        ? `${item.prescribedBy.firstName || ""} ${
+            item.prescribedBy.lastName || ""
+          }`.trim() || null
+        : null,
+      prescribedByEmail: item.prescribedBy?.email || null,
+      prescribedByFullName: item.prescribedBy?.fullName || null,
       prescribedAt: item.prescribedAt || null,
       startDate: item.startDate || null,
       endDate: item.endDate || null,

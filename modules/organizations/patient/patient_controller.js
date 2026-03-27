@@ -2,9 +2,8 @@ import { getPatientDetailService, getPatientsService, linkPatientService, linkPa
 
 export const getPatientsController = async (req, res, next) => {
   try {
-    const { search, page, limit, id } = req.query;
-    // const organizationId = req.user?.organizationId;
-    const organizationId = id;
+    const { search, page, limit } = req.query;
+    const organizationId = req.user?.sub;
 
     if (!organizationId) {
       return res.status(400).json({

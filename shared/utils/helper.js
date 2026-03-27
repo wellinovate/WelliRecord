@@ -1,11 +1,14 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
-export const signAccessToken = (account) => {
+export const signAccessToken = (results) => {
+  const {account, profile} = results
+  console.log("🚀 ~ signAccessToken ~ profile:", profile.fullName)
   return jwt.sign(
     {
       sub: account._id,
-      name: account.email,
+      email: account.email,
+      fullName: profile.fullName,
       accountType: account.accountType,
       role: account.role ?? null,
     },
