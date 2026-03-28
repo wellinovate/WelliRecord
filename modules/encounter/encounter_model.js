@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { generateEncounterCode } from "../../shared/utils/helper.js";
 const Schema = mongoose.Schema;
 
 const encounterSchema = new Schema(
@@ -12,21 +13,38 @@ const encounterSchema = new Schema(
 
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "UserProfile",
       required: true,
       index: true,
     },
 
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
+      ref: "OrganizationProfile",
       required: true,
+      index: true,
+    },
+
+    encounterLabel: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+    },
+
+    encounterTitle: {
+      type: String,
+      trim: true,
+    },
+
+    encounterCode: {
+      type: String,
+      unique: true,
       index: true,
     },
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Organization",
       default: null,
       index: true,
     },
@@ -143,6 +161,9 @@ encounterSchema.pre("save", function () {
   if (this.scheduledAt && this.startedAt && this.startedAt < this.scheduledAt) {
     // allow walk-in / early-start if needed
   }
+  if (!this.encounterCode) {
+    this.encounterCode = generateEncounterCode(Encounter);
+  }
 });
 
 encounterSchema.index({ organizationId: 1, scheduledAt: 1, status: 1 });
@@ -150,3 +171,4 @@ encounterSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
 encounterSchema.index({ patientId: 1, startedAt: -1 });
 
 export const Encounter = mongoose.model("Encounter", encounterSchema);
+

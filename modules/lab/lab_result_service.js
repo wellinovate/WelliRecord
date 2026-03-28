@@ -1,14 +1,25 @@
 import mongoose from "mongoose";
 import { labResultModel } from "./lab_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 
 export const createLabResultService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
+  const patientId = payload.patientId
 
   try {
+    const {
+      actor,
+      patientId: patientIds,
+      isSelf,
+    } = await resolvePatientAccessContext({
+      patientId,
+      authUser,
+    });
     const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.organizationId || payload.organizationId || null;
+    const organizationId =
+      authUser?.sub || payload.organizationId || null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
@@ -16,17 +27,10 @@ export const createLabResultService = async ({ payload, authUser }) => {
       throw error;
     }
 
-    const patient = await PatientIdentity.findById(payload.patientId).session(session);
-    if (!patient) {
-      const error = new Error("Patient not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
     const docs = await labResultModel.create(
       [
         {
-          patientId: payload.patientId,
+          patientId: patientIds,
           recordedBy,
           providerId: recordedBy,
           organizationId,
@@ -38,7 +42,9 @@ export const createLabResultService = async ({ payload, authUser }) => {
           visibility: payload.visibility || "shared",
           patientAccess: payload.patientAccess || "full",
           patientVisible:
-            payload.patientVisible !== undefined ? payload.patientVisible : true,
+            payload.patientVisible !== undefined
+              ? payload.patientVisible
+              : true,
 
           testName: payload.testName,
           category: payload.category || "other",

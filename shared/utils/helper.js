@@ -45,6 +45,7 @@ export const maskEmail = (email) => {
   return `${visible}***@${domain}`;
 };
 
+
 export const maskPhone = (phone) => {
   if (!phone) return null;
 
@@ -52,4 +53,31 @@ export const maskPhone = (phone) => {
   if (cleaned.length < 7) return "******";
 
   return `${cleaned.slice(0, 6)}*****${cleaned.slice(-3)}`;
+};
+
+// utils/generateEncounterCode.js
+
+export const generateEncounterCode = async (EncounterModel) => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  const dateStr = `${year}${month}${day}`;
+
+  // count today's encounters
+  const startOfDay = new Date(year, today.getMonth(), today.getDate());
+  const endOfDay = new Date(year, today.getMonth(), today.getDate() + 1);
+
+  const count = await EncounterModel.countDocuments({
+    createdAt: {
+      $gte: startOfDay,
+      $lt: endOfDay,
+    },
+  });
+
+  const sequence = String(count + 1).padStart(4, "0");
+
+  return `ENC-${dateStr}-${sequence}`;
 };

@@ -14,9 +14,7 @@ export const createVitalService = async ({ payload, authUser }) => {
       patientId: payload.patientId,
       authUser,
     });
-    console.log("🚀 ~ createVitalService ~ isSelf:", isSelf);
-    console.log("🚀 ~ createVitalService ~ actor:", actor);
-    console.log("🚀 ~ createVitalService ~ patient:", patientId);
+    console.log("FFFFFFFFFFFFF", payload.encounterId);
 
     // if (payload) return;
 
@@ -93,7 +91,6 @@ export const createVitalService = async ({ payload, authUser }) => {
           providerId: provider,
           organizationId,
           encounterId: payload.encounterId || null,
-
           source: source,
           createdContext: createdContext,
           ownershipType: payload.ownershipType || "shared",

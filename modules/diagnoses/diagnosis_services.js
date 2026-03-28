@@ -39,7 +39,6 @@ export const createDiagnosisService = async ({ payload, authUser }) => {
           providerId: recordedBy,
           organizationId,
           encounterId: payload.encounterId || null,
-
           source: payload.source || "provider",
           createdContext: payload.createdContext || "provider-chart",
           ownershipType: payload.ownershipType || "shared",

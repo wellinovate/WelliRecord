@@ -1,15 +1,32 @@
 import mongoose from "mongoose";
 import { Encounter } from "./encounter_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { vitalModel } from "../vitals/vitals_model.js";
+import { diagnosisModel } from "../diagnoses/diagnoses_model.js";
+import { medicationModel } from "../medications/medications_model.js";
+import { labResultModel } from "../lab/lab_model.js";
+import { procedureModel } from "../procedure/procedure_model.js";
+import { allergyModel } from "../allergies/allergies_model.js";
+import { immunizationModel } from "../immunizations/immunizations_model.js";
+import { generateEncounterCode } from "../../shared/utils/helper.js";
 
 export const createEncounterService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    const {
+      actor,
+      patientId: patientIds,
+      isSelf,
+    } = await resolvePatientAccessContext({
+      patientId: payload.patientId,
+      authUser,
+    });
     const createdBy = authUser?._id || authUser?.sub || null;
     const providerId = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.organizationId || null;
+    const organizationId = authUser?.sub || null;
 
     if (!createdBy || !providerId) {
       const error = new Error("Authenticated provider is required");
@@ -23,22 +40,18 @@ export const createEncounterService = async ({ payload, authUser }) => {
       throw error;
     }
 
-    const patient = await PatientIdentity.findById(payload.patientId).session(session);
-    if (!patient) {
-      const error = new Error("Patient not found");
-      error.statusCode = 404;
-      throw error;
-    }
+    const encounterCode = await generateEncounterCode(Encounter)
 
     const docs = await Encounter.create(
       [
         {
-          patientId: payload.patientId,
+          patientId: patientIds,
           providerId,
           organizationId,
           createdBy,
 
           encounterType: payload.encounterType || "outpatient",
+          encounterCode: encounterCode,
           scheduledAt: payload.scheduledAt || null,
           startedAt: payload.startedAt || new Date(),
           endedAt: payload.endedAt || null,
@@ -103,15 +116,25 @@ export const getPatientEncountersService = async ({
   limit = 10,
   authUser,
 }) => {
-  const organizationId = authUser?.organizationId || null;
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId,
+    authUser,
+  });
+  // const organizationId = authUser?.organizationId || null;
+  const organizationId = authUser?.sub || null;
   const skip = (page - 1) * limit;
 
+    console.log("🚀 TTTTTTTTTTTTTTTTTTTT:", organizationId)
   const filter = {
-    patientId,
+    patientId: patientIds,
     recordStatus: "active",
   };
 
-  if (organizationId) {
+  if (actor.isOrganizationActor) {
     filter.organizationId = organizationId;
   }
 
@@ -124,13 +147,16 @@ export const getPatientEncountersService = async ({
 
     Encounter.countDocuments(filter),
   ]);
+  console.log("🚀 ~ getPatientEncountersService ~ items:", items)
 
   return {
     items: items.map((item) => ({
       id: item._id,
       patientId: item.patientId,
       providerId: item.providerId,
-      organizationId: item.organizationId,
+      organizationId: item.organizationId?._id,
+      organizationName: item.organizationId?.email || null,
+      organizationFullName: item.organizationId?.fullName || null,
       encounterType: item.encounterType,
       scheduledAt: item.scheduledAt || null,
       startedAt: item.startedAt || null,
@@ -152,6 +178,117 @@ export const getPatientEncountersService = async ({
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+export const getPatientEncountersDetailService = async ({
+  id,
+  patientId,
+  authUser,
+}) => {
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId,
+    authUser,
+  });
+  const organizationId = authUser?.organizationId || null;
+
+  const filter = {
+    patientId: patientIds,
+    recordStatus: "active",
+  };
+
+  if (actor.isOrganizationActor) {
+    filter.organizationId = organizationId;
+  }
+  const encounterId = id;
+
+  const encounter = await Encounter.findOne({
+    _id: encounterId,
+  })
+    .populate("organizationId", "firstName fullName lastName email")
+    .lean();
+
+  if (!encounter) {
+    const error = new Error("Encounter not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const [
+    vitals,
+    diagnoses,
+    medications,
+    labResults,
+    procedures,
+    allergies,
+    immunizations,
+    // files,
+  ] = await Promise.all([
+    vitalModel
+      .find({ encounterId })
+      .sort({ recordedAt: -1, createdAt: -1 })
+      .lean(),
+    diagnosisModel.find({ encounterId }).sort({ createdAt: -1 }).lean(),
+    medicationModel
+      .find({ encounterId })
+      .sort({ prescribedAt: -1, createdAt: -1 })
+      .lean(),
+    labResultModel
+      .find({ encounterId })
+      .sort({ resultDate: -1, createdAt: -1 })
+      .lean(),
+    procedureModel
+      .find({ encounterId })
+      .sort({ performedAt: -1, createdAt: -1 })
+      .lean(),
+    allergyModel.find({ encounterId }).sort({ createdAt: -1 }).lean(),
+    immunizationModel
+      .find({ encounterId })
+      .sort({ administeredAt: -1, createdAt: -1 })
+      .lean(),
+    // FileModel.find({ encounterId }).sort({ createdAt: -1 }).lean(),
+  ]);
+
+  return {
+    encounter: {
+      id: String(encounter._id),
+      encounterName: encounter.encounterName || null,
+      encounterCode: encounter.encounterCode || null,
+      patientId: encounter.patientId,
+      providerId: encounter.providerId,
+      organizationId: encounter.organizationId?._id || null,
+      organizationName: encounter.organizationId?.email || null,
+      organizationFullName: encounter.organizationId?.fullName || null,
+      encounterType: encounter.encounterType,
+      scheduledAt: encounter.scheduledAt || null,
+      startedAt: encounter.startedAt || null,
+      endedAt: encounter.endedAt || null,
+      reasonForVisit: encounter.reasonForVisit || null,
+      chiefComplaint: encounter.chiefComplaint || null,
+      priority: encounter.priority || null,
+      source: encounter.source || null,
+      status: encounter.status || null,
+      visibilityToPatient: encounter.visibilityToPatient,
+      patientAccess: encounter.patientAccess || null,
+      recordStatus: encounter.recordStatus || null,
+      notes: encounter.notes || null,
+      createdAt: encounter.createdAt,
+      updatedAt: encounter.updatedAt,
+    },
+    records: {
+      vitals,
+      diagnoses,
+      medications,
+      labResults,
+      procedures,
+      allergies,
+      immunizations,
+      files: [],
     },
   };
 };
