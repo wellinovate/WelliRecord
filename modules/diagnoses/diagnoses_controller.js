@@ -45,3 +45,27 @@ export const getPatientDiagnosesController = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getMyDiagnosesController = async (req, res, next) => {
+  try {
+    const authUser = req.user;
+    const patientId = authUser.sub
+    const { page = 1, limit = 10 } = getPatientDiagnosesQuerySchema.parse(req.query);
+
+    const result = await getPatientDiagnosesService({
+      patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+    console.log("🚀 ~ getMyDiagnosesController ~ result:", result)
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient diagnoses fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

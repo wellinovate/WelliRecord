@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { diagnosisModel } from "./diagnoses_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 
 export const createDiagnosisService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -98,15 +99,26 @@ export const getPatientDiagnosesService = async ({
   limit = 10,
   authUser,
 }) => {
-  const organizationId = authUser?.organizationId || null;
-  const skip = (page - 1) * limit;
+  const {
+     actor,
+     patientId: patientIds,
+     isSelf,
+   } = await resolvePatientAccessContext({
+     patientId,
+     authUser,
+   });
+   const organizationId =  actor.isOrganizationActor ? authUser?.sub || null : null;
+   const skip = (page - 1) * limit;
+
+    console.log("🚀 ~ getPatientDiagnosesService ~ filter.patientIds:", patientIds)
+
 
   const filter = {
-    patientId,
+    patientId: patientIds,
     recordStatus: "active",
   };
 
-  if (organizationId) {
+ if (actor.isOrganizationActor) {
     filter.organizationId = organizationId;
   }
 

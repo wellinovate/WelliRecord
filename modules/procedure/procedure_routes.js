@@ -1,22 +1,29 @@
 import express from "express";
-import { procedureController } from "./procedure_controller.js";
+import { protect } from "../auth/auth_middleware.js";
+import { validate } from "../../shared/middlewares/validator.js";
 import {
-  validateCreateProcedure,
-  validateUpdateProcedure,
+  createProcedureController,
+  getPatientProceduresController,
+} from "./procedure_controller.js";
+import {
+  createProcedureSchema,
+  getPatientProceduresParamsSchema,
 } from "./procedure_validation.js";
-import { validateBody, validateParams } from "../../shared/libs/validate_middleware.js";
-import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
 
 const router = express.Router();
 
-router.post("/", validateBody(validateCreateProcedure), procedureController.create);
-router.get("/:id", validateParams(validateObjectIdParam), procedureController.getById);
-router.get("/patient/:patientId", validateParams(validateObjectIdParam), procedureController.getByPatientId);
-router.patch(
-  "/:id",
-  validateParams(validateObjectIdParam),
-  validateBody(validateUpdateProcedure),
-  procedureController.update,
+router.post(
+  "/",
+  protect,
+  validate(createProcedureSchema),
+  createProcedureController,
+);
+
+router.get(
+  "/patient/:patientId",
+  protect,
+  validate(getPatientProceduresParamsSchema, "params"),
+  getPatientProceduresController,
 );
 
 export default router;

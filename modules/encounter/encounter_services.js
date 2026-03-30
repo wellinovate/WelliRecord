@@ -14,7 +14,7 @@ import { generateEncounterCode } from "../../shared/utils/helper.js";
 export const createEncounterService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
-
+    
   try {
     const {
       actor,
@@ -50,6 +50,7 @@ export const createEncounterService = async ({ payload, authUser }) => {
           organizationId,
           createdBy,
 
+          encounterTitle: payload.encounterTitle || " ",
           encounterType: payload.encounterType || "outpatient",
           encounterCode: encounterCode,
           scheduledAt: payload.scheduledAt || null,
@@ -128,7 +129,6 @@ export const getPatientEncountersService = async ({
   const organizationId = authUser?.sub || null;
   const skip = (page - 1) * limit;
 
-    console.log("🚀 TTTTTTTTTTTTTTTTTTTT:", organizationId)
   const filter = {
     patientId: patientIds,
     recordStatus: "active",
@@ -147,7 +147,6 @@ export const getPatientEncountersService = async ({
 
     Encounter.countDocuments(filter),
   ]);
-  console.log("🚀 ~ getPatientEncountersService ~ items:", items)
 
   return {
     items: items.map((item) => ({
@@ -157,6 +156,7 @@ export const getPatientEncountersService = async ({
       organizationId: item.organizationId?._id,
       organizationName: item.organizationId?.email || null,
       organizationFullName: item.organizationId?.fullName || null,
+      encounterTitle: item.encounterTitle || null,
       encounterType: item.encounterType,
       scheduledAt: item.scheduledAt || null,
       startedAt: item.startedAt || null,

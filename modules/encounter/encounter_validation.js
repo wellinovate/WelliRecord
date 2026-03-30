@@ -1,13 +1,16 @@
 import mongoose from "mongoose";
 import { z } from "zod";
 
-const objectIdSchema = z.string().refine((val) => mongoose.Types.ObjectId.isValid(val), {
-  message: "Invalid ObjectId",
-});
+const objectIdSchema = z
+  .string()
+  .refine((val) => mongoose.Types.ObjectId.isValid(val), {
+    message: "Invalid ObjectId",
+  });
 
 export const createEncounterSchema = z.object({
   patientId: objectIdSchema,
 
+  encounterTitle: z.string().trim().max(200).optional(),
   encounterType: z
     .enum(["outpatient", "inpatient", "emergency", "telemedicine", "homecare"])
     .optional(),
@@ -20,7 +23,9 @@ export const createEncounterSchema = z.object({
   chiefComplaint: z.string().trim().max(1000).optional(),
 
   priority: z.enum(["routine", "urgent", "high", "critical"]).optional(),
-  source: z.enum(["provider", "organization", "patient", "imported", "system"]).optional(),
+  source: z
+    .enum(["provider", "organization", "patient", "imported", "system"])
+    .optional(),
   status: z
     .enum([
       "scheduled",
@@ -33,7 +38,9 @@ export const createEncounterSchema = z.object({
     .optional(),
 
   visibilityToPatient: z.boolean().optional(),
-  patientAccess: z.enum(["full", "limited", "hidden-until-reviewed"]).optional(),
+  patientAccess: z
+    .enum(["full", "limited", "hidden-until-reviewed"])
+    .optional(),
   recordStatus: z.enum(["active", "archived", "entered-in-error"]).optional(),
 
   notes: z.string().trim().max(2000).optional(),

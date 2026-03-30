@@ -45,3 +45,25 @@ export const getPatientImmunizationsController = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getMyImmunizationsController = async (req, res, next) => {
+  try {
+    const  patientId = req.user.sub;
+    const { page = 1, limit = 10 } = getPatientImmunizationsQuerySchema.parse(req.query);
+
+    const result = await getPatientImmunizationsService({
+      patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient immunizations fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -6,7 +6,7 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 export const createLabResultService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
-  const patientId = payload.patientId
+  const patientId = payload.patientId;
 
   try {
     const {
@@ -18,8 +18,7 @@ export const createLabResultService = async ({ payload, authUser }) => {
       authUser,
     });
     const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId =
-      authUser?.sub || payload.organizationId || null;
+    const organizationId = authUser?.sub || payload.organizationId || null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
@@ -103,15 +102,25 @@ export const getPatientLabResultsService = async ({
   limit = 10,
   authUser,
 }) => {
-  const organizationId = authUser?.organizationId || null;
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId,
+    authUser,
+  });
+  const organizationId = actor.isOrganizationActor
+    ? authUser?.sub || null
+    : null;
   const skip = (page - 1) * limit;
 
   const filter = {
-    patientId,
+    patientId: patientIds,
     recordStatus: "active",
   };
 
-  if (organizationId) {
+  if (actor.isOrganizationActor) {
     filter.organizationId = organizationId;
   }
 

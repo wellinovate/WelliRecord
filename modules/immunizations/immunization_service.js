@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { immunizationModel } from "./immunizations_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 
 export const createImmunizationService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -8,7 +9,8 @@ export const createImmunizationService = async ({ payload, authUser }) => {
 
   try {
     const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.organizationId || payload.organizationId || null;
+    const organizationId =
+      authUser?.organizationId || payload.organizationId || null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
@@ -16,7 +18,9 @@ export const createImmunizationService = async ({ payload, authUser }) => {
       throw error;
     }
 
-    const patient = await PatientIdentity.findById(payload.patientId).session(session);
+    const patient = await PatientIdentity.findById(payload.patientId).session(
+      session,
+    );
     if (!patient) {
       const error = new Error("Patient not found");
       error.statusCode = 404;
@@ -38,7 +42,9 @@ export const createImmunizationService = async ({ payload, authUser }) => {
           visibility: payload.visibility || "shared",
           patientAccess: payload.patientAccess || "full",
           patientVisible:
-            payload.patientVisible !== undefined ? payload.patientVisible : true,
+            payload.patientVisible !== undefined
+              ? payload.patientVisible
+              : true,
 
           vaccineName: payload.vaccineName,
           vaccineCode: payload.vaccineCode?.trim()?.toUpperCase() || undefined,
@@ -97,7 +103,17 @@ export const getPatientImmunizationsService = async ({
   limit = 10,
   authUser,
 }) => {
-  const organizationId = authUser?.organizationId || null;
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId,
+    authUser,
+  });
+  const organizationId = actor.isOrganizationActor
+    ? authUser?.sub || null
+    : null;
   const skip = (page - 1) * limit;
 
   const filter = {
@@ -105,7 +121,7 @@ export const getPatientImmunizationsService = async ({
     recordStatus: "active",
   };
 
-  if (organizationId) {
+  if (actor.isOrganizationActor) {
     filter.organizationId = organizationId;
   }
 

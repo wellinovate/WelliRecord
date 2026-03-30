@@ -93,14 +93,9 @@ procedureEntrySchema.plugin(clinicalMetadataPlugin, {
   providerOwnedSources: ["provider", "facility"],
 });
 
-procedureEntrySchema.pre("save", function (next) {
-  try {
-    if (!this.providerId && this.performedBy) {
-      this.providerId = this.performedBy;
-    }
-    next();
-  } catch (error) {
-    next(error);
+procedureEntrySchema.pre("save", function () {
+  if (!this.providerId && this.performedBy) {
+    this.providerId = this.performedBy;
   }
 });
 
