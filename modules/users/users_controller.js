@@ -196,3 +196,24 @@ export async function getPatientAllergies(req, res, next) {
     next(error);
   }
 }
+
+// controllers/userProfile.controller.ts
+
+export const fetchUserProfile = async (req, res) => {
+  try {
+    const accountId = req.user.sub; // from auth middleware
+    console.log("🚀 ~ fetchUserProfile ~ accountId:", accountId)
+
+    const profile = await medicalHistoryService.getUserProfile(accountId);
+
+    res.status(200).json({
+      success: true,
+      data: profile,
+    });
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

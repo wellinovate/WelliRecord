@@ -26,6 +26,8 @@ router.get("/medical-history/procedures", protect, getMyAllergiesController);
 router.get("/medical-history/encounter", protect, getMyEncountersController);
 router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailController);
 
+router.get("/me", protect, medicalHistoryController.fetchUserProfile);
+
 router.get(
   "/patients/:patientId/medical-history/vitals",
   protect,

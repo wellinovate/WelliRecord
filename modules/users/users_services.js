@@ -245,3 +245,32 @@ export async function getPatientAllergies(
 ) {
   return getPagedRecords(allergyModel, patientId, options);
 }
+
+// services/userProfile.service.ts
+
+export const getUserProfile = async (accountId) => {
+  const profile = await UserProfile.findOne({ accountId })
+    .populate("accountId", "email") // optional
+    .lean();
+
+  if (!profile) {
+    throw new Error("Profile not found");
+  }
+
+  return {
+    id: profile._id,
+    fullName: profile.fullName,
+    firstName: profile.firstName,
+    middleName: profile.middleName,
+    lastName: profile.lastName,
+    email: profile.email,
+    phone: profile.phone,
+    gender: profile.gender,
+    dateOfBirth: profile.dateOfBirth,
+    avatar: profile.logo, // rename here
+    emergencyContacts: profile.emergencyContacts,
+    isLicensed: profile.isLicensed,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
+};
