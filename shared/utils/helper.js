@@ -16,6 +16,19 @@ export const signAccessToken = (results) => {
     { expiresIn: "1d" }
   );
 };
+export const signAccessTokenGoogle = (user) => {
+  return jwt.sign(
+    {
+      sub: user._id,
+      email: user.email,
+      fullName: user.fullName ||user.firstName || user.name || "",
+      accountType: "user",
+      role: user.role ?? null,
+    },
+    process.env.JWT_SECRET_KEY,
+    { expiresIn: "1d" }
+  );
+};
 
 export const normalizeEmail = (email) => {
   return String(email || "").trim().toLowerCase();

@@ -13,7 +13,6 @@ export const getAccountByEmailForLogin = async (email) => {
 };
 
 export const createAccount = async (payload, session) => {
-  // console.log("🚀 ~ createAccount ~ session:", session)
   console.log("🚀 ~ createAccount ~ payload:", payload)
   const [account] = await Account.create(
     [

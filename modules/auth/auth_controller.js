@@ -1,5 +1,12 @@
-import { signAccessToken } from "../../shared/utils/helper.js";
+import { OAuth2Client } from "google-auth-library";
+import {
+  signAccessToken,
+  signAccessTokenGoogle,
+} from "../../shared/utils/helper.js";
 import { loginAccount, registerAccount } from "./auth_services.js";
+import { UserProfile } from "../users/user_profile_model.js";
+import { createAccount } from "../accounts/account_service.js";
+import { Account } from "../accounts/account_model.js";
 
 export const register = async (req, res, next) => {
   try {
@@ -21,9 +28,8 @@ export const login = async (req, res, next) => {
 
     const results = {
       account: result.account,
-      profile: result.profile
-    }
-    
+      profile: result.profile,
+    };
 
     const token = signAccessToken(results);
 
@@ -39,7 +45,6 @@ export const login = async (req, res, next) => {
       message: "Login successful",
       accessToken: token,
       data: result,
-  
     });
   } catch (error) {
     next(error);
@@ -57,4 +62,115 @@ export const logout = async (req, res) => {
     success: true,
     message: "Logged out successfully",
   });
+};
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export const googleLoginController = async (req, res) => {
+  try {
+    const { credential, profileType } = req.body;
+    let account;
+    if (!credential) {
+      console.log("🚀 ~ googleLoginController ~ credential:", credential);
+      return res.status(400).json({
+        success: false,
+        message: "Google credential is required",
+      });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid Google token",
+      });
+    }
+
+    const {
+      sub,
+      email,
+      email_verified,
+      given_name,
+      family_name,
+      name,
+      picture,
+    } = payload;
+
+    console.log("🚀 ~ googleLoginController ~ payload:", payload);
+
+    if (!email || !email_verified) {
+      return res.status(401).json({
+        success: false,
+        message: "Google email is not verified",
+      });
+    }
+
+    let user = await UserProfile.findOne({
+      $or: [{ googleId: sub }, { email }],
+    });
+
+    if (!user) {
+      account = await Account.create({
+        accountType: "user",
+        role: payload.role || "patient",
+        email: email,
+        password: sub, // Use Google sub as a placeholder password (not used for authentication)
+        img: picture || "",
+        status: "active",
+        isVerified: false,
+        isActive: true,
+      });
+      user = await UserProfile.create({
+        email,
+        googleId: sub,
+        accountId: account._id,
+        firstName: given_name || name?.split(" ")[0] || "",
+        lastName: family_name || "",
+        fullName: name || "",
+        avatar: picture || "",
+        authProvider: "google",
+        profileType: profileType || "Personal",
+        accountType: "user",
+        isEmailVerified: true,
+      });
+    } else {
+      if (!user.googleId) {
+        user.googleId = sub;
+      }
+      if (!user.authProvider) {
+        user.authProvider = "google";
+      }
+      user.isEmailVerified = true;
+      await user.save();
+    }
+
+    const token = signAccessTokenGoogle(user);
+
+    return res.status(200).json({
+      success: true,
+      message: "Google login successful",
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        accountType: "user",
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        avatar: user.avatar,
+      },
+    });
+  } catch (error) {
+    console.log("🚀 ~ googleLoginController ~ error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Google login failed",
+    });
+  }
 };

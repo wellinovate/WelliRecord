@@ -79,6 +79,15 @@ const userProfileSchema = new Schema(
       default: null,
     },
 
+    googleId: { type: String, default: null, index: true },
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
+    isEmailVerified: { type: Boolean, default: false },
+    avatar: { type: String, default: "" },
+
     logo: {
       type: String,
       default: null,
