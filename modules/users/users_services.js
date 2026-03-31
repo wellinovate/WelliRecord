@@ -3,17 +3,17 @@ import { UserProfile } from "./user_profile_model.js";
 
 import mongoose from "mongoose";
 
-import {vitalModel} from "../vitals/vitals_model.js";
-import {diagnosisModel} from "../diagnoses/diagnoses_model.js";
-import {medicationModel} from "../medications/medications_model.js";
-import {procedureModel} from "../procedure/procedure_model.js";
-import {immunizationModel} from "../immunizations/immunizations_model.js";
-import {labResultModel} from "../lab/lab_model.js";
-import {allergyModel} from "../allergies/allergies_model.js";
+import { vitalModel } from "../vitals/vitals_model.js";
+import { diagnosisModel } from "../diagnoses/diagnoses_model.js";
+import { medicationModel } from "../medications/medications_model.js";
+import { procedureModel } from "../procedure/procedure_model.js";
+import { immunizationModel } from "../immunizations/immunizations_model.js";
+import { labResultModel } from "../lab/lab_model.js";
+import { allergyModel } from "../allergies/allergies_model.js";
+import { generateWelliRecordId } from "../../shared/utils/helper.js";
 
 export const createUserProfile = async (payload, session) => {
-  const username =
-    payload.username || generateUsername(payload.email);
+  const username = payload.username || generateUsername(payload.email);
   const [profile] = await UserProfile.create(
     [
       {
@@ -28,14 +28,12 @@ export const createUserProfile = async (payload, session) => {
         homeAddress: payload.homeAddress || null,
       },
     ],
-    { session }
+    { session },
   );
-  console.log("🚀 ~ createUserProfile ~ profile:", profile)
+  console.log("🚀 ~ createUserProfile ~ profile:", profile);
 
   return profile;
 };
-
-
 
 function toObjectId(id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -50,19 +48,18 @@ function buildBaseMatch(patientId) {
   };
 }
 
-async function getPagedRecords(
-  Model,
-  patientId,
-  options,
-  sort
-) {
+async function getPagedRecords(Model, patientId, options, sort) {
   const match = buildBaseMatch(patientId);
 
   const [records, total] = await Promise.all([
-    Model.findById(patientId).sort(sort).skip(options.skip).limit(options.limit).lean(),
+    Model.findById(patientId)
+      .sort(sort)
+      .skip(options.skip)
+      .limit(options.limit)
+      .lean(),
     Model.countDocuments(match),
   ]);
-  console.log("🚀 ~ getPagedRecords ~ records:", records)
+  console.log("🚀 ~ getPagedRecords ~ records:", records);
 
   return {
     total,
@@ -70,17 +67,14 @@ async function getPagedRecords(
   };
 }
 
-async function getCategorySummary(
-  Model,
-  patientId,
-  category,
-  metricBuilder
-) {
+async function getCategorySummary(Model, patientId, category, metricBuilder) {
   const match = buildBaseMatch(patientId);
 
   const [total, latestRecord] = await Promise.all([
     Model.countDocuments(match),
-    Model.findOne(match).sort({ updatedAt: -1, recordedAt: -1, createdAt: -1 }).lean(),
+    Model.findOne(match)
+      .sort({ updatedAt: -1, recordedAt: -1, createdAt: -1 })
+      .lean(),
   ]);
 
   return {
@@ -96,7 +90,7 @@ async function getCategorySummary(
 }
 
 export async function getMedicalHistorySummary(patientId) {
-  console.log("🚀 ~ getMedicalHistorySummary ~ patientId:", patientId)
+  console.log("🚀 ~ getMedicalHistorySummary ~ patientId:", patientId);
   const [
     vitals,
     diagnoses,
@@ -118,73 +112,103 @@ export async function getMedicalHistorySummary(patientId) {
       };
     }),
 
-    getCategorySummary(diagnosisModel, patientId, "diagnoses", (latest, total) => {
-      if (!latest) {
-        return { activeCount: 0 };
-      }
+    getCategorySummary(
+      diagnosisModel,
+      patientId,
+      "diagnoses",
+      (latest, total) => {
+        if (!latest) {
+          return { activeCount: 0 };
+        }
 
-      return {
-        activeCount: total,
-        latestDiagnosis: latest.diagnosisName || latest.conditionName || null,
-      };
-    }),
+        return {
+          activeCount: total,
+          latestDiagnosis: latest.diagnosisName || latest.conditionName || null,
+        };
+      },
+    ),
 
-    getCategorySummary(medicationModel, patientId, "medications", (latest, total) => {
-      if (!latest) {
-        return { activeCount: 0 };
-      }
+    getCategorySummary(
+      medicationModel,
+      patientId,
+      "medications",
+      (latest, total) => {
+        if (!latest) {
+          return { activeCount: 0 };
+        }
 
-      return {
-        activeCount: total,
-        latestMedication: latest.medicationName || latest.drugName || null,
-      };
-    }),
+        return {
+          activeCount: total,
+          latestMedication: latest.medicationName || latest.drugName || null,
+        };
+      },
+    ),
 
-    getCategorySummary(procedureModel, patientId, "procedures", (latest, total) => {
-      if (!latest) {
-        return { totalProcedures: 0 };
-      }
+    getCategorySummary(
+      procedureModel,
+      patientId,
+      "procedures",
+      (latest, total) => {
+        if (!latest) {
+          return { totalProcedures: 0 };
+        }
 
-      return {
-        totalProcedures: total,
-        latestProcedure: latest.procedureName || latest.title || null,
-      };
-    }),
+        return {
+          totalProcedures: total,
+          latestProcedure: latest.procedureName || latest.title || null,
+        };
+      },
+    ),
 
-    getCategorySummary(immunizationModel, patientId, "immunizations", (latest, total) => {
-      if (!latest) {
-        return { totalImmunizations: 0 };
-      }
+    getCategorySummary(
+      immunizationModel,
+      patientId,
+      "immunizations",
+      (latest, total) => {
+        if (!latest) {
+          return { totalImmunizations: 0 };
+        }
 
-      return {
-        totalImmunizations: total,
-        latestVaccine: latest.vaccineName || null,
-      };
-    }),
+        return {
+          totalImmunizations: total,
+          latestVaccine: latest.vaccineName || null,
+        };
+      },
+    ),
 
-    getCategorySummary(labResultModel, patientId, "lab_results", (latest, total) => {
-      if (!latest) {
-        return { totalLabResults: 0 };
-      }
+    getCategorySummary(
+      labResultModel,
+      patientId,
+      "lab_results",
+      (latest, total) => {
+        if (!latest) {
+          return { totalLabResults: 0 };
+        }
 
-      return {
-        totalLabResults: total,
-        latestTestName: latest.testName || latest.labName || null,
-      };
-    }),
+        return {
+          totalLabResults: total,
+          latestTestName: latest.testName || latest.labName || null,
+        };
+      },
+    ),
 
-    getCategorySummary(allergyModel, patientId, "allergies", (latest, total) => {
-      if (!latest) {
-        return { totalAllergies: 0 };
-      }
+    getCategorySummary(
+      allergyModel,
+      patientId,
+      "allergies",
+      (latest, total) => {
+        if (!latest) {
+          return { totalAllergies: 0 };
+        }
 
-      return {
-        totalAllergies: total,
-        latestAllergen: latest.allergen || latest.substance || null,
-      };
-    }),
+        return {
+          totalAllergies: total,
+          latestAllergen: latest.allergen || latest.substance || null,
+        };
+      },
+    ),
   ]);
-    console.log("🚀 ~ getMedicalHistorySummary ~ vitals:", vitals)
+  console.log("🚀 ~ getMedicalHistorySummary ~ vitals:", vitals);
 
   return {
     vitals,
@@ -197,80 +221,72 @@ export async function getMedicalHistorySummary(patientId) {
   };
 }
 
-export async function getPatientVitals(
-  patientId,
-  options
-) {
+export async function getPatientVitals(patientId, options) {
   return getPagedRecords(vitalModel, patientId, options);
 }
 
-export async function getPatientDiagnoses(
-  patientId,
-  options
-) {
+export async function getPatientDiagnoses(patientId, options) {
   return getPagedRecords(diagnosisModel, patientId, options);
 }
 
-export async function getPatientMedications(
-  patientId,
-  options
-) {
+export async function getPatientMedications(patientId, options) {
   return getPagedRecords(medicationModel, patientId, options);
 }
 
-export async function getPatientProcedures(
-  patientId,
-  options
-) {
+export async function getPatientProcedures(patientId, options) {
   return getPagedRecords(procedureModel, patientId, options);
 }
 
-export async function getPatientImmunizations(
-  patientId,
-  options
-) {
+export async function getPatientImmunizations(patientId, options) {
   return getPagedRecords(immunizationModel, patientId, options);
 }
 
-export async function getPatientLabResults(
-  patientId,
-  options
-) {
+export async function getPatientLabResults(patientId, options) {
   return getPagedRecords(labResultModel, patientId, options);
 }
 
-export async function getPatientAllergies(
-  patientId,
-  options
-) {
+export async function getPatientAllergies(patientId, options) {
   return getPagedRecords(allergyModel, patientId, options);
 }
 
 // services/userProfile.service.ts
 
 export const getUserProfile = async (accountId) => {
-  const profile = await UserProfile.findOne({ accountId })
-    .populate("accountId", "email") // optional
-    .lean();
+  try {
+    const profile = await UserProfile.findOne({ accountId })
+      .populate("accountId", "email") // optional
+      // .lean();
+    console.log("🚀 ~ getUserProfile ~ profile:", profile);
 
-  if (!profile) {
-    throw new Error("Profile not found");
+    if (profile && !profile.wrId) {
+      profile.wrId = generateWelliRecordId();
+      console.log("🚀 ~ getUserProfile ~ profile.wrId:", profile.wrId);
+      await profile.save();
+      console.log(profile);
+    }
+
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+
+    return {
+      id: profile._id,
+      wrId: profile.wrId,
+      fullName: profile.fullName,
+      firstName: profile.firstName,
+      middleName: profile.middleName,
+      lastName: profile.lastName,
+      email: profile.email,
+      phone: profile.phone,
+      gender: profile.gender,
+      dateOfBirth: profile.dateOfBirth,
+      avatar: profile.logo, // rename here
+      emergencyContacts: profile.emergencyContacts,
+      isLicensed: profile.isLicensed,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+  } catch (error) {
+    console.log("🚀 ~ getUserProfile ~ error:", error);
   }
-
-  return {
-    id: profile._id,
-    fullName: profile.fullName,
-    firstName: profile.firstName,
-    middleName: profile.middleName,
-    lastName: profile.lastName,
-    email: profile.email,
-    phone: profile.phone,
-    gender: profile.gender,
-    dateOfBirth: profile.dateOfBirth,
-    avatar: profile.logo, // rename here
-    emergencyContacts: profile.emergencyContacts,
-    isLicensed: profile.isLicensed,
-    createdAt: profile.createdAt,
-    updatedAt: profile.updatedAt,
-  };
 };

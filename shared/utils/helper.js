@@ -81,3 +81,9 @@ export const generateEncounterCode = async (EncounterModel) => {
 
   return `ENC-${dateStr}-${sequence}`;
 };
+
+export const generateWelliRecordId = () => {
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const timestamp = Date.now().toString().slice(-4);
+  return `WR-${timestamp}-${random}`;
+};

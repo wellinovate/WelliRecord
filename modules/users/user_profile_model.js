@@ -21,6 +21,14 @@ const userProfileSchema = new Schema(
       index: true,
     },
 
+    wrId: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
     fullName: {
       type: String,
       required: true,
@@ -113,5 +121,27 @@ const userProfileSchema = new Schema(
 );
 
 userProfileSchema.index({ fullName: "text", username: "text" });
+
+const generateWelliRecordId = () => {
+  const part1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const part2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `WR-${part1}-${part2}`;
+};
+
+userProfileSchema.pre("validate", async function () {
+  if (this.wrId) return;
+
+  let exists = true;
+
+  while (exists) {
+    const wrId = generateWelliRecordId();
+    const existingProfile = await this.constructor.findOne({ wrId });
+
+    if (!existingProfile) {
+      this.wrId = wrId;
+      exists = false;
+    }
+  }
+});
 
 export const UserProfile = mongoose.model("UserProfile", userProfileSchema);
