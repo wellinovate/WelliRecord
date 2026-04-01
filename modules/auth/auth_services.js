@@ -10,15 +10,15 @@ import { createOrganizationProfile } from "../organizations/organizations_servic
 
 export const registerAccount = async (payload) => {
   console.log("🚀 ~ registerAccount ~ payload:", payload)
-  if (payload.profileType === "personal") {
+  if (payload.accountType === "user") {
     return registerUserAccount(payload);
   }
 
-  if (payload.profileType === "organization") {
+  if (payload.accountType === "organization") {
     return registerOrganizationAccount(payload);
   }
 
-  throw new AppError("Invalid profile type", 400, "INVALID_PROFILE_TYPE");
+  throw new AppError("Invalid account type", 400, "INVALID_PROFILE_TYPE");
 };
 
 export const registerUserAccount = async (payload) => {

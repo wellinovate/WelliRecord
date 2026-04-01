@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const personalRegisterSchema = z.object({
-  profileType: z.literal("personal"),
+  accountType: z.literal("user"),
   fullName: z.string().trim().min(2, "Full name is required"),
   email: z
     .string()
@@ -9,10 +9,13 @@ const personalRegisterSchema = z.object({
     .email("Valid email is required")
     .transform((val) => val.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  phone: z.string().optional(),
+  role: z.string().optional(),
+  authProvider: z.literal("local").optional(),
 });
 
 const organizationRegisterSchema = z.object({
-  profileType: z.literal("organization"),
+  accountType: z.literal("organization"),
   organizationName: z.string().trim().min(2, "Organization name is required"),
   organizationMainType: z
     .string()
@@ -48,13 +51,14 @@ const loginSchema = z.object({
 });
 
 export const validateRegisterRequest = (req, res, next) => {
-  const { profileType } = req.body;
+  const { accountType } = req.body;
+  console.log("🚀 ~ validateRegisterRequest ~ req.body:", req.body)
 
   let schema;
 
-  if (profileType === "personal") {
+  if (accountType === "user") {
     schema = personalRegisterSchema;
-  } else if (profileType === "organization") {
+  } else if (accountType === "organization") {
     schema = organizationRegisterSchema;
   } else {
     return res.status(400).json({
