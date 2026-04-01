@@ -7,6 +7,7 @@ import { withTransaction } from "../../shared/utils/withTransaction.js";
 import { createAccount, findAccountByEmail } from "../accounts/account_service.js";
 import { createUserProfile } from "../users/users_services.js";
 import { createOrganizationProfile } from "../organizations/organizations_services.js";
+import { generateWelliRecordId } from "../../shared/utils/helper.js";
 
 export const registerAccount = async (payload) => {
   console.log("🚀 ~ registerAccount ~ payload:", payload)
@@ -91,11 +92,14 @@ export const registerOrganizationAccount = async (payload) => {
       session,
     );
 
+    const wrId = generateWelliRecordId();
+
     const profile = await createOrganizationProfile(
       {
         accountId: account._id,
+        wrOrgId: wrId,
         organizationName: payload.organizationName,
-        organizationType: payload.organizationMainType,
+        organizationType: payload.organizationType,
         officeAddress: payload.officeAddress,
         registrationNumber: payload.registrationNumber,
         licenseNumber: payload.licenseNumber,

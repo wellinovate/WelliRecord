@@ -8,6 +8,7 @@ export const createOrganizationProfile = async (payload, session) => {
     [
       {
         accountId: payload.accountId,
+        wrOrgId: payload.wrOrgId,
         organizationName: payload.organizationName,
         organizationType: payload.organizationType,
         officeAddress: payload.officeAddress || null,

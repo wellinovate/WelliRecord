@@ -14,24 +14,21 @@ const personalRegisterSchema = z.object({
   authProvider: z.literal("local").optional(),
 });
 
+
 const organizationRegisterSchema = z.object({
   accountType: z.literal("organization"),
   organizationName: z.string().trim().min(2, "Organization name is required"),
-  organizationMainType: z
-    .string()
-    .trim()
-    .min(2, "Organization name is required"),
   organizationType: z.enum([
-    "organization(healthcare_provider)", // hospital + clinic + lab + pharmacy
-    "organization(diagnostic)", // standalone lab centers
-    "organization(pharmacy)", // standalone pharmacy chains
-    "organization(insurance)", // insurers / HMOs
-    "organization(telehealth)", // virtual care platforms
-    "organization(government)", // ministries, public health bodies
-    "organization(ngo)", // non-profits
-    "organization(healthtech)", // tech companies (like WelliRecord)
-    "organization(vendor)", // devices, wearables, suppliers
-    "organization(other)",
+    "healthcare_provider",
+    "diagnostic",
+    "pharmacy",
+    "insurance",
+    "telehealth",
+    "government",
+    "ngo",
+    "healthtech",
+    "vendor",
+    "other",
   ]),
   email: z
     .string()
@@ -39,6 +36,19 @@ const organizationRegisterSchema = z.object({
     .email("Valid email is required")
     .transform((val) => val.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  phone: z.string().trim().min(7, "Phone number must be at least 7 digits"),
+  country: z.string().trim().min(2, "Country is required"),
+  state: z.string().trim().min(2, "State is required"),
+  city: z.string().trim().min(2, "City is required"),
+  contactPersonName: z
+    .string()
+    .trim()
+    .min(2, "Contact person name is required"),
+  contactPersonRole: z
+    .string()
+    .trim()
+    .min(2, "Contact person role is required"),
+  authProvider: z.literal("local").optional(),
 });
 
 const loginSchema = z.object({
@@ -52,7 +62,7 @@ const loginSchema = z.object({
 
 export const validateRegisterRequest = (req, res, next) => {
   const { accountType } = req.body;
-  console.log("🚀 ~ validateRegisterRequest ~ req.body:", req.body)
+  console.log("🚀 ~ validateRegisterRequest ~ req.body:", req.body);
 
   let schema;
 

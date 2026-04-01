@@ -11,6 +11,13 @@ const organizationProfileSchema = new Schema(
       unique: true,
       index: true,
     },
+    wrOrgId: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
 
     organizationName: {
       type: String,

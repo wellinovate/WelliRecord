@@ -2,36 +2,56 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
 export const signAccessToken = (results) => {
-  const {account, profile} = results
-  console.log("🚀 ~ signAccessToken ~ profile:", profile.fullName)
-  return jwt.sign(
-    {
-      sub: account._id,
-      email: account.email,
-      fullName: profile.fullName,
-      accountType: account.accountType,
-      role: account.role ?? null,
-    },
-    process.env.JWT_SECRET_KEY,
-    { expiresIn: "1d" }
-  );
+  const { account, profile } = results;
+  console.log("🚀 ~ signAccessToken ~ profile:", profile);
+
+  if (account.accountType === "organization") {
+    return jwt.sign(
+      {
+        sub: account._id,
+        isVerified: account.isVerified,
+        orgId: profile.wrOrgId,
+        email: account.email,
+        fullName: profile.organizationName,
+        accountType: account.accountType,
+        role: account.accountType ?? null,
+      },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "1d" },
+    );
+  } else {
+    return jwt.sign(
+      {
+        sub: account._id,
+        email: account.email,
+        fullName: profile.fullName,
+        accountType: account.accountType,
+        role: account.role ?? null,
+      },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "1d" },
+    );
+  }
 };
+
 export const signAccessTokenGoogle = (user) => {
   return jwt.sign(
     {
       sub: user._id,
       email: user.email,
-      fullName: user.fullName ||user.firstName || user.name || "",
+      fullName: user.fullName || user.firstName || user.name || "",
       accountType: "user",
       role: user.role ?? null,
     },
     process.env.JWT_SECRET_KEY,
-    { expiresIn: "1d" }
+    { expiresIn: "1d" },
   );
 };
 
 export const normalizeEmail = (email) => {
-  return String(email || "").trim().toLowerCase();
+  return String(email || "")
+    .trim()
+    .toLowerCase();
 };
 
 export const normalizePhone = (phone) => {
@@ -57,7 +77,6 @@ export const maskEmail = (email) => {
   const visible = local.slice(0, 2);
   return `${visible}***@${domain}`;
 };
-
 
 export const maskPhone = (phone) => {
   if (!phone) return null;
