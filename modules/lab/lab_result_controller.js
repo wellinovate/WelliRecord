@@ -1,5 +1,6 @@
 import {
   createLabResultService,
+  getAllPatientLabResultsService,
   getPatientLabResultsService,
 } from "./lab_result_service.js";
 import { getPatientLabResultsQuerySchema } from "./lab_result_validation.js";
@@ -31,6 +32,26 @@ export const getPatientLabResultsController = async (req, res, next) => {
 
     const result = await getPatientLabResultsService({
       patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient lab results fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllPatientLabResultsController = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = getPatientLabResultsQuerySchema.parse(req.query);
+
+    const result = await getAllPatientLabResultsService({
       page,
       limit,
       authUser: req.user,

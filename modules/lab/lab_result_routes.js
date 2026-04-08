@@ -3,6 +3,7 @@ import { protect } from "../auth/auth_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
   createLabResultController,
+  getAllPatientLabResultsController,
   getPatientLabResultsController,
 } from "./lab_result_controller.js";
 import {
@@ -24,6 +25,11 @@ router.get(
   protect,
   validate(getPatientLabResultsParamsSchema, "params"),
   getPatientLabResultsController,
+);
+router.get(
+  "/patients",
+  protect,
+  getAllPatientLabResultsController,
 );
 
 export default router;

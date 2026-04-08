@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { vitalModel } from "./vitals_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
 // import { Patient } from "../patients/patient_model.js"; // adjust path/model name
 // import { Encounter } from "../encounters/encounter_model.js"; // optional, if validating encounter existence
 
@@ -14,12 +15,18 @@ export const createVitalService = async ({ payload, authUser }) => {
       patientId: payload.patientId,
       authUser,
     });
-    console.log("FFFFFFFFFFFFF", payload.encounterId);
+    
 
     // if (payload) return;
+    let recordedBy = null;
 
     // const organizationIdFromUser = authUser?.sub || null;
-    const recordedBy = authUser?.sub || null;
+    if (actor.isOrganizationActor === true) {
+      recordedBy = actor.organizationId;
+      console.log("🚀 ~ createVitalService ~ recordedBy:", recordedBy);
+    } else {
+      recordedBy = authUser?.sub || null;
+    }
 
     // if (!recordedBy) {
     //   const error = new Error("Authenticated user is required");
@@ -69,7 +76,7 @@ export const createVitalService = async ({ payload, authUser }) => {
       : payload.createdContext || "provider-chart";
 
     const providerId = actor.isOrganizationActor ? actor.userId : null;
-    const organizationId = actor.isOrganizationActor ? actor.userId : null;
+    const organizationId = actor.isOrganizationActor ? actor.organizationId : null;
 
     // const check = patientFromUserProfile || patientFromPatientIdentity;
     if (!patientId) {
@@ -166,7 +173,9 @@ export const getPatientVitalsService = async ({
     patientId,
     authUser,
   });
-  const organizationId =  actor.isOrganizationActor ? authUser?.sub || null : null;
+  const organizationId = actor.isOrganizationActor
+    ? authUser?.sub || null
+    : null;
   const skip = (page - 1) * limit;
 
   const filter = {
@@ -243,22 +252,35 @@ export const getPatientVitalsService = async ({
   };
 };
 
-const resolveActorContext = (authUser) => {
+const resolveActorContext = async (authUser) => {
   const userId = authUser?._id || authUser?.sub || null;
   const accountType =
     authUser?.accountType || authUser?.account?.accountType || null;
-  console.log("🚀 ~ resolveActorContext ~ accountType:", accountType);
+  // console.log("🚀 ~ resolveActorContext ~ accountType:", accountType);
 
   const isOrganizationActor = accountType === "organization";
   // accountType === "provider" ||
 
   const isPatientActor = accountType === "user" || accountType === "patient";
 
-  const organizationId = (isOrganizationActor && authUser?.sub) || null;
+  let organizationId = null;
+  let organizationName = null;
+
+  if (isOrganizationActor) {
+    const wrOrgId = authUser?.orgId || null;
+    const organization = await OrganizationProfile.findOne({
+      wrOrgId: wrOrgId,
+    });
+    organizationId = organization._id;
+    organizationName = organization.organizationName;
+  }
+
+  // const organizationId = (isOrganizationActor && authUser?.sub) || null;
 
   return {
     userId,
     organizationId,
+    organizationName,
     accountType,
     isOrganizationActor,
     isPatientActor,
@@ -266,11 +288,11 @@ const resolveActorContext = (authUser) => {
 };
 
 export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
-  console.log("🚀 ~ resolvePatientAccessContext ~ patientId:", patientId)
+  console.log("🚀 ~ resolvePatientAccessContext ~ patientId:", patientId);
   const session = await mongoose.startSession();
   session.startTransaction();
 
-  const actor = resolveActorContext(authUser);
+  const actor = await resolveActorContext(authUser);
 
   if (actor.isOrganizationActor === true) {
     const patientFromPatientIdentity = await PatientIdentity.findById(
@@ -316,7 +338,8 @@ export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
     if (patientFromUserProfile) {
       const isSelf =
         actor.isPatientActor &&
-        String(patientFromUserProfile.accountId || "") === String(actor.userId || "");
+        String(patientFromUserProfile.accountId || "") ===
+          String(actor.userId || "");
 
       return {
         actor,
@@ -328,10 +351,6 @@ export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
 
   const patientFromUserProfile = await UserProfile.findById(patientId).session(
     session,
-  );
-  console.log(
-    "🚀 ~ resolvePatientAccessContext ~ patientFromUserProfile:",
-    patientFromUserProfile,
   );
 
   if (!patientFromUserProfile) {

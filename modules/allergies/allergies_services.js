@@ -7,28 +7,33 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 export const createAllergyService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
   session.startTransaction();
+  const patientId = payload.patientId;
 
   try {
-    const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.sub || payload.organizationId || null;
+    const {
+          actor,
+          patientId: patientIds,
+          isSelf,
+        } = await resolvePatientAccessContext({
+          patientId,
+          authUser,
+        });
+    let recordedBy = null;
+
+    // const organizationIdFromUser = authUser?.sub || null;
+    if (actor.isOrganizationActor === true) {
+      recordedBy = actor.organizationId;
+      console.log("🚀 ~ createVitalService ~ recordedBy:", recordedBy);
+    } else {
+      recordedBy = authUser?.sub || null;
+    }
+    const organizationId = actor.isOrganizationActor
+      ? actor.organizationId
+      : null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
       error.statusCode = 401;
-      throw error;
-    }
-
-    // Optional: verify patient exists
-    const patientFromUserProfile = await UserProfile.findById(
-      payload.patientId,
-    ).session(session);
-    const patientFromPatientIdentity = await PatientIdentity.findById(
-      payload.patientId,
-    ).session(session);
-    const check = patientFromUserProfile || patientFromPatientIdentity;
-    if (!check) {
-      const error = new Error("Patient not found");
-      error.statusCode = 404;
       throw error;
     }
 
@@ -113,9 +118,7 @@ export const getPatientAllergiesService = async ({
     patientId,
     authUser,
   });
-  const organizationId = actor.isOrganizationActor
-    ? authUser?.sub || null
-    : null;
+  const organizationId = actor.isOrganizationActor && actor.organizationId;
   const skip = (page - 1) * limit;
 
   const filter = {

@@ -1,5 +1,6 @@
 import {
   createMedicationService,
+  getAllPatientMedicationsService,
   getPatientMedicationsService,
 } from "./medication_service.js";
 import { getPatientMedicationsQuerySchema } from "./medications_validator.js";
@@ -45,6 +46,27 @@ export const getPatientMedicationsController = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getAllPatientMedicationsController = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = getPatientMedicationsQuerySchema.parse(req.query);
+
+    const result = await getAllPatientMedicationsService({
+      page,
+      limit,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient medications fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getMyMedicationsController = async (req, res, next) => {
   try {
     const { page = 1, limit = 10 } = getPatientMedicationsQuerySchema.parse(req.query);

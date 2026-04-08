@@ -90,6 +90,12 @@ const medicationEntrySchema = new Schema(
       maxlength: 100,
     },
 
+    duration: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+
     indication: {
       type: String,
       trim: true,
@@ -98,7 +104,7 @@ const medicationEntrySchema = new Schema(
 
     prescribedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Account",
+      ref: "OrganizationProfile",
       default: null,
       index: true,
     },

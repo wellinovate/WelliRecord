@@ -8,6 +8,7 @@ import { getMyEncounterDetailController, getMyEncountersController } from "../en
 import { getMyDiagnosesController } from "../diagnoses/diagnoses_controller.js";
 import { getMyLabResultsController } from "../lab/lab_result_controller.js";
 import { getMyImmunizationsController } from "../immunizations/immunization_controller.js";
+import { getMyProceduresController } from "../procedure/procedure_controller.js";
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.get("/medical-history/allergies", protect, getMyAllergiesController);
 router.get("/medical-history/diagnoses", protect, getMyDiagnosesController);
 router.get("/medical-history/lab", protect, getMyLabResultsController);
 router.get("/medical-history/immunizations", protect, getMyImmunizationsController);
-router.get("/medical-history/procedures", protect, getMyAllergiesController);
+router.get("/medical-history/procedures", protect, getMyProceduresController);
 router.get("/medical-history/encounter", protect, getMyEncountersController);
 router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailController);
 

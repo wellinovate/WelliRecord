@@ -8,8 +8,8 @@ import { getPatientEncountersQuerySchema } from "./encounter_validation.js";
 export const createEncounterController = async (req, res, next) => {
   try {
     const payload = req.validated;
-    console.log("🚀 ~ createEncounterController ~ payload:", payload);
     const authUser = req.user;
+    // console.log("🚀 ~ createEncounterController ~ authUser:", authUser)
 
     const result = await createEncounterService({
       payload,
@@ -29,7 +29,7 @@ export const createEncounterController = async (req, res, next) => {
 export const getPatientEncountersController = async (req, res, next) => {
   try {
     const { patientId } = req.validated;
-    
+
     const { page = 1, limit = 10 } = getPatientEncountersQuerySchema.parse(
       req.query,
     );
@@ -65,6 +65,7 @@ export const getMyEncountersController = async (req, res, next) => {
       limit,
       authUser: req.user,
     });
+    // console.log("🚀 ~ getMyEncountersController ~ result:", result)
 
     return res.status(200).json({
       success: true,
@@ -78,8 +79,8 @@ export const getMyEncountersController = async (req, res, next) => {
 
 export const getMyEncounterDetailController = async (req, res, next) => {
   try {
-    const { id } = req.params
-    console.log("🚀 ~ getMyEncounterDetailController ~ id:", id)
+    const { id } = req.params;
+    console.log("🚀 ~ getMyEncounterDetailController ~ id:", id);
     const authUser = req.user;
     const patientId = authUser.sub;
 

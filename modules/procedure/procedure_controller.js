@@ -27,7 +27,34 @@ export const createProcedureController = async (req, res, next) => {
 export const getPatientProceduresController = async (req, res, next) => {
   try {
     const { patientId } = req.validated;
-    const { page = 1, limit = 10 } = getPatientProceduresQuerySchema.parse(req.query);
+    const { page = 1, limit = 10 } = getPatientProceduresQuerySchema.parse(
+      req.query,
+    );
+
+    const result = await getPatientProceduresService({
+      patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient procedures fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyProceduresController = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = getPatientProceduresQuerySchema.parse(
+      req.query,
+    );
+    const authUser = req.user;
+    const patientId = authUser.sub;
 
     const result = await getPatientProceduresService({
       patientId,

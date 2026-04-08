@@ -44,7 +44,7 @@ const encounterSchema = new Schema(
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
+      ref: "OrganizationProfile",
       default: null,
       index: true,
     },
@@ -113,6 +113,7 @@ const encounterSchema = new Schema(
       type: String,
       enum: [
         "scheduled",
+        "active",
         "checked-in",
         "in-progress",
         "completed",
@@ -171,4 +172,3 @@ encounterSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
 encounterSchema.index({ patientId: 1, startedAt: -1 });
 
 export const Encounter = mongoose.model("Encounter", encounterSchema);
-

@@ -9,8 +9,23 @@ export const createDiagnosisService = async ({ payload, authUser }) => {
   session.startTransaction();
 
   try {
-    const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.sub || payload.organizationId || null;
+    const { actor, patientId, isSelf } = await resolvePatientAccessContext({
+      patientId: payload.patientId,
+      authUser,
+    });
+
+    let recordedBy = null;
+
+    // const organizationIdFromUser = authUser?.sub || null;
+    if (actor.isOrganizationActor === true) {
+      recordedBy = actor.organizationId;
+      console.log("🚀 ~ createVitalService ~ recordedBy:", recordedBy);
+    } else {
+      recordedBy = authUser?.sub || null;
+    }
+    const organizationId = actor.isOrganizationActor
+      ? actor.organizationId
+      : null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
@@ -18,19 +33,20 @@ export const createDiagnosisService = async ({ payload, authUser }) => {
       throw error;
     }
 
-    // Optional: verify patient exists
-    const patientFromUserProfile = await UserProfile.findById(
-      payload.patientId,
-    ).session(session);
-    const patientFromPatientIdentity = await PatientIdentity.findById(
-      payload.patientId,
-    ).session(session);
-    const check = patientFromUserProfile || patientFromPatientIdentity;
-    if (!check) {
-      const error = new Error("Patient not found");
-      error.statusCode = 404;
+    if (!actor.userId) {
+      const error = new Error("Authenticated user is required");
+      error.statusCode = 401;
       throw error;
     }
+
+    if (actor.isPatientActor) {
+      if (!isSelf) {
+        const error = new Error("You can only create vitals for yourself");
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+
 
     const docs = await diagnosisModel.create(
       [
@@ -100,25 +116,22 @@ export const getPatientDiagnosesService = async ({
   authUser,
 }) => {
   const {
-     actor,
-     patientId: patientIds,
-     isSelf,
-   } = await resolvePatientAccessContext({
-     patientId,
-     authUser,
-   });
-   const organizationId =  actor.isOrganizationActor ? authUser?.sub || null : null;
-   const skip = (page - 1) * limit;
-
-    console.log("🚀 ~ getPatientDiagnosesService ~ filter.patientIds:", patientIds)
-
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId,
+    authUser,
+  });
+  const organizationId = actor.isOrganizationActor && actor.organizationId;
+  const skip = (page - 1) * limit;
 
   const filter = {
     patientId: patientIds,
     recordStatus: "active",
   };
 
- if (actor.isOrganizationActor) {
+  if (actor.isOrganizationActor) {
     filter.organizationId = organizationId;
   }
 

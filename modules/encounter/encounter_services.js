@@ -10,11 +10,14 @@ import { procedureModel } from "../procedure/procedure_model.js";
 import { allergyModel } from "../allergies/allergies_model.js";
 import { immunizationModel } from "../immunizations/immunizations_model.js";
 import { generateEncounterCode } from "../../shared/utils/helper.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { Account } from "../accounts/account_model.js";
 
 export const createEncounterService = async ({ payload, authUser }) => {
+  console.log("🚀 ~ createEncounterService ~ authUser:", authUser);
   const session = await mongoose.startSession();
   session.startTransaction();
-    
+
   try {
     const {
       actor,
@@ -24,9 +27,23 @@ export const createEncounterService = async ({ payload, authUser }) => {
       patientId: payload.patientId,
       authUser,
     });
-    const createdBy = authUser?._id || authUser?.sub || null;
+
+    const wrOrgId = actor.wrOrgId || authUser?.orgId || null;
+    console.log("🚀 ~ createEncounterService ~ wrOrgId:", wrOrgId);
+
+    const organization = await OrganizationProfile.findOne({
+      wrOrgId: wrOrgId,
+    });
+    const organizationId = organization._id;
+    // const accounId = await Account.findOne({ accountId: authUser?.sub });
+    // console.log("🚀 ~ createEncounterService ~ accounId:", accounId)
+    console.log(
+      "🚀 ~ createEncounterService ~ organizationId:",
+      organizationId,
+    );
+
+    const createdBy = actor?._id || authUser?.sub || null;
     const providerId = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.sub || null;
 
     if (!createdBy || !providerId) {
       const error = new Error("Authenticated provider is required");
@@ -40,7 +57,8 @@ export const createEncounterService = async ({ payload, authUser }) => {
       throw error;
     }
 
-    const encounterCode = await generateEncounterCode(Encounter)
+    const encounterCode = await generateEncounterCode(Encounter);
+    const encounterTitle = getEncounterDisplayTitle(payload);
 
     const docs = await Encounter.create(
       [
@@ -50,29 +68,22 @@ export const createEncounterService = async ({ payload, authUser }) => {
           organizationId,
           createdBy,
 
-          encounterTitle: payload.encounterTitle || " ",
+          encounterTitle,
           encounterType: payload.encounterType || "outpatient",
           encounterCode: encounterCode,
-          scheduledAt: payload.scheduledAt || null,
+          //       scheduledAt: payload.scheduledAt || null,
           startedAt: payload.startedAt || new Date(),
           endedAt: payload.endedAt || null,
 
           reasonForVisit: payload.reasonForVisit || null,
           chiefComplaint: payload.chiefComplaint || null,
 
-          priority: payload.priority || "routine",
-          source: payload.source || "provider",
+          //       priority: payload.priority || "routine",
+          source: payload.providerId || "provider",
           status: payload.status || "scheduled",
-
-          visibilityToPatient:
-            payload.visibilityToPatient !== undefined
-              ? payload.visibilityToPatient
-              : true,
-
-          patientAccess: payload.patientAccess || "full",
-          recordStatus: payload.recordStatus || "active",
-
           notes: payload.notes || null,
+
+          //       recordStatus: payload.recordStatus || "active",
         },
       ],
       { session },
@@ -89,7 +100,7 @@ export const createEncounterService = async ({ payload, authUser }) => {
       providerId: created.providerId,
       organizationId: created.organizationId,
       encounterType: created.encounterType,
-      scheduledAt: created.scheduledAt,
+      // scheduledAt: created.scheduledAt,
       startedAt: created.startedAt,
       endedAt: created.endedAt,
       reasonForVisit: created.reasonForVisit,
@@ -97,9 +108,6 @@ export const createEncounterService = async ({ payload, authUser }) => {
       priority: created.priority,
       source: created.source,
       status: created.status,
-      visibilityToPatient: created.visibilityToPatient,
-      patientAccess: created.patientAccess,
-      recordStatus: created.recordStatus,
       notes: created.notes,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
@@ -126,8 +134,15 @@ export const getPatientEncountersService = async ({
     authUser,
   });
   // const organizationId = authUser?.organizationId || null;
-  const organizationId = authUser?.sub || null;
+  let organizationId = authUser?.sub || null;
   const skip = (page - 1) * limit;
+  if (actor.isOrganizationActor) {
+    const wrOrgId = actor.wrOrgId || authUser?.orgId || null;
+    const organization = await OrganizationProfile.findOne({
+      wrOrgId: wrOrgId,
+    });
+    organizationId = organization._id;
+  }
 
   const filter = {
     patientId: patientIds,
@@ -140,6 +155,10 @@ export const getPatientEncountersService = async ({
 
   const [items, total] = await Promise.all([
     Encounter.find(filter)
+      .populate({
+        path: "organizationId",
+        select: "email fullName organizationName name",
+      })
       .sort({ startedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -153,12 +172,17 @@ export const getPatientEncountersService = async ({
       id: item._id,
       patientId: item.patientId,
       providerId: item.providerId,
-      organizationId: item.organizationId?._id,
-      organizationName: item.organizationId?.email || null,
-      organizationFullName: item.organizationId?.fullName || null,
+
+      organizationId: item.organizationId?._id || null,
+      organizationName:
+        item.organizationId?.organizationName ||
+        item.organizationId?.name ||
+        item.organizationId?.fullName ||
+        null,
+      organizationEmail: item.organizationId?.email || null,
+
       encounterTitle: item.encounterTitle || null,
       encounterType: item.encounterType,
-      scheduledAt: item.scheduledAt || null,
       startedAt: item.startedAt || null,
       endedAt: item.endedAt || null,
       reasonForVisit: item.reasonForVisit || null,
@@ -180,6 +204,39 @@ export const getPatientEncountersService = async ({
       totalPages: Math.ceil(total / limit),
     },
   };
+
+  // return {
+  //   items: items.map((item) => ({
+  //     id: item._id,
+  //     patientId: item.patientId,
+  //     providerId: item.providerId,
+  //     organizationId: item.organizationId?._id,
+  //     organizationName: item.organizationId?.email || null,
+  //     organizationFullName: item.organizationId?.fullName || null,
+  //     encounterTitle: item.encounterTitle || null,
+  //     encounterType: item.encounterType,
+  //     scheduledAt: item.scheduledAt || null,
+  //     startedAt: item.startedAt || null,
+  //     endedAt: item.endedAt || null,
+  //     reasonForVisit: item.reasonForVisit || null,
+  //     chiefComplaint: item.chiefComplaint || null,
+  //     priority: item.priority || null,
+  //     source: item.source || null,
+  //     status: item.status || null,
+  //     visibilityToPatient: item.visibilityToPatient,
+  //     patientAccess: item.patientAccess || null,
+  //     recordStatus: item.recordStatus || null,
+  //     notes: item.notes || null,
+  //     createdAt: item.createdAt,
+  //     updatedAt: item.updatedAt,
+  //   })),
+  //   pagination: {
+  //     total,
+  //     page,
+  //     limit,
+  //     totalPages: Math.ceil(total / limit),
+  //   },
+  // };
 };
 
 export const getPatientEncountersDetailService = async ({
@@ -291,4 +348,22 @@ export const getPatientEncountersDetailService = async ({
       files: [],
     },
   };
+};
+
+export const getEncounterDisplayTitle = (encounter) => {
+  const typeLabel =
+    encounter.encounterType?.charAt(0).toUpperCase() +
+      encounter.encounterType?.slice(1) || "Encounter";
+
+  if (encounter.reasonForVisit?.trim()) {
+    return `${typeLabel} — ${encounter.reasonForVisit.trim()}`;
+  }
+
+  if (encounter.startedAt) {
+    return `${typeLabel} — ${new Date(
+      encounter.startedAt,
+    ).toLocaleDateString()}`;
+  }
+
+  return typeLabel;
 };

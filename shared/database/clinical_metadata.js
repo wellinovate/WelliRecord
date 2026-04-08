@@ -21,7 +21,7 @@ export const attachmentSubSchema = new Schema(
 export const clinicalMetadataFields = {
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Patient",
+    ref: "UserProfile",
     required: true,
     index: true,
   },
@@ -42,7 +42,7 @@ export const clinicalMetadataFields = {
 
   organizationId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Organization",
+    ref: "OrganizationProfile",
     default: null,
     index: true,
   },

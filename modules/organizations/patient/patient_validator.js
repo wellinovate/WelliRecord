@@ -4,7 +4,6 @@ import { z, ZodError } from "zod";
 export const searchPatientSchema = z
   .object({
     identifier: z.string().trim().min(1, "identifier is required"),
-    id: z.string(),
     identifierType: z.enum(["wrId", "email", "phone", "qr"]),
   })
   .superRefine((data, ctx) => {
@@ -36,7 +35,6 @@ export const linkPatientSchema = z.object({
     .refine((val) => mongoose.Types.ObjectId.isValid(val), {
       message: "Invalid patientIdentityId",
     }),
-    id: z.string(),
 });
 
 export const validate = (schema) => {

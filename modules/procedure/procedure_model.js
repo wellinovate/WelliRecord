@@ -58,7 +58,7 @@ const procedureEntrySchema = new Schema(
 
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "OrganizationProfile",
       default: null,
       index: true,
     },

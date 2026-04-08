@@ -17,14 +17,14 @@ router.get("/patients/:patientId", protect, getPatientDetailController);
 
 router.post(
   "/patient/search",
-  // protect,
+  protect,
   validate(searchPatientSchema),
   searchPatientForOrganizationController,
 );
 
 router.post(
   "/patient/link",
-  // protect,
+  protect,
   validate(linkPatientSchema),
   linkPatientToOrganizationController,
 );

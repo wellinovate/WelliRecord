@@ -1,4 +1,10 @@
-import { getPatientDetailService, getPatientsService, linkPatientService, linkPatientToOrganizationService, searchPatientForOrganizationService } from "./patient_service.js";
+import {
+  getPatientDetailService,
+  getPatientsService,
+  linkPatientService,
+  linkPatientToOrganizationService,
+  searchPatientForOrganizationService,
+} from "./patient_service.js";
 
 export const getPatientsController = async (req, res, next) => {
   try {
@@ -11,7 +17,6 @@ export const getPatientsController = async (req, res, next) => {
         message: "Organization context missing",
       });
     }
-
 
     const result = await getPatientsService({
       organizationId,
@@ -30,11 +35,10 @@ export const getPatientsController = async (req, res, next) => {
   }
 };
 
-
 export const getPatientDetailController = async (req, res, next) => {
   try {
     const { patientId } = req.params;
-    console.log("🚀 ~ getPatientDetailController ~ patientId:", patientId)
+    console.log("🚀 ~ getPatientDetailController ~ patientId:", patientId);
     const organizationId = req.user?.sub;
 
     if (!organizationId) {
@@ -97,10 +101,11 @@ export const searchPatientForOrganizationController = async (
   next,
 ) => {
   try {
-    const { identifier, identifierType, id } = req.validated;
-    console.log("🚀 ~ searchPatientForOrganizationController ~ identifier:", identifier)
+    const { identifier, identifierType } = req.validated;
+    
     // const organizationId = req.user?.organizationId;
-    const organizationId = id;
+    const organizationId = req.user.sub;
+    console.log("🚀 ~ searchPatientForOrganizationController ~ organizationId:", organizationId)
 
     if (!organizationId) {
       return res.status(403).json({
@@ -121,16 +126,17 @@ export const searchPatientForOrganizationController = async (
       data: result,
     });
   } catch (error) {
+    console.log("🚀 ~ searchPatientForOrganizationController ~ error:", error);
     next(error);
   }
 };
 
 export const linkPatientToOrganizationController = async (req, res, next) => {
   try {
-    const { patientIdentityId, id } = req.validated;
+    const { patientIdentityId } = req.validated;
     // const organizationId = req.user?.organizationId;
-    const organizationId = id;
-    const createdBy = id;
+    const organizationId = req.user.sub;
+    const createdBy = req.user?.sub;
 
     if (!organizationId) {
       return res.status(403).json({

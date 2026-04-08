@@ -16,8 +16,18 @@ export const createProcedureService = async ({ payload, authUser }) => {
       patientId,
       authUser,
     });
-    const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.sub || payload.organizationId || null;
+    let recordedBy = null;
+
+    // const organizationIdFromUser = authUser?.sub || null;
+    if (actor.isOrganizationActor === true) {
+      recordedBy = actor.organizationId;
+      console.log("🚀 ~ createVitalService ~ recordedBy:", recordedBy);
+    } else {
+      recordedBy = authUser?.sub || null;
+    }
+    const organizationId = actor.isOrganizationActor
+      ? actor.organizationId
+      : null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
@@ -54,7 +64,7 @@ export const createProcedureService = async ({ payload, authUser }) => {
           complications: payload.complications || undefined,
 
           performedBy: recordedBy,
-          facilityName: payload.facilityName || undefined,
+          facilityName: payload.facilityName || actor.organizationName,
           performedAt: payload.performedAt || new Date(),
           clinicalStatus: payload.clinicalStatus || "completed",
 
@@ -100,11 +110,21 @@ export const getPatientProceduresService = async ({
   limit = 10,
   authUser,
 }) => {
-  const organizationId = authUser?.organizationId || null;
+
+   const {
+      actor,
+      patientId: patientIds,
+      isSelf,
+    } = await resolvePatientAccessContext({
+      patientId,
+      authUser,
+    });
+
+  const organizationId = actor.isOrganizationActor && actor.organizationId;
   const skip = (page - 1) * limit;
 
   const filter = {
-    patientId,
+    patientId: patientIds,
     recordStatus: "active",
   };
 
@@ -115,6 +135,7 @@ export const getPatientProceduresService = async ({
   const [items, total] = await Promise.all([
     procedureModel
       .find(filter)
+      .populate("performedBy", "organizationName fullName  email")
       .sort({ performedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -122,6 +143,7 @@ export const getPatientProceduresService = async ({
 
     procedureModel.countDocuments(filter),
   ]);
+  console.log("🚀 ~ getPatientProceduresService ~ items:", items)
 
   return {
     items: items.map((item) => ({

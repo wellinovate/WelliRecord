@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { labResultModel } from "./lab_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
 
 export const createLabResultService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -17,8 +18,19 @@ export const createLabResultService = async ({ payload, authUser }) => {
       patientId,
       authUser,
     });
-    const recordedBy = authUser?._id || authUser?.sub || null;
-    const organizationId = authUser?.sub || payload.organizationId || null;
+
+    let recordedBy = null;
+
+    // const organizationIdFromUser = authUser?.sub || null;
+    if (actor.isOrganizationActor === true) {
+      recordedBy = actor.organizationId;
+      console.log("🚀 ~ createVitalService ~ recordedBy:", recordedBy);
+    } else {
+      recordedBy = authUser?.sub || null;
+    }
+    const organizationId = actor.isOrganizationActor
+      ? actor.organizationId
+      : null;
 
     if (!recordedBy) {
       const error = new Error("Authenticated user is required");
@@ -110,9 +122,7 @@ export const getPatientLabResultsService = async ({
     patientId,
     authUser,
   });
-  const organizationId = actor.isOrganizationActor
-    ? authUser?.sub || null
-    : null;
+  const organizationId = actor.isOrganizationActor && actor.organizationId;
   const skip = (page - 1) * limit;
 
   const filter = {
@@ -127,6 +137,66 @@ export const getPatientLabResultsService = async ({
   const [items, total] = await Promise.all([
     labResultModel
       .find(filter)
+      .sort({ resultedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    labResultModel.countDocuments(filter),
+  ]);
+
+  return {
+    items: items.map((item) => ({
+      id: item._id,
+      patientId: item.patientId,
+      testName: item.testName,
+      category: item.category || null,
+      specimen: item.specimen || null,
+      resultValue: item.resultValue || null,
+      unit: item.unit || null,
+      referenceRange: item.referenceRange || null,
+      interpretation: item.interpretation || null,
+      collectedAt: item.collectedAt || null,
+      resultedAt: item.resultedAt || null,
+      verificationStatus: item.verificationStatus || null,
+      attachments: item.attachments || [],
+      notes: item.notes || null,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    })),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
+export const getAllPatientLabResultsService = async ({
+  page = 1,
+  limit = 10,
+  authUser,
+}) => {
+  
+  let organizationId;
+    const wrOrgId = authUser?.orgId || null;
+    const organization = await OrganizationProfile.findOne({
+      wrOrgId: wrOrgId,
+    });
+    organizationId = organization._id;
+    const skip = (page - 1) * limit;
+  
+    const filter = {
+      organizationId: organizationId,
+      // recordStatus: "active",
+    };
+
+  
+
+  const [items, total] = await Promise.all([
+    labResultModel
+      .find(filter)
+      .populate("patientId", "firstName fullName lastName email")
       .sort({ resultedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
