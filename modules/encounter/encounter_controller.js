@@ -99,3 +99,26 @@ export const getMyEncounterDetailController = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getUserEncounterDetailControllerByOrganization = async (req, res, next) => {
+  try {
+    const { id, patientId } = req.params;
+    console.log("🚀 ~ getMyEncounterDetailController ~ id:", id);
+    // const authUser = req.user;
+    
+
+    const result = await getPatientEncountersDetailService({
+      id,
+      patientId,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient encounters fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

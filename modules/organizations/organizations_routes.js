@@ -5,6 +5,7 @@ import { registerPatientController } from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
 import { protect } from "../auth/auth_middleware.js";
 import { linkPatientSchema, searchPatientSchema, validate } from "./patient/patient_validator.js";
+import { getUserEncounterDetailControllerByOrganization } from "../encounter/encounter_controller.js";
 // import { protect } from "../auth/auth_middleware;
 
 const storage = multer.memoryStorage();
@@ -21,6 +22,7 @@ router.post(
   validate(searchPatientSchema),
   searchPatientForOrganizationController,
 );
+router.get("/medical-history/encounter/:id/:patientId", protect, getUserEncounterDetailControllerByOrganization);
 
 router.post(
   "/patient/link",
