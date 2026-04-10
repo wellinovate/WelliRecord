@@ -4,7 +4,7 @@ import { getMyVitalsController } from "../vitals/vital_controller.js";
 import * as medicalHistoryController from "./users_controller.js";
 import { getMyMedicationsController } from "../medications/medication_controller.js";
 import { getMyAllergiesController } from "../allergies/allergies_controller.js";
-import { getMyEncounterDetailController, getMyEncountersController } from "../encounter/encounter_controller.js";
+import { getMyEncounterDetailController, getMyEncountersController, getuserEncountersControllerByOrganiazation } from "../encounter/encounter_controller.js";
 import { getMyDiagnosesController } from "../diagnoses/diagnoses_controller.js";
 import { getMyLabResultsController } from "../lab/lab_result_controller.js";
 import { getMyImmunizationsController } from "../immunizations/immunization_controller.js";
@@ -17,6 +17,11 @@ router.get(
   protect,
   medicalHistoryController.getMedicalHistorySummary,
 );
+router.get(
+  "/medical-history/summary/:patientId",
+  protect,
+  medicalHistoryController.getMedicalHistorySummaryByProviders,
+);
 router.get("/medical-history/vitals", protect, getMyVitalsController);
 router.get("/medical-history/medications", protect, getMyMedicationsController);
 router.get("/medical-history/allergies", protect, getMyAllergiesController);
@@ -25,6 +30,7 @@ router.get("/medical-history/lab", protect, getMyLabResultsController);
 router.get("/medical-history/immunizations", protect, getMyImmunizationsController);
 router.get("/medical-history/procedures", protect, getMyProceduresController);
 router.get("/medical-history/encounter", protect, getMyEncountersController);
+router.get("/medical-history/encounter/provider/:patientId", protect, getuserEncountersControllerByOrganiazation);
 router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailController);
 
 router.get("/me", protect, medicalHistoryController.fetchUserProfile);

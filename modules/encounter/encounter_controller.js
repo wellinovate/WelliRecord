@@ -77,6 +77,32 @@ export const getMyEncountersController = async (req, res, next) => {
   }
 };
 
+export const getuserEncountersControllerByOrganiazation = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10 } = getPatientEncountersQuerySchema.parse(
+      req.query,
+    );
+    const authUser = req.user;
+    const {patientId} = req.params;
+
+    const result = await getPatientEncountersService({
+      patientId,
+      page,
+      limit,
+      authUser: req.user,
+    });
+    // console.log("🚀 ~ getMyEncountersController ~ result:", result)
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient encounters fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getMyEncounterDetailController = async (req, res, next) => {
   try {
     const { id } = req.params;

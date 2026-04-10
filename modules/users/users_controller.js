@@ -33,6 +33,32 @@ export async function getMedicalHistorySummary(req, res, next) {
     next(error);
   }
 }
+export async function getMedicalHistorySummaryByProviders(req, res, next) {
+  try {
+    const {patientId} = req.params
+    const authUser = req.user;
+    const { actor, patientId: patientIds, isSelf } = await resolvePatientAccessContext({
+      patientId: patientId,
+      authUser,
+    });
+
+    console.log("FFFFFFFFFFFFFFFFFFFFFFFFFFFF ~ patientId:", patientId);
+
+    const data = await medicalHistoryService.getMedicalHistorySummary(
+      patientIds,
+    );
+    console.log("🚀 ~ getMedicalHistorySummary ~ data:", data);
+
+    return res.status(200).json({
+      success: true,
+      message: "Medical history summary fetched successfully",
+      data,
+    });
+  } catch (error) {
+    console.log("🚀 ~ getMedicalHistorySummary ~ error:", error);
+    next(error);
+  }
+}
 
 export async function getPatientVitals(req, res, next) {
   try {
