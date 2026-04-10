@@ -23,6 +23,7 @@ export const registerAccount = async (payload) => {
 };
 
 export const registerUserAccount = async (payload) => {
+  // console.log("🚀 ~ registerUserAccount ~ payload:", payload)
   return withTransaction(async (session) => {
     const existing = await findAccountByEmail(payload.email, session);
 
@@ -54,8 +55,9 @@ export const registerUserAccount = async (payload) => {
         middleName: payload.middleName,
         lastName: payload.lastName,
         email: payload.email,
+        phone: payload.phone,
         gender: payload.gender,
-        homeAddress: payload.homeAddress,
+        homeAddress: payload.address,
       },
       session,
     );

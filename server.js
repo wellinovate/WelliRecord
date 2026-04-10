@@ -30,6 +30,8 @@ const corsOptions = {
   origin: [
     "http://localhost:5173",
     "https://wellirecord.com",
+    // "https://www.wellirecord.com",
+    "https://www.wellirecord.com",
     "https://wellirecords.vercel.app",
     "http://localhost:3000",
   ],

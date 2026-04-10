@@ -10,6 +10,8 @@ const personalRegisterSchema = z.object({
     .transform((val) => val.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
   phone: z.string().optional(),
+  gender: z.string().trim().min(2, "Gender is required"),
+  address: z.string().optional(),
   role: z.string().optional(),
   authProvider: z.literal("local").optional(),
 });
@@ -62,7 +64,6 @@ const loginSchema = z.object({
 
 export const validateRegisterRequest = (req, res, next) => {
   const { accountType } = req.body;
-  console.log("🚀 ~ validateRegisterRequest ~ req.body:", req.body);
 
   let schema;
 

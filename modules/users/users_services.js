@@ -13,6 +13,8 @@ import { allergyModel } from "../allergies/allergies_model.js";
 import { generateWelliRecordId } from "../../shared/utils/helper.js";
 
 export const createUserProfile = async (payload, session) => {
+  console.log("🚀 ~ createUserProfile ~ profile:", payload );
+
   const username = payload.username || generateUsername(payload.email);
   const [profile] = await UserProfile.create(
     [
@@ -24,13 +26,13 @@ export const createUserProfile = async (payload, session) => {
         middleName: payload.middleName || "",
         lastName: payload.lastName || "",
         email: payload.email,
-        gender: payload.gender || null,
-        homeAddress: payload.homeAddress || null,
+        phone: payload.phone || null,
+        homeAddress: payload.homeAddress,
+        gender: payload.gender ,
       },
     ],
     { session },
   );
-  console.log("🚀 ~ createUserProfile ~ profile:", profile);
 
   return profile;
 };
@@ -253,9 +255,11 @@ export async function getPatientAllergies(patientId, options) {
 
 export const getUserProfile = async (accountId) => {
   try {
-    const profile = await UserProfile.findOne({ accountId })
-      .populate("accountId", "email") // optional
-      // .lean();
+    const profile = await UserProfile.findOne({ accountId }).populate(
+      "accountId",
+      "email",
+    ); // optional
+    // .lean();
     console.log("🚀 ~ getUserProfile ~ profile:", profile);
 
     if (profile && !profile.wrId) {

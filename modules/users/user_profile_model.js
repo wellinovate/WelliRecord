@@ -64,6 +64,7 @@ const userProfileSchema = new Schema(
 
     gender: {
       type: String,
+      required: true,
       enum: ["Male", "Female", "Other"],
       default: null,
     },
@@ -95,6 +96,7 @@ const userProfileSchema = new Schema(
 
     phone: {
       type: String,
+      required: true,
       trim: true,
       default: null,
     },
