@@ -36,6 +36,13 @@ export const linkPatientSchema = z.object({
       message: "Invalid patientIdentityId",
     }),
 });
+export const addDoctorSchema = z.object({
+  doctorIdentityId: z
+    .string()
+    .refine((val) => mongoose.Types.ObjectId.isValid(val), {
+      message: "Invalid patientIdentityId",
+    }),
+});
 
 export const validate = (schema) => {
   return (req, res, next) => {

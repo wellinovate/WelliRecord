@@ -131,6 +131,42 @@ export const searchPatientForOrganizationController = async (
   }
 };
 
+export const searchDoctorForOrganizationController = async (
+  req,
+  res,
+  next,
+) => {
+  try {
+    const { identifier, identifierType } = req.validated;
+    
+    // const organizationId = req.user?.organizationId;
+    const organizationId = req.user.sub;
+    console.log("🚀 ~ searchPatientForOrganizationController ~ organizationId:", organizationId)
+
+    if (!organizationId) {
+      return res.status(403).json({
+        success: false,
+        message: "Organization context is required",
+      });
+    }
+
+    const result = await searchPatientForOrganizationService({
+      identifier,
+      identifierType,
+      organizationId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient found",
+      data: result,
+    });
+  } catch (error) {
+    console.log("🚀 ~ searchPatientForOrganizationController ~ error:", error);
+    next(error);
+  }
+};
+
 export const linkPatientToOrganizationController = async (req, res, next) => {
   try {
     const { patientIdentityId } = req.validated;

@@ -13,7 +13,7 @@ const organizationMembershipSchema = new Schema(
 
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "Account",
+      ref: "UserProfile",
       required: true,
       index: true,
     },
@@ -35,6 +35,12 @@ const organizationMembershipSchema = new Schema(
     },
 
     department: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    specialist: {
       type: String,
       trim: true,
       default: null,
