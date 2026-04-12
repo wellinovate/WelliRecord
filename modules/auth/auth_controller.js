@@ -128,9 +128,9 @@ export const googleLoginController = async (req, res) => {
         isActive: true,
       });
       user = await UserProfile.create({
+        accountId: account._id,
         email,
         googleId: sub,
-        accountId: account._id,
         firstName: given_name || name?.split(" ")[0] || "",
         lastName: family_name || "",
         fullName: name || "",

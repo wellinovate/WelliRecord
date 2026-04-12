@@ -243,3 +243,53 @@ export const fetchUserProfile = async (req, res) => {
     });
   }
 };
+
+
+
+export const updateUserProfileController = async (
+  req,
+  res
+) => {
+  try {
+    const userId = req.user?.id || req.user?._id || req.auth?.sub;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const updatedProfile = await medicalHistoryService.updateUserProfileService({
+      userId,
+      payload: req.body,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: updatedProfile,
+    });
+  } catch (error) {
+    console.error("updateUserProfileController error:", error);
+
+    const knownErrors = [
+      "Invalid user id",
+      "Profile not found",
+      "Invalid dateOfBirth",
+      "No valid fields provided for update",
+      "Each emergency contact must have a name",
+      "Each emergency contact must have a phone number",
+      "Full name must be at least 2 characters",
+      "Emergency contacts must be an array",
+    ];
+
+    const statusCode = knownErrors.includes(error.message) ? 400 : 500;
+
+    return res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode === 500 ? "Failed to update profile" : error.message,
+    });
+  }
+};

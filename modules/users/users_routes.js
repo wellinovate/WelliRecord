@@ -34,6 +34,7 @@ router.get("/medical-history/encounter/provider/:patientId", protect, getuserEnc
 router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailController);
 
 router.get("/me", protect, medicalHistoryController.fetchUserProfile);
+router.put("/update/profile", protect, medicalHistoryController.updateUserProfileController);
 
 router.get(
   "/patients/:patientId/medical-history/vitals",

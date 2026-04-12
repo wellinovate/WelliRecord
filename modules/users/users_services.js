@@ -255,7 +255,7 @@ export async function getPatientAllergies(patientId, options) {
 
 export const getUserProfile = async (accountId) => {
   try {
-    const profile = await UserProfile.findOne({ accountId }).populate(
+    const profile = await UserProfile.findOne({ accountId: accountId }).populate(
       "accountId",
       "email",
     ); // optional
@@ -293,4 +293,111 @@ export const getUserProfile = async (accountId) => {
   } catch (error) {
     console.log("🚀 ~ getUserProfile ~ error:", error);
   }
+};
+
+
+
+
+const sanitizeString = (value) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed;
+};
+
+const sanitizeNullableString = (value) => {
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+  return value.trim();
+};
+
+export const updateUserProfileService = async ({
+  userId,
+  payload,
+}) => {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error("Invalid user id");
+  }
+
+  const profile = await UserProfile.findOne({ userId });
+
+  if (!profile) {
+    throw new Error("Profile not found");
+  }
+
+  const updateData = {};
+
+  // Editable fields only
+  if ("avatar" in payload) {
+    updateData.avatar = sanitizeNullableString(payload.avatar);
+  }
+
+  if ("dateOfBirth" in payload) {
+    if (payload.dateOfBirth === null || payload.dateOfBirth === "") {
+      updateData.dateOfBirth = null;
+    } else {
+      const parsed = new Date(payload.dateOfBirth);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new Error("Invalid dateOfBirth");
+      }
+      updateData.dateOfBirth = parsed;
+    }
+  }
+
+  if ("firstName" in payload) {
+    updateData.firstName = sanitizeString(payload.firstName) || "";
+  }
+
+  if ("middleName" in payload) {
+    updateData.middleName = sanitizeString(payload.middleName) || "";
+  }
+
+  if ("lastName" in payload) {
+    updateData.lastName = sanitizeString(payload.lastName) || "";
+  }
+
+  if ("fullName" in payload) {
+    const fullName = sanitizeString(payload.fullName) || "";
+    if (fullName.length < 2) {
+      throw new Error("Full name must be at least 2 characters");
+    }
+    updateData.fullName = fullName;
+  }
+
+  if ("emergencyContacts" in payload) {
+    if (!Array.isArray(payload.emergencyContacts)) {
+      throw new Error("Emergency contacts must be an array");
+    }
+
+    updateData.emergencyContacts = payload.emergencyContacts.map((contact) => {
+      const name = sanitizeString(contact.name) || "";
+      const relationship = sanitizeString(contact.relationship) || "";
+      const phone = sanitizeString(contact.phone) || "";
+
+      if (!name) {
+        throw new Error("Each emergency contact must have a name");
+      }
+
+      if (!phone) {
+        throw new Error("Each emergency contact must have a phone number");
+      }
+
+      return {
+        name,
+        relationship,
+        phone,
+      };
+    });
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error("No valid fields provided for update");
+  }
+
+  const updatedProfile = await UserProfile.findByIdAndUpdate(
+    profile._id,
+    { $set: updateData },
+    { new: true, runValidators: true }
+  ).lean();
+
+  return updatedProfile;
 };

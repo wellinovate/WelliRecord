@@ -37,7 +37,8 @@ export const signAccessToken = (results) => {
 export const signAccessTokenGoogle = (user) => {
   return jwt.sign(
     {
-      sub: user._id,
+      // sub: user._id,
+      sub: user.accountId,
       email: user.email,
       fullName: user.fullName || user.firstName || user.name || "",
       accountType: "user",
