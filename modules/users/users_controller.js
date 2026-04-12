@@ -251,7 +251,8 @@ export const updateUserProfileController = async (
   res
 ) => {
   try {
-    const userId = req.user?.id || req.user?._id || req.auth?.sub;
+    const userId = req.user?.sub;
+    console.log("🚀 ~ updateUserProfileController ~ userId:", userId)
 
     if (!userId) {
       return res.status(401).json({

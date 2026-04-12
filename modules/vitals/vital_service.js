@@ -76,7 +76,7 @@ export const createVitalService = async ({ payload, authUser }) => {
       : payload.createdContext || "provider-chart";
 
     const providerId = actor.isOrganizationActor ? actor.userId : null;
-    const organizationId = actor.isOrganizationActor ? actor.organizationId : null;
+    const organizationId = actor.isOrganizationActor && actor.organizationId;
 
     // const check = patientFromUserProfile || patientFromPatientIdentity;
     if (!patientId) {
@@ -216,6 +216,7 @@ export const getPatientVitalsService = async ({
   const [vitals, total] = await Promise.all([
     vitalModel
       .find(filter)
+      .populate("recordedBy", "organizationName email")
       .sort({ measuredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -223,6 +224,7 @@ export const getPatientVitalsService = async ({
 
     vitalModel.countDocuments(filter),
   ]);
+  console.log("🚀 ~ getPatientVitalsService ~ vitals:", vitals)
 
   return {
     items: vitals.map((item) => ({
@@ -235,6 +237,9 @@ export const getPatientVitalsService = async ({
       temperature: item.temperature || null,
       respiratoryRate: item.respiratoryRate ?? null,
       oxygenSaturation: item.oxygenSaturation ?? null,
+      organiztion: item.organizationId?._id || null,
+      organizationEmail: item.organizationId?.email,
+      organizationFullName: item.organizationId?.organizationName || null,
       weight: item.weight || null,
       height: item.height || null,
       bmi: item.bmi ?? null,

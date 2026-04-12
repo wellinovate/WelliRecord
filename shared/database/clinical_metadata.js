@@ -28,7 +28,7 @@ export const clinicalMetadataFields = {
 
   recordedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: "OrganizationProfile",
     default: null,
     index: true,
   },

@@ -13,7 +13,7 @@ import { allergyModel } from "../allergies/allergies_model.js";
 import { generateWelliRecordId } from "../../shared/utils/helper.js";
 
 export const createUserProfile = async (payload, session) => {
-  console.log("🚀 ~ createUserProfile ~ profile:", payload );
+  console.log("🚀 ~ createUserProfile ~ profile:", payload);
 
   const username = payload.username || generateUsername(payload.email);
   const [profile] = await UserProfile.create(
@@ -28,7 +28,7 @@ export const createUserProfile = async (payload, session) => {
         email: payload.email,
         phone: payload.phone || null,
         homeAddress: payload.homeAddress,
-        gender: payload.gender ,
+        gender: payload.gender,
       },
     ],
     { session },
@@ -255,10 +255,9 @@ export async function getPatientAllergies(patientId, options) {
 
 export const getUserProfile = async (accountId) => {
   try {
-    const profile = await UserProfile.findOne({ accountId: accountId }).populate(
-      "accountId",
-      "email",
-    ); // optional
+    const profile = await UserProfile.findOne({
+      accountId: accountId,
+    }).populate("accountId", "email"); // optional
     // .lean();
     console.log("🚀 ~ getUserProfile ~ profile:", profile);
 
@@ -295,9 +294,6 @@ export const getUserProfile = async (accountId) => {
   }
 };
 
-
-
-
 const sanitizeString = (value) => {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
@@ -310,21 +306,47 @@ const sanitizeNullableString = (value) => {
   return value.trim();
 };
 
-export const updateUserProfileService = async ({
-  userId,
-  payload,
-}) => {
+export const updateUserProfileService = async ({ userId, payload }) => {
+  console.log("🚀 ~ updateUserProfileService ~ payload:", payload)
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid user id");
   }
 
-  const profile = await UserProfile.findOne({ userId });
+  const profile = await UserProfile.findOne({ accountId: userId });
 
   if (!profile) {
     throw new Error("Profile not found");
   }
 
   const updateData = {};
+
+  if ("phone" in payload) {
+    if (profile.phone) {
+      throw new Error("Phone cannot be changed once set");
+    }
+
+    const phone = sanitizeString(payload.phone);
+    if (!phone) {
+      throw new Error("Phone is required");
+    }
+
+    updateData.phone = phone;
+  }
+
+  if ("gender" in payload) {
+    if (profile.gender) {
+      throw new Error("Gender cannot be changed once set");
+    }
+
+    const allowedGenders = ["Male", "Female", "Other"];
+    const gender = sanitizeString(payload.gender);
+
+    if (!gender || !allowedGenders.includes(gender)) {
+      throw new Error("Invalid gender");
+    }
+
+    updateData.gender = gender;
+  }
 
   // Editable fields only
   if ("avatar" in payload) {
@@ -396,7 +418,7 @@ export const updateUserProfileService = async ({
   const updatedProfile = await UserProfile.findByIdAndUpdate(
     profile._id,
     { $set: updateData },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   ).lean();
 
   return updatedProfile;
