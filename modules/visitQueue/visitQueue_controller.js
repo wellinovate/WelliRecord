@@ -12,6 +12,7 @@ export const createWalkInQueueController = async (req, res, next) => {
   try {
     const queueItem = await createWalkInQueueService({
       ...req.body,
+      authUser: req.user,
       checkedInBy: req.user?.sub || null,
     });
 
@@ -72,6 +73,7 @@ export const updateQueueStatusController = async (req, res, next) => {
 };
 
 export const saveTriageController = async (req, res, next) => {
+  console.log("🚀 ~ saveTriageController ~ req:", req.body)
   try {
     const queueItem = await saveTriageService({
       queueId: req.params.queueId,
@@ -93,7 +95,7 @@ export const startEncounterFromQueueController = async (req, res, next) => {
   try {
     const result = await startEncounterFromQueueService({
       queueId: req.params.queueId,
-      providerId: req.body.providerId || req.user?.sub,
+      authUser: req.user,
       startedBy: req.user?.sub || null,
     });
 

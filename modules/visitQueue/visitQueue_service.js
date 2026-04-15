@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import { VisitQueue } from "./visitQueue_model.js";
 import { Appointment } from "../appointments/appointment_model.js";
 import { Encounter } from "../encounter/encounter_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { generateEncounterCode } from "../../shared/utils/helper.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -12,20 +14,27 @@ export const createWalkInQueueService = async ({
   visitType = "consultation",
   priority = "normal",
   chiefComplaint = null,
+  authUser,
   checkedInBy = null,
 }) => {
-  if (!patientId || !organizationId) {
+  const { actor, patientId: patientIds , isSelf } = await resolvePatientAccessContext({
+        patientId: patientId,
+        authUser,
+      });
+  console.log("🚀 ~ createWalkInQueueService ~ organizationId:", actor.organizationId)
+  console.log("🚀 ~ createWalkInQueueService ~ patientId:", patientId)
+  if (!patientIds || !actor.organizationId) {
     throw new Error("patientId and organizationId are required");
   }
 
-  if (!isValidObjectId(patientId)) throw new Error("Invalid patientId");
-  if (!isValidObjectId(organizationId)) throw new Error("Invalid organizationId");
+  if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
+  if (!isValidObjectId(actor.organizationId)) throw new Error("Invalid organizationId");
   if (providerId && !isValidObjectId(providerId)) throw new Error("Invalid providerId");
   if (checkedInBy && !isValidObjectId(checkedInBy)) throw new Error("Invalid checkedInBy");
 
   const queueItem = await VisitQueue.create({
-    patientId,
-    organizationId,
+    patientId: patientIds,
+    organizationId: actor.organizationId,
     providerId,
     source: "walk-in",
     visitType,
@@ -186,16 +195,26 @@ export const saveTriageService = async ({
 
 export const startEncounterFromQueueService = async ({
   queueId,
-  providerId,
+  authUser,
   startedBy = null,
 }) => {
+  
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
-  if (!providerId || !isValidObjectId(providerId)) {
-    throw new Error("Valid providerId is required");
-  }
-
   const queueItem = await VisitQueue.findById(queueId);
   if (!queueItem) throw new Error("Queue item not found");
+  
+  const { actor, patientId , isSelf } = await resolvePatientAccessContext({
+    patientId : queueItem.patientId,
+    authUser,
+  });
+  console.log("🚀 ~ startEncounterFromQueueService ~ actor:", actor)
+
+  const organizationId = actor.organizationId
+
+  if (!organizationId || !isValidObjectId(organizationId)) {
+    throw new Error("Valid organization is required");
+  }
+
 
   if (queueItem.encounterId) {
     throw new Error("Encounter already exists for this queue item");
@@ -205,15 +224,18 @@ export const startEncounterFromQueueService = async ({
     throw new Error(`Cannot start encounter from ${queueItem.workflowStatus} status`);
   }
 
+  const encounterCode = await generateEncounterCode(Encounter);
+
   const encounter = await Encounter.create({
-  patientId: queueItem.patientId,
-  providerId,
-  organizationId: queueItem.organizationId,
+  patientId: patientId,
+  providerId: organizationId,
+  organizationId: organizationId,
   queueId: queueItem._id,
   appointmentId: queueItem.appointmentId || null,
   visitSource: queueItem.source,
   encounterTitle: "Outpatient Consultation",
   encounterType: queueItem.visitType === "emergency" ? "emergency" : "outpatient",
+  encounterCode: encounterCode,
   startedAt: new Date(),
   reasonForVisit: queueItem.chiefComplaint || null,
   chiefComplaint: queueItem.chiefComplaint || null,
@@ -229,17 +251,17 @@ export const startEncounterFromQueueService = async ({
 });
 
   queueItem.encounterId = encounter._id;
-  queueItem.providerId = providerId;
+  queueItem.providerId = organizationId;
   queueItem.workflowStatus = "in-progress";
   queueItem.startedAt = new Date();
-  queueItem.startedBy = startedBy || providerId;
+  queueItem.startedBy = startedBy || organizationId;
 
   await queueItem.save();
 
   if (queueItem.appointmentId) {
     await Appointment.findByIdAndUpdate(queueItem.appointmentId, {
       status: "checked-in",
-      providerId,
+      organizationId,
     });
   }
 
