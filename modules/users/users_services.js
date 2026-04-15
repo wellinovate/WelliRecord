@@ -92,7 +92,6 @@ async function getCategorySummary(Model, patientId, category, metricBuilder) {
 }
 
 export async function getMedicalHistorySummary(patientId) {
-  console.log("🚀 ~ getMedicalHistorySummary ~ patientId:", patientId);
   const [
     vitals,
     diagnoses,
@@ -210,7 +209,6 @@ export async function getMedicalHistorySummary(patientId) {
       },
     ),
   ]);
-  console.log("🚀 ~ getMedicalHistorySummary ~ vitals:", vitals);
 
   return {
     vitals,

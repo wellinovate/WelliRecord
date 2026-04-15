@@ -58,7 +58,6 @@ export const getMyDiagnosesController = async (req, res, next) => {
       limit,
       authUser: req.user,
     });
-    console.log("🚀 ~ getMyDiagnosesController ~ result:", result)
 
     return res.status(200).json({
       success: true,

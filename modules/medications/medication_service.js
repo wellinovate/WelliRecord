@@ -146,14 +146,14 @@ export const getPatientMedicationsService = async ({
     authUser,
   });
   const organizationId = actor.isOrganizationActor && actor.organizationId;
-  const skip = (page - 1) * limit;
   console.log(
-    "🚀 ~ getPatientMedicationsService ~ filter.patientIds:",
-    patientIds,
+    "🚀 ~ getPatientMedicationsService ~ organizationId:",
+    organizationId,
   );
+  const skip = (page - 1) * limit;
 
   const filter = {
-    // patientId: patientIds,
+    patientId: patientIds,
     recordStatus: "active",
     // clinicalStatus: "active",
   };
@@ -165,7 +165,14 @@ export const getPatientMedicationsService = async ({
   const [items, total] = await Promise.all([
     medicationModel
       .find(filter)
-      .populate("prescribedBy", "firstName fullName lastName email")
+      .populate({
+        path: "prescribedBy",
+        select: "organizationName accountId ",
+        populate: {
+          path: "accountId",
+          select: "email fullName accountType isVerified",
+        },
+      })
       .sort({ prescribedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -173,6 +180,7 @@ export const getPatientMedicationsService = async ({
 
     medicationModel.countDocuments(filter),
   ]);
+  console.log("🚀 ~ getPatientMedicationsService ~ items:", items);
 
   return {
     items: items.map((item) => ({
@@ -187,13 +195,12 @@ export const getPatientMedicationsService = async ({
       frequency: item.frequency || null,
       indication: item.indication || null,
       prescribedBy: item.prescribedBy?._id || null,
-      prescribedByName: item.prescribedBy
-        ? `${item.prescribedBy.firstName || ""} ${
-            item.prescribedBy.lastName || ""
-          }`.trim() || null
-        : null,
+      prescribedByAccountId: item.prescribedBy?.accountId?._id || null,
+      prescribedByAccountEmail: item.prescribedBy?.accountId?.email || null,
+      prescribedByAccountType:
+        item.prescribedBy?.accountId?.accountType || null,
       prescribedByEmail: item.prescribedBy?.email || null,
-      prescribedByFullName: item.prescribedBy?.fullName || null,
+      prescribedByFullName: item.prescribedBy?.organizationName || null,
       prescribedAt: item.prescribedAt || null,
       startDate: item.startDate || null,
       endDate: item.endDate || null,

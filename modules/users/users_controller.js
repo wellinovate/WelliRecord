@@ -1,3 +1,4 @@
+import redisClient from "../../shared/config/redis.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import * as medicalHistoryService from "./users_services.js";
 
@@ -16,12 +17,10 @@ export async function getMedicalHistorySummary(req, res, next) {
       authUser,
     });
 
-    console.log("FFFFFFFFFFFFFFFFFFFFFFFFFFFF ~ patientId:", patientId);
 
     const data = await medicalHistoryService.getMedicalHistorySummary(
       patientId,
     );
-    console.log("🚀 ~ getMedicalHistorySummary ~ data:", data);
 
     return res.status(200).json({
       success: true,
@@ -42,12 +41,10 @@ export async function getMedicalHistorySummaryByProviders(req, res, next) {
       authUser,
     });
 
-    console.log("FFFFFFFFFFFFFFFFFFFFFFFFFFFF ~ patientId:", patientId);
 
     const data = await medicalHistoryService.getMedicalHistorySummary(
       patientIds,
     );
-    console.log("🚀 ~ getMedicalHistorySummary ~ data:", data);
 
     return res.status(200).json({
       success: true,
@@ -230,7 +227,33 @@ export const fetchUserProfile = async (req, res) => {
     const accountId = req.user.sub; // from auth middleware
     console.log("🚀 ~ fetchUserProfile ~ accountId:", accountId)
 
+
+    if (!accountId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const cacheKey = `user:profile:${accountId}`;
+
+
+
+    // 1. Check Redis first
+    const cachedProfile = await redisClient.get(cacheKey);
+
+    if (cachedProfile) {
+      return res.status(200).json({
+        success: true,
+        source: "redis",
+        data: JSON.parse(cachedProfile),
+      });
+    }
+
     const profile = await medicalHistoryService.getUserProfile(accountId);
+
+    // 3. Save to Redis for 10 minutes
+    await redisClient.setEx(cacheKey, 600, JSON.stringify(profile));
 
     res.status(200).json({
       success: true,
@@ -265,6 +288,16 @@ export const updateUserProfileController = async (
       userId,
       payload: req.body,
     });
+
+     if (!updatedProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Clear stale cache
+    await redisClient.del(`user:profile:${userId}`);
 
     return res.status(200).json({
       success: true,

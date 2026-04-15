@@ -36,6 +36,7 @@ const organizationProfileSchema = new Schema(
         "telehealth", // virtual care platforms
         "government", // ministries, public health bodies
         "ngo", // non-profits
+        "individaul_provider", // non-profits
         "healthtech", // tech companies (like WelliRecord)
         "vendor", // devices, wearables, suppliers
         "other",

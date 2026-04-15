@@ -73,6 +73,20 @@ const accountSchema = new Schema(
       index: true,
     },
 
+    verificationTokenHash: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    verificationTokenExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    verificationLastSentAt: {
+      type: Date,
+      default: null,
+    },
+
     status: {
       type: String,
       enum: ["active", "suspended", "pending", "disabled"],

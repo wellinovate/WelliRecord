@@ -17,6 +17,9 @@ import diagnosisRoutes from "./modules/diagnoses/diagnosis_routes.js";
 import labResultRoutes from "./modules/lab/lab_result_routes.js";
 import procedureRoutes from "./modules/procedure/procedure_routes.js";
 import immunizationRoutes from "./modules/immunizations/immunization_routes.js";
+import appointmentRoutes from "./modules/appointments/appointment_routes.js";
+import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
+import { connectRedis } from "./shared/config/redis.js";
 // import uploadRoute from "./routes/upload.js";
 
 dotenv.config();
@@ -25,6 +28,7 @@ const app = express();
 // app.use(bodyParser.json());
 
 connectDB();
+connectRedis();
 
 const corsOptions = {
   origin: [
@@ -61,11 +65,19 @@ app.use("/api/v1/vitals", vitalRoutes);
 app.use("/api/v1/encounter", encounterRoutes);
 app.use("/api/v1/user", userRoutes);
 
+
+app.use("/api/v1/appointments", appointmentRoutes);
+app.use("/api/v1/queue", visitQueueRoutes);
+
 // Health check
 app.get("/", (req, res) => res.send("WelliID Issuer Service is running..."));
 
 // Start server
+// const PORT = process.env.PORT || 3001;
+// app.listen(PORT, () => {
+//   console.log(`✅ WelliID Issuer Service listening on port ${PORT}`);
+// });
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ WelliID Issuer Service listening on port ${PORT}`);
 });

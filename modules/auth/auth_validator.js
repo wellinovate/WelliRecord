@@ -28,6 +28,7 @@ const organizationRegisterSchema = z.object({
     "telehealth",
     "government",
     "ngo",
+    "individaul_provider",
     "healthtech",
     "vendor",
     "other",

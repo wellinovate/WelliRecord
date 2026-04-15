@@ -167,3 +167,87 @@ export const registerNewPatientService = async ({
     isNew,
   };
 };
+
+
+
+
+const escapeRegex = (value = "") =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const searchProvidersService = async ({
+  search = "",
+  page = 1,
+  limit = 20,
+}) => {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 20));
+  const skip = (safePage - 1) * safeLimit;
+
+  const searchableTypes = [
+    "healthcare_provider",
+    "diagnostic",
+    "pharmacy",
+    "telehealth",
+    "individaul_provider", // keep as stored in your DB for now
+  ];
+
+  const query = {
+    organizationType: { $in: searchableTypes },
+    isLicensed: true,
+  };
+
+  if (search && search.trim()) {
+    const regex = new RegExp(escapeRegex(search.trim()), "i");
+
+    query.$or = [
+      { organizationName: regex },
+      { officeAddress: regex },
+      { email: regex },
+      { phone: regex },
+      { contactPersonName: regex },
+      { contactPersonRole: regex },
+      { wrOrgId: regex },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    OrganizationProfile.find()
+      .sort({ updatedAt: -1, organizationName: 1 })
+      .skip(skip)
+      .limit(safeLimit)
+      .lean(),
+    OrganizationProfile.countDocuments(query),
+  ]);
+  console.log("🚀 ~ searchProvidersService ~ items:", items)
+
+  const mapped = items.map((item) => {
+    const isIndividualProvider =
+      item.organizationType === "individaul_provider";
+
+    return {
+      _id: item._id,
+      fullName: isIndividualProvider
+        ? item.organizationName
+        : item.contactPersonName || null,
+      organizationName: item.organizationName,
+      organizationType: item.organizationType,
+      email: item.email || null,
+      phone: item.phone || null,
+      specialty: item.contactPersonRole || null,
+      telemedicineAvailable: item.organizationType === "telehealth",
+      organization: {
+        _id: item._id,
+        name: item.organizationName,
+        address: item.officeAddress || null,
+      },
+    };
+  });
+
+  return {
+    items: mapped,
+    total,
+    page: safePage,
+    limit: safeLimit,
+    totalPages: Math.ceil(total / safeLimit),
+  };
+};

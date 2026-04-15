@@ -109,6 +109,25 @@ const encounterSchema = new Schema(
       index: true,
     },
 
+    queueId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "VisitQueue",
+      default: null,
+      index: true,
+    },
+    appointmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Appointment",
+      default: null,
+      index: true,
+    },
+    visitSource: {
+      type: String,
+      enum: ["appointment", "walk-in"],
+      default: null,
+      index: true,
+    },
+
     status: {
       type: String,
       enum: [

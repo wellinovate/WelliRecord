@@ -1,6 +1,7 @@
 import {
   registerNewPatientService,
   registerPatientService,
+  searchProvidersService,
 } from "./organizations_services.js";
 
 export const registerPatientController = async (req, res, next) => {
@@ -92,6 +93,28 @@ export const registerNewPatientController = async (req, res, next) => {
         ? "New patient registered"
         : "Existing patient matched and linked",
       data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+
+export const searchProvidersController = async (req, res, next) => {
+  try {
+    const result = await searchProvidersService({
+      search: req.query.search || "",
+      page: req.query.page || 1,
+      limit: req.query.limit || 20,
+    });
+    console.log("🚀 ~ searchProvidersController ~ result:", result)
+
+    return res.status(200).json({
+      success: true,
+      message: "Care directory fetched successfully",
+      ...result,
     });
   } catch (error) {
     next(error);

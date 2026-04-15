@@ -126,7 +126,6 @@ export const getPatientsService = async ({
   };
 };
 
-
 export const getPatientDetailService = async ({
   patientId,
   organizationId,
@@ -137,7 +136,7 @@ export const getPatientDetailService = async ({
     throw error;
   }
 
-  const relationByPatientId  = await PatientOrganization.findOne({
+  const relationByPatientId = await PatientOrganization.findOne({
     patientId,
     organizationId,
     status: "active",
@@ -145,9 +144,14 @@ export const getPatientDetailService = async ({
     .populate({
       path: "patientId",
       select:
-        "fullName firstName lastName dateOfBirth gender phone email wrId",
+        "fullName firstName lastName dateOfBirth accountId gender phone email wrId",
+      populate: {
+        path: "accountId",
+        select: "email fullName phone gender createdAt",
+      },
     })
     .lean();
+  console.log("🚀 ~ getPatientDetailService ~ relationByPatientId:", relationByPatientId)
 
   const relationByPatientIdentity = await PatientOrganization.findOne({
     patientIdentity: patientId,
@@ -156,13 +160,13 @@ export const getPatientDetailService = async ({
   })
     .populate({
       path: "patientIdentity",
-      select:
-        "fullName firstName lastName dateOfBirth gender phone email wrId",
+      select: "fullName firstName lastName dateOfBirth gender phone email wrId",
     })
     .lean();
 
- const patient =
-    relationByPatientId?.patientId || relationByPatientIdentity?.patientIdentity;
+  const patient =
+    relationByPatientId?.patientId ||
+    relationByPatientIdentity?.patientIdentity;
 
   const relation = relationByPatientId || relationByPatientIdentity;
 
@@ -178,7 +182,6 @@ export const getPatientDetailService = async ({
     throw error;
   }
 
-
   return {
     patientIdentityId: patient._id,
     wrId: patient.wrId || null,
@@ -187,8 +190,9 @@ export const getPatientDetailService = async ({
       `${patient.firstName || ""} ${patient.lastName || ""}`.trim(),
     dateOfBirth: patient.dateOfBirth || null,
     gender: patient.gender || null,
-    phone: patient.phone || null,
+    phone: patient.phone || patient.accountId.phone,
     email: patient.email || null,
+    registered: patient.accountId.createdAt,
 
     relationship: {
       id: relation._id,

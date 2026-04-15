@@ -1,9 +1,11 @@
 import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
+import crypto from "node:crypto";
+
 import dotenv from "dotenv";
 dotenv.config();
 export const signAccessToken = (results) => {
   const { account, profile } = results;
-  console.log("🚀 ~ signAccessToken ~ profile:", profile);
 
   if (account.accountType === "organization") {
     return jwt.sign(
@@ -11,6 +13,7 @@ export const signAccessToken = (results) => {
         sub: account._id,
         isVerified: account.isVerified,
         orgId: profile.wrOrgId,
+        organizationId: profile._id,
         email: account.email,
         fullName: profile.organizationName,
         accountType: account.accountType,
@@ -119,4 +122,27 @@ export const generateWelliRecordId = () => {
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   const timestamp = Date.now().toString().slice(-4);
   return `WR-${timestamp}-${random}`;
+};
+
+
+export const mailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: false, // true only for 465
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+export const generateEmailVerificationToken = () => {
+  return crypto.randomBytes(32).toString("hex");
+};
+
+export const hashVerificationToken = (token) => {
+  return crypto.createHash("sha256").update(token).digest("hex");
+};
+
+export const getVerificationTokenExpiry = () => {
+  return new Date(Date.now() + 1000 * 60 * 30); // 30 minutes
 };

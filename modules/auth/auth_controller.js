@@ -3,7 +3,7 @@ import {
   signAccessToken,
   signAccessTokenGoogle,
 } from "../../shared/utils/helper.js";
-import { loginAccount, registerAccount } from "./auth_services.js";
+import { loginAccount, registerAccount, resendVerificationEmailService, verifyEmailService } from "./auth_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createAccount } from "../accounts/account_service.js";
 import { Account } from "../accounts/account_model.js";
@@ -173,5 +173,35 @@ export const googleLoginController = async (req, res) => {
       success: false,
       message: error.message || "Google login failed",
     });
+  }
+};
+
+export const verifyEmailController = async (req, res, next) => {
+  try {
+    const { token } = req.query;
+
+    const result = await verifyEmailService(token);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resendVerificationEmailController = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const result = await resendVerificationEmailService(email);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    next(error);
   }
 };
