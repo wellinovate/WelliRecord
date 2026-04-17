@@ -49,40 +49,54 @@ export const createWalkInQueueService = async ({
 };
 
 export const getQueueService = async ({
-  organizationId,
-  providerId,
-  workflowStatus,
-  source,
-  page = 1,
-  limit = 20,
+  // organizationId,
+  // providerId,
+  // workflowStatus,
+  // source,
+  // page = 1,
+  // limit = 20,
+  authUser,
 }) => {
   const query = {};
 
+  const organizationId = authUser.organizationId
+  
   if (organizationId) query.organizationId = organizationId;
-  if (providerId) query.providerId = providerId;
-  if (workflowStatus) query.workflowStatus = workflowStatus;
-  if (source) query.source = source;
-
-  const skip = (Number(page) - 1) * Number(limit);
+  // if (organizationId) query.organizationId = organizationId;
+  // if (providerId) query.providerId = providerId;
+  // if (workflowStatus) query.workflowStatus = workflowStatus;
+  // if (source) query.source = source;
+  
+  console.log("🚀 ~ getQueueService ~ query:", query)
+  // const skip = (Number(page) - 1) * Number(limit);
 
   const [items, total] = await Promise.all([
     VisitQueue.find(query)
       .populate("patientId", "fullName wrId phone")
       .populate("providerId", "fullName email")
+      .populate({
+        path: "organizationId",
+        select: "organizationName accountId contactPersonName ",
+        populate: {
+          path: "accountId",
+          select: "email fullName accountType isVerified",
+        },
+      })
       .populate("appointmentId", "scheduledFor status reasonForVisit")
       .populate("encounterId", "encounterCode encounterTitle status startedAt endedAt")
-      .sort({ checkedInAt: 1, createdAt: 1 })
-      .skip(skip)
-      .limit(Number(limit)),
+      .sort({ checkedInAt: 1, createdAt: 1 }),
+      // .skip(skip)
+      // .limit(Number(limit)),
     VisitQueue.countDocuments(query),
   ]);
+  // console.log("🚀 ~ getQueueService ~ items:", items)
 
   return {
     items,
     total,
-    page: Number(page),
-    limit: Number(limit),
-    totalPages: Math.ceil(total / Number(limit)),
+    // page: Number(page),
+    // limit: Number(limit),
+    // totalPages: Math.ceil(total / Number(limit)),
   };
 };
 

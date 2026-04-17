@@ -42,32 +42,37 @@ export const createAppointmentService = async ({
 };
 
 export const getAppointmentsService = async ({
-  organizationId,
-  providerId,
-  patientId,
-  status,
-  page = 1,
-  limit = 20,
-  dateFrom,
-  dateTo,
+  // organizationId,
+  // providerId,
+  // patientId,
+  // status,
+  // page = 1,
+  // limit = 20,
+  // dateFrom,
+  // dateTo,
+  authUser
 }) => {
   const query = {};
 
+  const organizationId = authUser.organizationId
+  
   if (organizationId) query.organizationId = organizationId;
-  if (providerId) query.providerId = providerId;
-  if (patientId) query.patientId = patientId;
-  if (status) query.status = status;
 
-  if (dateFrom || dateTo) {
-    query.scheduledFor = {};
-    if (dateFrom) query.scheduledFor.$gte = new Date(dateFrom);
-    if (dateTo) query.scheduledFor.$lte = new Date(dateTo);
-  }
+  // if (organizationId) query.organizationId = organizationId;
+  // if (providerId) query.providerId = providerId;
+  // if (patientId) query.patientId = patientId;
+  // if (status) query.status = status;
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // if (dateFrom || dateTo) {
+  //   query.scheduledFor = {};
+  //   if (dateFrom) query.scheduledFor.$gte = new Date(dateFrom);
+  //   if (dateTo) query.scheduledFor.$lte = new Date(dateTo);
+  // }
+
+  // const skip = (Number(page) - 1) * Number(limit);
 
   const [items, total] = await Promise.all([
-    Appointment.find()
+    Appointment.find(query)
       .populate("patientId", "fullName wrId phone")
       .populate("providerId", "fullName email phone")
       .populate({
@@ -78,9 +83,9 @@ export const getAppointmentsService = async ({
           select: "email fullName accountType isVerified",
         },
       })
-      .sort({ scheduledFor: 1 })
-      .skip(skip)
-      .limit(Number(limit)),
+      .sort({ scheduledFor: 1 }),
+      // .skip(skip)
+      // .limit(Number(limit)),
     Appointment.countDocuments(query),
   ]);
   console.log("🚀 ~ getAppointmentsService ~ items:", items)
@@ -88,9 +93,9 @@ export const getAppointmentsService = async ({
   return {
     items,
     total,
-    page: Number(page),
-    limit: Number(limit),
-    totalPages: Math.ceil(total / Number(limit)),
+    // page: Number(page),
+    // limit: Number(limit),
+    // totalPages: Math.ceil(total / Number(limit)),
   };
 };
 

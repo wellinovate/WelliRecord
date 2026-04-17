@@ -12,7 +12,7 @@ import { protect } from "../auth/auth_middleware.js";
 const router = express.Router();
 
 router.post("/", protect, createAppointmentController);
-router.get("/", getAppointmentsController);
+router.get("/", protect, getAppointmentsController);
 router.get("/:appointmentId", protect, getAppointmentByIdController);
 router.patch("/:appointmentId", protect, updateAppointmentController);
 router.post("/:appointmentId/check-in", protect, checkInAppointmentController);

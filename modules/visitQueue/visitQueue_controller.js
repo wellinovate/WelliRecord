@@ -28,7 +28,8 @@ export const createWalkInQueueController = async (req, res, next) => {
 
 export const getQueueController = async (req, res, next) => {
   try {
-    const result = await getQueueService(req.query);
+    const authUser = req.user
+    const result = await getQueueService({ authUser });
 
     return res.status(200).json({
       success: true,

@@ -13,7 +13,7 @@ import { protect } from "../auth/auth_middleware.js";
 const router = express.Router();
 
 router.post("/walk-in", protect, createWalkInQueueController);
-router.get("/", getQueueController);
+router.get("/", protect, getQueueController);
 router.get("/:queueId", getQueueByIdController);
 router.patch("/:queueId/status", updateQueueStatusController);
 router.patch("/:queueId/triage", protect, saveTriageController);
