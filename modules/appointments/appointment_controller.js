@@ -11,6 +11,7 @@ export const createAppointmentController = async (req, res, next) => {
   try {
     const appointment = await createAppointmentService({
       ...req.body,
+      authUser: req.user,
       createdBy: req.user?.sub || null,
     });
 
@@ -71,9 +72,10 @@ export const updateAppointmentController = async (req, res, next) => {
 
 export const checkInAppointmentController = async (req, res, next) => {
   try {
+      console.log("🚀 ~ checkInAppointmentController ~ req.user?.sub:", req.user)
     const result = await checkInAppointmentService({
       appointmentId: req.params.appointmentId,
-      checkedInBy: req.user?.sub || null,
+      checkedInBy: req.user?.sub,
     });
 
     return res.status(200).json({

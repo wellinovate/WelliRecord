@@ -168,6 +168,6 @@ visitQueueSchema.pre("save", function () {
 visitQueueSchema.index({ organizationId: 1, createdAt: -1 });
 visitQueueSchema.index({ organizationId: 1, workflowStatus: 1, checkedInAt: 1 });
 visitQueueSchema.index({ providerId: 1, workflowStatus: 1, checkedInAt: 1 });
-visitQueueSchema.index({ appointmentId: 1 }, { unique: true, sparse: true });
+// visitQueueSchema.index({ appointmentId: 1 }, { unique: true, sparse: true });
 
 export const VisitQueue = mongoose.model("VisitQueue", visitQueueSchema);

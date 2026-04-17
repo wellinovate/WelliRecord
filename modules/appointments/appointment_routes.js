@@ -7,14 +7,15 @@ import {
   checkInAppointmentController,
   markAppointmentNoShowController,
 } from "./appointment_controller.js";
+import { protect } from "../auth/auth_middleware.js";
 
 const router = express.Router();
 
-router.post("/", createAppointmentController);
+router.post("/", protect, createAppointmentController);
 router.get("/", getAppointmentsController);
-router.get("/:appointmentId", getAppointmentByIdController);
-router.patch("/:appointmentId", updateAppointmentController);
-router.post("/:appointmentId/check-in", checkInAppointmentController);
-router.post("/:appointmentId/no-show", markAppointmentNoShowController);
+router.get("/:appointmentId", protect, getAppointmentByIdController);
+router.patch("/:appointmentId", protect, updateAppointmentController);
+router.post("/:appointmentId/check-in", protect, checkInAppointmentController);
+router.post("/:appointmentId/no-show", protect, markAppointmentNoShowController);
 
 export default router;

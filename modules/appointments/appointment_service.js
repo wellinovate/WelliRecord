@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Appointment } from "./appointment_model.js";
 import { VisitQueue } from "../visitQueue/visitQueue_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -10,19 +11,26 @@ export const createAppointmentService = async ({
   providerId = null,
   scheduledFor,
   reasonForVisit = null,
+  authUser,
   createdBy = null,
 }) => {
+  console.log("🚀 ~ createAppointmentService ~ authUser:", authUser)
   if (!patientId || !organizationId || !scheduledFor) {
     throw new Error("patientId, organizationId and scheduledFor are required");
   }
 
-  if (!isValidObjectId(patientId)) throw new Error("Invalid patientId");
+  const { actor, patientId: patientIds , isSelf } = await resolvePatientAccessContext({
+      patientId : authUser.sub,
+      authUser,
+    });
+
+  if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
   if (!isValidObjectId(organizationId)) throw new Error("Invalid organizationId");
   if (providerId && !isValidObjectId(providerId)) throw new Error("Invalid providerId");
   if (createdBy && !isValidObjectId(createdBy)) throw new Error("Invalid createdBy");
 
   const appointment = await Appointment.create({
-    patientId,
+    patientId: patientIds,
     organizationId,
     providerId,
     scheduledFor,
@@ -62,6 +70,14 @@ export const getAppointmentsService = async ({
     Appointment.find()
       .populate("patientId", "fullName wrId phone")
       .populate("providerId", "fullName email phone")
+      .populate({
+        path: "organizationId",
+        select: "organizationName accountId ",
+        populate: {
+          path: "accountId",
+          select: "email fullName accountType isVerified",
+        },
+      })
       .sort({ scheduledFor: 1 })
       .skip(skip)
       .limit(Number(limit)),
