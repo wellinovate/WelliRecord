@@ -88,7 +88,7 @@ export const getAppointmentsService = async ({
       // .limit(Number(limit)),
     Appointment.countDocuments(query),
   ]);
-  console.log("🚀 ~ getAppointmentsService ~ items:", items)
+  // console.log("🚀 ~ getAppointmentsService ~ items:", items)
 
   return {
     items,

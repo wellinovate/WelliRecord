@@ -235,25 +235,25 @@ export const fetchUserProfile = async (req, res) => {
       });
     }
 
-    const cacheKey = `user:profile:${accountId}`;
+    // const cacheKey = `user:profile:${accountId}`;
 
 
 
-    // 1. Check Redis first
-    const cachedProfile = await redisClient.get(cacheKey);
+    // // 1. Check Redis first
+    // const cachedProfile = await redisClient.get(cacheKey);
 
-    if (cachedProfile) {
-      return res.status(200).json({
-        success: true,
-        source: "redis",
-        data: JSON.parse(cachedProfile),
-      });
-    }
+    // if (cachedProfile) {
+    //   return res.status(200).json({
+    //     success: true,
+    //     source: "redis",
+    //     data: JSON.parse(cachedProfile),
+    //   });
+    // }
 
     const profile = await medicalHistoryService.getUserProfile(accountId);
 
     // 3. Save to Redis for 10 minutes
-    await redisClient.setEx(cacheKey, 600, JSON.stringify(profile));
+    // await redisClient.setEx(cacheKey, 600, JSON.stringify(profile));
 
     res.status(200).json({
       success: true,
@@ -275,7 +275,7 @@ export const updateUserProfileController = async (
 ) => {
   try {
     const userId = req.user?.sub;
-    console.log("🚀 ~ updateUserProfileController ~ userId:", userId)
+    // console.log("🚀 ~ updateUserProfileController ~ userId:", userId)
 
     if (!userId) {
       return res.status(401).json({
@@ -297,7 +297,7 @@ export const updateUserProfileController = async (
     }
 
     // Clear stale cache
-    await redisClient.del(`user:profile:${userId}`);
+    // await redisClient.del(`user:profile:${userId}`);
 
     return res.status(200).json({
       success: true,
