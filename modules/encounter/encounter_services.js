@@ -157,7 +157,7 @@ export const getPatientEncountersService = async ({
     Encounter.find(filter)
       .populate({
         path: "organizationId",
-        select: "email fullName organizationName name",
+        select: "email fullName organizationName contactPersonName name",
       })
       .sort({ startedAt: -1, createdAt: -1 })
       .skip(skip)
@@ -174,6 +174,7 @@ export const getPatientEncountersService = async ({
       providerId: item.providerId,
 
       organizationId: item.organizationId?._id || null,
+      organizationPersonName: item.organizationId?.contactPersonName,
       organizationName:
         item.organizationId?.organizationName ||
         item.organizationId?.name ||

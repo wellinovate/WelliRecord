@@ -70,6 +70,7 @@ export const createMedicationSchema = z.object({
     .optional(),
 
   frequency: z.string().trim().max(100).optional(),
+  duration: z.string().trim().max(100).optional(),
   indication: z.string().trim().max(500).optional(),
 
   prescribedAt: z.coerce.date().optional(),

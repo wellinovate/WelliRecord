@@ -6,6 +6,7 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 
 export const createMedicationService = async ({ payload, authUser }) => {
+  console.log("🚀 ~ createMedicationService ~ payload:", payload)
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -167,7 +168,7 @@ export const getPatientMedicationsService = async ({
       .find(filter)
       .populate({
         path: "prescribedBy",
-        select: "organizationName accountId ",
+        select: "organizationName contactPersonName accountId ",
         populate: {
           path: "accountId",
           select: "email fullName accountType isVerified",
@@ -190,6 +191,7 @@ export const getPatientMedicationsService = async ({
       genericName: item.genericName || null,
       brandName: item.brandName || null,
       dosage: item.dosage || null,
+      duration: item.duration || null,
       form: item.form || null,
       route: item.route || null,
       frequency: item.frequency || null,
@@ -201,6 +203,7 @@ export const getPatientMedicationsService = async ({
         item.prescribedBy?.accountId?.accountType || null,
       prescribedByEmail: item.prescribedBy?.email || null,
       prescribedByFullName: item.prescribedBy?.organizationName || null,
+      prescribedByContactPersonName: item.prescribedBy?.contactPersonName || null,
       prescribedAt: item.prescribedAt || null,
       startDate: item.startDate || null,
       endDate: item.endDate || null,
@@ -258,6 +261,7 @@ export const getAllPatientMedicationsService = async ({
       genericName: item.genericName || null,
       brandName: item.brandName || null,
       dosage: item.dosage || null,
+      duration: item.duration || null,
       form: item.form || null,
       route: item.route || null,
       frequency: item.frequency || null,
