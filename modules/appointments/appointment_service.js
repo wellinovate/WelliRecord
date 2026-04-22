@@ -14,20 +14,27 @@ export const createAppointmentService = async ({
   authUser,
   createdBy = null,
 }) => {
-  console.log("🚀 ~ createAppointmentService ~ authUser:", authUser)
+  console.log("🚀 ~ createAppointmentService ~ authUser:", authUser);
   if (!patientId || !organizationId || !scheduledFor) {
     throw new Error("patientId, organizationId and scheduledFor are required");
   }
 
-  const { actor, patientId: patientIds , isSelf } = await resolvePatientAccessContext({
-      patientId : authUser.sub,
-      authUser,
-    });
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId: authUser.sub,
+    authUser,
+  });
 
   if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
-  if (!isValidObjectId(organizationId)) throw new Error("Invalid organizationId");
-  if (providerId && !isValidObjectId(providerId)) throw new Error("Invalid providerId");
-  if (createdBy && !isValidObjectId(createdBy)) throw new Error("Invalid createdBy");
+  if (!isValidObjectId(organizationId))
+    throw new Error("Invalid organizationId");
+  if (providerId && !isValidObjectId(providerId))
+    throw new Error("Invalid providerId");
+  if (createdBy && !isValidObjectId(createdBy))
+    throw new Error("Invalid createdBy");
 
   const appointment = await Appointment.create({
     patientId: patientIds,
@@ -41,35 +48,59 @@ export const createAppointmentService = async ({
   return appointment;
 };
 
-export const getAppointmentsService = async ({
-  // organizationId,
-  // providerId,
-  // patientId,
-  // status,
-  // page = 1,
-  // limit = 20,
-  // dateFrom,
-  // dateTo,
-  authUser
-}) => {
+export const getAppointmentsService = async ({ authUser, params }) => {
+  const {
+    providerId,
+    patientId,
+    status,
+    page = 1,
+    limit = 20,
+    dateFrom,
+    dateTo,
+  } = params;
+
   const query = {};
 
-  const organizationId = authUser.organizationId
-  
-  if (organizationId) query.organizationId = organizationId;
+  const numericPage = Number(page) || 1;
+  const numericLimit = Number(limit) || 20;
+  const skip = (numericPage - 1) * numericLimit;
 
-  // if (organizationId) query.organizationId = organizationId;
-  // if (providerId) query.providerId = providerId;
-  // if (patientId) query.patientId = patientId;
-  // if (status) query.status = status;
+  // 1. Base access control
+  if (authUser.accountType === "organization") {
+    if (!authUser.organizationId) {
+      throw new Error("Organization user is missing organizationId");
+    }
 
-  // if (dateFrom || dateTo) {
-  //   query.scheduledFor = {};
-  //   if (dateFrom) query.scheduledFor.$gte = new Date(dateFrom);
-  //   if (dateTo) query.scheduledFor.$lte = new Date(dateTo);
-  // }
+    query.organizationId = authUser.organizationId;
 
-  // const skip = (Number(page) - 1) * Number(limit);
+    // org can optionally filter by patient
+    if (patientId) {
+      const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
+        patientId,
+        authUser,
+      });
+
+      query.patientId = resolvedPatientId;
+    }
+  } else {
+    // individual patient/user can only see their own appointments
+    const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
+      patientId: authUser.sub,
+      authUser,
+    });
+
+    query.patientId = resolvedPatientId;
+  }
+
+  // 2. Optional filters
+  if (providerId) query.providerId = providerId;
+  if (status) query.status = status;
+
+  if (dateFrom || dateTo) {
+    query.scheduledFor = {};
+    if (dateFrom) query.scheduledFor.$gte = new Date(dateFrom);
+    if (dateTo) query.scheduledFor.$lte = new Date(dateTo);
+  }
 
   const [items, total] = await Promise.all([
     Appointment.find(query)
@@ -77,25 +108,24 @@ export const getAppointmentsService = async ({
       .populate("providerId", "fullName email phone")
       .populate({
         path: "organizationId",
-        select: "organizationName accountId ",
+        select: "organizationName accountId",
         populate: {
           path: "accountId",
           select: "email fullName accountType isVerified",
         },
       })
-      .sort({ scheduledFor: 1 }),
-      // .skip(skip)
-      // .limit(Number(limit)),
+      .sort({ scheduledFor: 1 })
+      .skip(skip)
+      .limit(numericLimit),
     Appointment.countDocuments(query),
   ]);
-  // console.log("🚀 ~ getAppointmentsService ~ items:", items)
 
   return {
     items,
     total,
-    // page: Number(page),
-    // limit: Number(limit),
-    // totalPages: Math.ceil(total / Number(limit)),
+    page: numericPage,
+    limit: numericLimit,
+    totalPages: Math.ceil(total / numericLimit),
   };
 };
 
@@ -121,7 +151,12 @@ export const updateAppointmentService = async (appointmentId, payload = {}) => {
     throw new Error(`Cannot update a ${appointment.status} appointment`);
   }
 
-  const allowedFields = ["providerId", "scheduledFor", "reasonForVisit", "status"];
+  const allowedFields = [
+    "providerId",
+    "scheduledFor",
+    "reasonForVisit",
+    "status",
+  ];
 
   for (const key of allowedFields) {
     if (payload[key] !== undefined) {
@@ -133,9 +168,13 @@ export const updateAppointmentService = async (appointmentId, payload = {}) => {
   return appointment;
 };
 
-export const checkInAppointmentService = async ({ appointmentId, checkedInBy }) => {
+export const checkInAppointmentService = async ({
+  appointmentId,
+  checkedInBy,
+}) => {
   if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
-  if (checkedInBy && !isValidObjectId(checkedInBy)) throw new Error("Invalid checkedInBy");
+  if (checkedInBy && !isValidObjectId(checkedInBy))
+    throw new Error("Invalid checkedInBy");
 
   const appointment = await Appointment.findById(appointmentId);
   if (!appointment) throw new Error("Appointment not found");
@@ -184,7 +223,9 @@ export const markAppointmentNoShowService = async (appointmentId) => {
   appointment.status = "no-show";
   await appointment.save();
 
-  const queueItem = await VisitQueue.findOne({ appointmentId: appointment._id });
+  const queueItem = await VisitQueue.findOne({
+    appointmentId: appointment._id,
+  });
   if (queueItem && !["completed"].includes(queueItem.workflowStatus)) {
     queueItem.workflowStatus = "no-show";
     await queueItem.save();

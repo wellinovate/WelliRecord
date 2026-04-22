@@ -28,7 +28,8 @@ export const createAppointmentController = async (req, res, next) => {
 export const getAppointmentsController = async (req, res, next) => {
   try {
     const authUser = req.user
-    const result = await getAppointmentsService({authUser});
+    const params = req.query;
+    const result = await getAppointmentsService({authUser, params});
 
     return res.status(200).json({
       success: true,

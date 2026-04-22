@@ -28,15 +28,7 @@ export const createVitalService = async ({ payload, authUser }) => {
       recordedBy = authUser?.sub || null;
     }
 
-    // if (!recordedBy) {
-    //   const error = new Error("Authenticated user is required");
-    //   error.statusCode = 401;
-    //   throw error;
-    // }
 
-    // Stronger safety: do not trust organizationId fully from client
-    // const organizationId =
-    //   payload.organizationId || organizationIdFromUser || null;
 
     if (!actor.userId) {
       const error = new Error("Authenticated user is required");

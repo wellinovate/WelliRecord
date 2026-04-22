@@ -4,6 +4,7 @@ import { Appointment } from "../appointments/appointment_model.js";
 import { Encounter } from "../encounter/encounter_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { generateEncounterCode } from "../../shared/utils/helper.js";
+import { vitalModel } from "../vitals/vitals_model.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -17,20 +18,30 @@ export const createWalkInQueueService = async ({
   authUser,
   checkedInBy = null,
 }) => {
-  const { actor, patientId: patientIds , isSelf } = await resolvePatientAccessContext({
-        patientId: patientId,
-        authUser,
-      });
-  console.log("🚀 ~ createWalkInQueueService ~ organizationId:", actor.organizationId)
-  console.log("🚀 ~ createWalkInQueueService ~ patientId:", patientId)
+  const {
+    actor,
+    patientId: patientIds,
+    isSelf,
+  } = await resolvePatientAccessContext({
+    patientId: patientId,
+    authUser,
+  });
+  console.log(
+    "🚀 ~ createWalkInQueueService ~ organizationId:",
+    actor.organizationId,
+  );
+  console.log("🚀 ~ createWalkInQueueService ~ patientId:", patientId);
   if (!patientIds || !actor.organizationId) {
     throw new Error("patientId and organizationId are required");
   }
 
   if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
-  if (!isValidObjectId(actor.organizationId)) throw new Error("Invalid organizationId");
-  if (providerId && !isValidObjectId(providerId)) throw new Error("Invalid providerId");
-  if (checkedInBy && !isValidObjectId(checkedInBy)) throw new Error("Invalid checkedInBy");
+  if (!isValidObjectId(actor.organizationId))
+    throw new Error("Invalid organizationId");
+  if (providerId && !isValidObjectId(providerId))
+    throw new Error("Invalid providerId");
+  if (checkedInBy && !isValidObjectId(checkedInBy))
+    throw new Error("Invalid checkedInBy");
 
   const queueItem = await VisitQueue.create({
     patientId: patientIds,
@@ -59,15 +70,15 @@ export const getQueueService = async ({
 }) => {
   const query = {};
 
-  const organizationId = authUser.organizationId
-  
+  const organizationId = authUser.organizationId;
+
   if (organizationId) query.organizationId = organizationId;
   // if (organizationId) query.organizationId = organizationId;
   // if (providerId) query.providerId = providerId;
   // if (workflowStatus) query.workflowStatus = workflowStatus;
   // if (source) query.source = source;
-  
-  console.log("🚀 ~ getQueueService ~ query:", query)
+
+  console.log("🚀 ~ getQueueService ~ query:", query);
   // const skip = (Number(page) - 1) * Number(limit);
 
   const [items, total] = await Promise.all([
@@ -83,10 +94,13 @@ export const getQueueService = async ({
         },
       })
       .populate("appointmentId", "scheduledFor status reasonForVisit")
-      .populate("encounterId", "encounterCode encounterTitle status startedAt endedAt")
+      .populate(
+        "encounterId",
+        "encounterCode encounterTitle status startedAt endedAt",
+      )
       .sort({ checkedInAt: 1, createdAt: 1 }),
-      // .skip(skip)
-      // .limit(Number(limit)),
+    // .skip(skip)
+    // .limit(Number(limit)),
     VisitQueue.countDocuments(query),
   ]);
   // console.log("🚀 ~ getQueueService ~ items:", items)
@@ -107,7 +121,10 @@ export const getQueueByIdService = async (queueId) => {
     .populate("patientId", "fullName wrId phone gender dateOfBirth")
     .populate("providerId", "fullName email phone")
     .populate("appointmentId", "scheduledFor status reasonForVisit")
-    .populate("encounterId", "encounterCode encounterTitle status startedAt endedAt chiefComplaint notes");
+    .populate(
+      "encounterId",
+      "encounterCode encounterTitle status startedAt endedAt chiefComplaint notes",
+    );
 
   if (!queueItem) throw new Error("Queue item not found");
 
@@ -175,12 +192,15 @@ export const saveTriageService = async ({
   triagedBy = null,
 }) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
-  if (triagedBy && !isValidObjectId(triagedBy)) throw new Error("Invalid triagedBy");
+  if (triagedBy && !isValidObjectId(triagedBy))
+    throw new Error("Invalid triagedBy");
 
   const queueItem = await VisitQueue.findById(queueId);
   if (!queueItem) throw new Error("Queue item not found");
 
-  if (["completed", "cancelled", "no-show"].includes(queueItem.workflowStatus)) {
+  if (
+    ["completed", "cancelled", "no-show"].includes(queueItem.workflowStatus)
+  ) {
     throw new Error(`Cannot triage a ${queueItem.workflowStatus} queue item`);
   }
 
@@ -195,7 +215,8 @@ export const saveTriageService = async ({
   queueItem.vitals = {
     temperature: vitals.temperature ?? queueItem.vitals?.temperature ?? null,
     pulse: vitals.pulse ?? queueItem.vitals?.pulse ?? null,
-    bloodPressure: vitals.bloodPressure ?? queueItem.vitals?.bloodPressure ?? null,
+    bloodPressure:
+      vitals.bloodPressure ?? queueItem.vitals?.bloodPressure ?? null,
     respiratoryRate:
       vitals.respiratoryRate ?? queueItem.vitals?.respiratoryRate ?? null,
     spo2: vitals.spo2 ?? queueItem.vitals?.spo2 ?? null,
@@ -212,57 +233,62 @@ export const startEncounterFromQueueService = async ({
   authUser,
   startedBy = null,
 }) => {
-  
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
   const queueItem = await VisitQueue.findById(queueId);
+  console.log(
+    "🚀 ~ startEncounterFromQueueService ~ queueItem:",
+    queueItem.vitals.bloodPressure,
+  );
   if (!queueItem) throw new Error("Queue item not found");
-  
-  const { actor, patientId , isSelf } = await resolvePatientAccessContext({
-    patientId : queueItem.patientId,
+
+  const { actor, patientId, isSelf } = await resolvePatientAccessContext({
+    patientId: queueItem.patientId,
     authUser,
   });
-  console.log("🚀 ~ startEncounterFromQueueService ~ actor:", actor)
+  console.log("🚀 ~ startEncounterFromQueueService ~ actor:", actor);
 
-  const organizationId = actor.organizationId
+  const organizationId = actor.organizationId;
 
   if (!organizationId || !isValidObjectId(organizationId)) {
     throw new Error("Valid organization is required");
   }
-
 
   if (queueItem.encounterId) {
     throw new Error("Encounter already exists for this queue item");
   }
 
   if (!["checked-in", "triage", "waiting"].includes(queueItem.workflowStatus)) {
-    throw new Error(`Cannot start encounter from ${queueItem.workflowStatus} status`);
+    throw new Error(
+      `Cannot start encounter from ${queueItem.workflowStatus} status`,
+    );
   }
 
   const encounterCode = await generateEncounterCode(Encounter);
 
   const encounter = await Encounter.create({
-  patientId: patientId,
-  providerId: organizationId,
-  organizationId: organizationId,
-  queueId: queueItem._id,
-  appointmentId: queueItem.appointmentId || null,
-  visitSource: queueItem.source,
-  encounterTitle: "Outpatient Consultation",
-  encounterType: queueItem.visitType === "emergency" ? "emergency" : "outpatient",
-  encounterCode: encounterCode,
-  startedAt: new Date(),
-  reasonForVisit: queueItem.chiefComplaint || null,
-  chiefComplaint: queueItem.chiefComplaint || null,
-  priority:
-    queueItem.priority === "emergency"
-      ? "critical"
-      : queueItem.priority === "urgent"
+    patientId: patientId,
+    providerId: organizationId,
+    organizationId: organizationId,
+    queueId: queueItem._id,
+    appointmentId: queueItem.appointmentId || null,
+    visitSource: queueItem.source,
+    encounterTitle: "Outpatient Consultation",
+    encounterType:
+      queueItem.visitType === "emergency" ? "emergency" : "outpatient",
+    encounterCode: encounterCode,
+    startedAt: new Date(),
+    reasonForVisit: queueItem.chiefComplaint || null,
+    chiefComplaint: queueItem.chiefComplaint || null,
+    priority:
+      queueItem.priority === "emergency"
+        ? "critical"
+        : queueItem.priority === "urgent"
         ? "urgent"
         : "routine",
-  status: "in-progress",
-  source: "provider",
-  notes: queueItem.triageNotes || null,
-});
+    status: "in-progress",
+    source: "provider",
+    notes: queueItem.triageNotes || null,
+  });
 
   queueItem.encounterId = encounter._id;
   queueItem.providerId = organizationId;
@@ -271,6 +297,36 @@ export const startEncounterFromQueueService = async ({
   queueItem.startedBy = startedBy || organizationId;
 
   await queueItem.save();
+
+  const vital = await vitalModel.create(
+    [
+      {
+        patientId: patientId,
+        recordedBy: organizationId,
+        providerId: organizationId,
+        organizationId,
+        encounterId: encounter._id,
+        source: "provider",
+        // createdContext: createdContext,
+        // ownershipType: payload.ownershipType || "shared",
+        // visibility: payload.visibility || "shared",
+        // patientAccess: payload.patientAccess || "full",
+        patientVisible: true,
+
+        bloodPressure: queueItem.vitals.bloodPressure,
+        heartRate: queueItem.vitals.pulse,
+        temperature: queueItem.vitals.temperature,
+        respiratoryRate: queueItem.respiratoryRate,
+        oxygenSaturation: queueItem.vitals.spo2,
+        weight: queueItem.vitals.weight,
+        height: queueItem.vitals.height,
+        bloodGlucose: queueItem.vitals.bloodGlucose,
+        measuredAt: queueItem.createdAt || new Date(),
+        notes: queueItem.triageNotes || queueItem.chiefComplaint,
+      },
+    ],
+    { session },
+  );
 
   if (queueItem.appointmentId) {
     await Appointment.findByIdAndUpdate(queueItem.appointmentId, {
