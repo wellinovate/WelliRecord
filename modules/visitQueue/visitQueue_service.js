@@ -59,27 +59,47 @@ export const createWalkInQueueService = async ({
   return queueItem;
 };
 
-export const getQueueService = async ({
-  // organizationId,
-  // providerId,
-  // workflowStatus,
-  // source,
-  // page = 1,
-  // limit = 20,
-  authUser,
-}) => {
+export const getQueueService = async ({ authUser, params }) => {
+  const {
+    providerId,
+    workflowStatus,
+    source,
+    page = 1,
+    limit = 20,
+    dateFrom,
+    dateTo,
+  } = params;
+
   const query = {};
 
   const organizationId = authUser.organizationId;
 
   if (organizationId) query.organizationId = organizationId;
-  // if (organizationId) query.organizationId = organizationId;
-  // if (providerId) query.providerId = providerId;
-  // if (workflowStatus) query.workflowStatus = workflowStatus;
-  // if (source) query.source = source;
+  if (providerId) query.providerId = providerId;
+  if (workflowStatus) query.workflowStatus = workflowStatus;
+  if (source) query.source = source;
 
-  console.log("🚀 ~ getQueueService ~ query:", query);
-  // const skip = (Number(page) - 1) * Number(limit);
+  // default to today if no date range is passed
+  if (dateFrom || dateTo) {
+    query.checkedInAt = {};
+    if (dateFrom) query.checkedInAt.$gte = new Date(dateFrom);
+    if (dateTo) query.checkedInAt.$lte = new Date(dateTo);
+  } else {
+    const now = new Date();
+
+    const startOfDay = new Date(now);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    query.checkedInAt = {
+      $gte: startOfDay,
+      $lte: endOfDay,
+    };
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
 
   const [items, total] = await Promise.all([
     VisitQueue.find(query)
@@ -87,7 +107,7 @@ export const getQueueService = async ({
       .populate("providerId", "fullName email")
       .populate({
         path: "organizationId",
-        select: "organizationName accountId contactPersonName ",
+        select: "organizationName accountId contactPersonName",
         populate: {
           path: "accountId",
           select: "email fullName accountType isVerified",
@@ -98,19 +118,18 @@ export const getQueueService = async ({
         "encounterId",
         "encounterCode encounterTitle status startedAt endedAt",
       )
-      .sort({ checkedInAt: 1, createdAt: 1 }),
-    // .skip(skip)
-    // .limit(Number(limit)),
+      .sort({ checkedInAt: 1, createdAt: 1 })
+      .skip(skip)
+      .limit(Number(limit)),
     VisitQueue.countDocuments(query),
   ]);
-  // console.log("🚀 ~ getQueueService ~ items:", items)
 
   return {
     items,
     total,
-    // page: Number(page),
-    // limit: Number(limit),
-    // totalPages: Math.ceil(total / Number(limit)),
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / Number(limit)),
   };
 };
 
