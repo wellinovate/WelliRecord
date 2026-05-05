@@ -7,34 +7,65 @@ dotenv.config();
 export const signAccessToken = (results) => {
   const { account, profile } = results;
 
-  if (account.accountType === "organization") {
-    return jwt.sign(
-      {
-        sub: account._id,
-        isVerified: account.isVerified,
-        orgId: profile.wrOrgId,
-        organizationId: profile._id,
-        email: account.email,
-        fullName: profile.organizationName,
-        accountType: account.accountType,
-        role: account.accountType ?? null,
-      },
-      process.env.JWT_SECRET_KEY,
-      { expiresIn: "1d" },
-    );
-  } else {
-    return jwt.sign(
-      {
-        sub: account._id,
-        email: account.email,
-        fullName: profile.fullName,
-        accountType: account.accountType,
-        role: account.role ?? null,
-      },
-      process.env.JWT_SECRET_KEY,
-      { expiresIn: "1d" },
-    );
+   if (!account?._id && !account?.id) {
+    throw new Error("Cannot sign token without account id");
   }
+
+    const payload = {
+    sub: String(account._id || account.id),
+    email: account.email,
+    fullName: profile.fullName,
+    accountType: account.accountType,
+    role: account.role ?? null,
+    profileId: profile?._id ? String(profile._id) : profile?.id ? String(profile.id) : null,
+  };
+
+  if (account.accountType === "organization") {
+    payload.organizationId = profile?._id
+      ? String(profile._id)
+      : profile?.id
+        ? String(profile.id)
+        : null;
+
+
+    payload.fullName = profile.organizationName;
+    payload.wrOrgId = profile?.wrOrgId ?? null;
+  }
+
+  // if (account.accountType === "organization") {
+  //   return jwt.sign(
+  //     {
+  //       sub: account._id,
+  //       isVerified: account.isVerified,
+  //       orgId: profile.wrOrgId,
+  //       organizationId: profile._id,
+  //       email: account.email,
+  //       fullName: profile.organizationName,
+  //       accountType: account.accountType,
+  //       role: account.accountType ?? null,
+  //     },
+  //     process.env.JWT_SECRET_KEY,
+  //     { expiresIn: "1d" },
+  //   );
+  // } else {
+  //   return jwt.sign(
+  //     {
+  //       sub: account._id,
+  //       email: account.email,
+  //       fullName: profile.fullName,
+  //       accountType: account.accountType,
+  //       role: account.role ?? null,
+  //     },
+  //     process.env.JWT_SECRET_KEY,
+  //     { expiresIn: "1d" },
+  //   );
+  // }
+
+   return jwt.sign(payload, process.env.JWT_SECRET_KEY, {
+    expiresIn: "1d",
+    issuer: "wellirecord-api",
+    audience: "wellirecord-client",
+  });
 };
 
 export const signAccessTokenGoogle = (user) => {

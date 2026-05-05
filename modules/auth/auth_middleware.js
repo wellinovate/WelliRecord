@@ -24,12 +24,16 @@ export const protect = (req, res, next) => {
     }
 
     // const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const decoded = jwt.verify(token, "6eyhfye6353e333533wseew3tette6r7furyr7yyy7e6ddyy763et3e7ryurr7e8uuf77ye");
+    // const decoded = jwt.verify(token, "6eyhfye6353e333533wseew3tette6r7furyr7yyy7e6ddyy763et3e7ryurr7e8uuf77ye");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY, {
+      issuer: "wellirecord-api",
+      audience: "wellirecord-client",
+    });
     req.user = decoded;
 
     next();
   } catch (error) {
-  console.log("🚀 ~ protect ~ error:", error)
+    console.log("🚀 ~ protect ~ error:", error);
 
     return res.status(401).json({
       success: false,
