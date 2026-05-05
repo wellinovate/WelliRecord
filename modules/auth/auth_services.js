@@ -17,6 +17,7 @@ import { createOrganizationProfile } from "../organizations/organizations_servic
 import { UserProfile } from "../users/user_profile_model.js";
 import { createUserProfile } from "../users/users_services.js";
 import { sendVerificationEmail } from "../../shared/utils/resend.js";
+import bcrypt from "bcryptjs";
 
 export const registerAccount = async (payload) => {
   console.log("🚀 ~ registerAccount ~ payload:", payload);
@@ -155,54 +156,150 @@ export const registerOrganizationAccount = async (payload) => {
   });
 };
 
-export const loginAccount = async ({ email, password }) => {
-  const normalizedEmail = email.trim().toLowerCase();
-  console.log("🚀 ~ loginAccount ~ normalizedEmail:", normalizedEmail);
+// export const loginAccount = async ({ email, password }) => {
+//   const normalizedEmail = email.trim().toLowerCase();
+//   console.log("🚀 ~ loginAccount ~ normalizedEmail:", normalizedEmail);
 
-  const account = await Account.findOne({ email: normalizedEmail }).select(
-    "+password",
+//   const account = await Account.findOne({ email: normalizedEmail }).select(
+//     "+password",
+//   );
+//   // console.log("🚀 ~ loginAccount ~ account:", account)
+
+//   if (!account) {
+//     throw new Error("Invalid email or password");
+//   }
+
+//   if (!account.isActive || account.status !== "active") {
+//     throw new Error("Account is not active");
+//   }
+
+//   const isMatch = await account.comparePassword(password);
+
+//   if (!isMatch) {
+//     throw new Error("Invalid email or password");
+//   }
+
+//   let profile = null;
+
+//   if (account.accountType === "user") {
+//     profile = await UserProfile.findOne({ accountId: account._id });
+//   } else if (account.accountType === "organization") {
+//     profile = await OrganizationProfile.findOne({ accountId: account._id });
+//   }
+
+//   Account.updateOne(
+//   { _id: account._id },
+//   { $set: { lastLoginAt: new Date() } }
+// ).catch((err) => {
+//   console.error("Failed to update lastLoginAt:", err.message);
+// });
+
+//   return {
+//     account: account.toSafeObject()
+//       ? account.toSafeObject()
+//       : account.toObject(),
+//     profile: profile ? profile.toObject() : null,
+//   };
+// };
+
+export const loginAccount = async ({ email, password }) => {
+  const totalStart = performance.now();
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const findStart = performance.now();
+  const account = await Account.findByEmailWithPassword(normalizedEmail);
+  console.log(
+    "⏱ find account:",
+    (performance.now() - findStart).toFixed(2),
+    "ms",
   );
-  // console.log("🚀 ~ loginAccount ~ account:", account)
 
   if (!account) {
     throw new Error("Invalid email or password");
   }
 
+  console.log("bcrypt rounds:", Number(account.password.split("$")[2]));
+
   if (!account.isActive || account.status !== "active") {
     throw new Error("Account is not active");
   }
 
+  const passwordStart = performance.now();
   const isMatch = await account.comparePassword(password);
+  console.log(
+    "⏱ password compare:",
+    (performance.now() - passwordStart).toFixed(2),
+    "ms",
+  );
 
   if (!isMatch) {
     throw new Error("Invalid email or password");
   }
 
+  const currentRounds = Number(account.password.split("$")[2]);
+
+  if (currentRounds > 10) {
+    bcrypt
+      .hash(password, 10)
+      .then((newHash) => {
+        return Account.updateOne(
+          { _id: account._id },
+          {
+            $set: {
+              password: newHash,
+              passwordChangedAt: new Date(),
+            },
+          },
+        );
+      })
+      .catch((err) => {
+        console.error("Password rehash failed:", err.message);
+      });
+  }
+
+  const profileStart = performance.now();
+
   let profile = null;
 
   if (account.accountType === "user") {
-    profile = await UserProfile.findOne({ accountId: account._id });
+    profile = await UserProfile.findOne({ accountId: account._id }).lean();
   } else if (account.accountType === "organization") {
-    profile = await OrganizationProfile.findOne({ accountId: account._id });
+    profile = await OrganizationProfile.findOne({
+      accountId: account._id,
+    }).lean();
   }
 
-  account.lastLoginAt = new Date();
-  await account.save();
-  // console.log("🚀 ~ loginAccount ~ profile:", profile)
+  console.log(
+    "⏱ profile lookup:",
+    (performance.now() - profileStart).toFixed(2),
+    "ms",
+  );
+
+  Account.updateOne(
+    { _id: account._id },
+    { $set: { lastLoginAt: new Date() } },
+  ).catch((err) => {
+    console.error("Failed to update lastLoginAt:", err.message);
+  });
+
+  const safeAccount = account.toSafeObject();
+
+  console.log(
+    "⏱ TOTAL LOGIN:",
+    (performance.now() - totalStart).toFixed(2),
+    "ms",
+  );
 
   return {
-    account: account.toSafeObject()
-      ? account.toSafeObject()
-      : account.toObject(),
-    profile: profile ? profile.toObject() : null,
+    account: safeAccount,
+    profile: profile || null,
   };
 };
 
 export const generateVerificationToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
-
-
 
 export const verifyEmailService = async (token) => {
   if (!token) {
@@ -244,7 +341,6 @@ export const verifyEmailService = async (token) => {
   };
 };
 
-
 export const resendVerificationEmailService = async (email) => {
   const account = await Account.findOne({ email: email.toLowerCase().trim() });
 
@@ -266,7 +362,7 @@ export const resendVerificationEmailService = async (email) => {
     throw new AppError(
       "Please wait before requesting another verification email",
       429,
-      "RESEND_COOLDOWN"
+      "RESEND_COOLDOWN",
     );
   }
 
@@ -289,4 +385,3 @@ export const resendVerificationEmailService = async (email) => {
     message: "Verification email resent successfully.",
   };
 };
-

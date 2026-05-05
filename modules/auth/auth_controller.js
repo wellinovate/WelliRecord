@@ -25,7 +25,7 @@ export const register = async (req, res, next) => {
 export const login = async (req, res, next) => {
   try {
     const result = await loginAccount(req.validatedBody);
-    console.log("🚀 ~ login ~ result:", result)
+    // console.log("🚀 ~ login ~ result:", result)
 
     const results = {
       account: result.account,

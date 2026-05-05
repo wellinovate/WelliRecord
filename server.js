@@ -50,6 +50,22 @@ app.use(cors(corsOptions));
 app.use(bodyParse.json({ limit: "10mb" }));
 app.use(cookieParser());
 
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+
+  res.on("finish", () => {
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1_000_000;
+
+    console.log(
+      `${req.method} ${req.originalUrl} ${
+        res.statusCode
+      } - ${durationMs.toFixed(2)} ms`,
+    );
+  });
+
+  next();
+});
 
 // Routes
 // app.use("/app", welliidRoutes);
@@ -64,7 +80,6 @@ app.use("/api/v1/immunizations", immunizationRoutes);
 app.use("/api/v1/vitals", vitalRoutes);
 app.use("/api/v1/encounter", encounterRoutes);
 app.use("/api/v1/user", userRoutes);
-
 
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/queue", visitQueueRoutes);
