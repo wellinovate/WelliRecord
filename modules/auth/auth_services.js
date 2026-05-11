@@ -18,6 +18,7 @@ import { UserProfile } from "../users/user_profile_model.js";
 import { createUserProfile } from "../users/users_services.js";
 import { sendVerificationEmail } from "../../shared/utils/resend.js";
 import bcrypt from "bcryptjs";
+import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 
 export const registerAccount = async (payload) => {
   console.log("🚀 ~ registerAccount ~ payload:", payload);
@@ -208,92 +209,148 @@ export const loginAccount = async ({ email, password }) => {
   const normalizedEmail = email.trim().toLowerCase();
 
   const findStart = performance.now();
+
   const account = await Account.findByEmailWithPassword(normalizedEmail);
+
   console.log(
     "⏱ find account:",
     (performance.now() - findStart).toFixed(2),
-    "ms",
+    "ms"
   );
 
   if (!account) {
     throw new Error("Invalid email or password");
   }
 
-  console.log("bcrypt rounds:", Number(account.password.split("$")[2]));
-
   if (!account.isActive || account.status !== "active") {
     throw new Error("Account is not active");
   }
 
+  const currentRounds = Number(account.password.split("$")[2]);
+
+  console.log("bcrypt rounds:", currentRounds);
+
   const passwordStart = performance.now();
+
   const isMatch = await account.comparePassword(password);
+
   console.log(
     "⏱ password compare:",
     (performance.now() - passwordStart).toFixed(2),
-    "ms",
+    "ms"
   );
 
   if (!isMatch) {
     throw new Error("Invalid email or password");
   }
 
-  const currentRounds = Number(account.password.split("$")[2]);
-
-  if (currentRounds > 10) {
-    bcrypt
-      .hash(password, 10)
-      .then((newHash) => {
-        return Account.updateOne(
-          { _id: account._id },
-          {
-            $set: {
-              password: newHash,
-              passwordChangedAt: new Date(),
-            },
-          },
-        );
-      })
-      .catch((err) => {
-        console.error("Password rehash failed:", err.message);
-      });
-  }
-
-  const profileStart = performance.now();
-
   let profile = null;
+  let memberships = [];
 
   if (account.accountType === "user") {
-    profile = await UserProfile.findOne({ accountId: account._id }).lean();
-  } else if (account.accountType === "organization") {
-    profile = await OrganizationProfile.findOne({
-      accountId: account._id,
-    }).lean();
+    const profileStart = performance.now();
+
+    profile = await UserProfile.findOne({ accountId: account._id })
+      .select("_id firstName lastName email phone avatar dateOfBirth gender wrId")
+      .lean();
+
+    console.log(
+      "⏱ user profile:",
+      (performance.now() - profileStart).toFixed(2),
+      "ms"
+    );
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    if (account.role !== "patient") {
+      const membershipStart = performance.now();
+
+      memberships = await OrganizationMembership.find({
+        userId: profile._id,
+        status: "active",
+      })
+        .select(
+          "_id userId organizationId role status departmentId permissions createdAt"
+        )
+        .populate({
+          path: "organizationId",
+          select:
+            "organizationName organizationId organizationType logo address contactEmail phone",
+        })
+        .lean();
+
+      console.log(
+        "⏱ memberships:",
+        (performance.now() - membershipStart).toFixed(2),
+        "ms"
+      );
+    }
   }
 
-  console.log(
-    "⏱ profile lookup:",
-    (performance.now() - profileStart).toFixed(2),
-    "ms",
-  );
+  if (account.accountType === "organization") {
+    const orgProfileStart = performance.now();
+
+    profile = await OrganizationProfile.findOne({
+      accountId: account._id,
+    })
+      .select(
+        "_id organizationName organizationId organizationType logo address contactEmail phone"
+      )
+      .lean();
+
+    console.log(
+      "⏱ organization profile:",
+      (performance.now() - orgProfileStart).toFixed(2),
+      "ms"
+    );
+
+    if (!profile) {
+      throw new Error("Organization profile not found");
+    }
+  }
 
   Account.updateOne(
     { _id: account._id },
-    { $set: { lastLoginAt: new Date() } },
+    { $set: { lastLoginAt: new Date() } }
   ).catch((err) => {
     console.error("Failed to update lastLoginAt:", err.message);
   });
+
+  if (currentRounds > 10) {
+    setImmediate(() => {
+      bcrypt
+        .hash(password, 10)
+        .then((newHash) => {
+          return Account.updateOne(
+            { _id: account._id },
+            {
+              $set: {
+                password: newHash,
+                passwordChangedAt: new Date(),
+              },
+            }
+          );
+        })
+        .catch((err) => {
+          console.error("Password rehash failed:", err.message);
+        });
+    });
+  }
 
   const safeAccount = account.toSafeObject();
 
   console.log(
     "⏱ TOTAL LOGIN:",
     (performance.now() - totalStart).toFixed(2),
-    "ms",
+    "ms"
   );
 
   return {
     account: safeAccount,
-    profile: profile || null,
+    profile,
+    memberships,
   };
 };
 

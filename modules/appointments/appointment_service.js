@@ -5,6 +5,34 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
+const toPositiveInt = (value, fallback, max = 100) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return Math.min(Math.floor(parsed), max);
+};
+
+const buildDateQuery = ({ dateFrom, dateTo }) => {
+  if (!dateFrom && !dateTo) return null;
+
+  const range = {};
+
+  if (dateFrom) {
+    const from = new Date(dateFrom);
+    if (!Number.isNaN(from.getTime())) {
+      range.$gte = from;
+    }
+  }
+
+  if (dateTo) {
+    const to = new Date(dateTo);
+    if (!Number.isNaN(to.getTime())) {
+      range.$lte = to;
+    }
+  }
+
+  return Object.keys(range).length ? range : null;
+};
+
 export const createAppointmentService = async ({
   patientId,
   organizationId,
@@ -14,41 +42,44 @@ export const createAppointmentService = async ({
   authUser,
   createdBy = null,
 }) => {
-  console.log("🚀 ~ createAppointmentService ~ authUser:", authUser);
   if (!patientId || !organizationId || !scheduledFor) {
     throw new Error("patientId, organizationId and scheduledFor are required");
   }
 
-  const {
-    actor,
-    patientId: patientIds,
-    isSelf,
-  } = await resolvePatientAccessContext({
-    patientId: authUser.sub,
+  const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
+    patientId: authUser.accountType === "organization" ? patientId : authUser.sub,
     authUser,
   });
 
-  if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
-  if (!isValidObjectId(organizationId))
+  if (!isValidObjectId(resolvedPatientId)) {
+    throw new Error("Invalid patientId");
+  }
+
+  if (!isValidObjectId(organizationId)) {
     throw new Error("Invalid organizationId");
-  if (providerId && !isValidObjectId(providerId))
+  }
+
+  if (providerId && !isValidObjectId(providerId)) {
     throw new Error("Invalid providerId");
-  if (createdBy && !isValidObjectId(createdBy))
+  }
+
+  if (createdBy && !isValidObjectId(createdBy)) {
     throw new Error("Invalid createdBy");
+  }
 
   const appointment = await Appointment.create({
-    patientId: patientIds,
+    patientId: resolvedPatientId,
     organizationId,
-    providerId,
+    providerId: providerId || null,
     scheduledFor,
     reasonForVisit,
-    createdBy,
+    createdBy: createdBy || null,
   });
 
   return appointment;
 };
 
-export const getAppointmentsService = async ({ authUser, params }) => {
+export const getAppointmentsService = async ({ authUser, params = {} }) => {
   const {
     providerId,
     patientId,
@@ -59,11 +90,11 @@ export const getAppointmentsService = async ({ authUser, params }) => {
     dateTo,
   } = params;
 
-  const query = {};
-
-  const numericPage = Number(page) || 1;
-  const numericLimit = Number(limit) || 20;
+  const numericPage = toPositiveInt(page, 1);
+  const numericLimit = toPositiveInt(limit, 20, 100);
   const skip = (numericPage - 1) * numericLimit;
+
+  const query = {};
 
   // 1. Base access control
   if (authUser.accountType === "organization") {
@@ -73,7 +104,6 @@ export const getAppointmentsService = async ({ authUser, params }) => {
 
     query.organizationId = authUser.organizationId;
 
-    // org can optionally filter by patient
     if (patientId) {
       const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
         patientId,
@@ -83,7 +113,6 @@ export const getAppointmentsService = async ({ authUser, params }) => {
       query.patientId = resolvedPatientId;
     }
   } else {
-    // individual patient/user can only see their own appointments
     const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
       patientId: authUser.sub,
       authUser,
@@ -93,31 +122,58 @@ export const getAppointmentsService = async ({ authUser, params }) => {
   }
 
   // 2. Optional filters
-  if (providerId) query.providerId = providerId;
-  if (status) query.status = status;
-
-  if (dateFrom || dateTo) {
-    query.scheduledFor = {};
-    if (dateFrom) query.scheduledFor.$gte = new Date(dateFrom);
-    if (dateTo) query.scheduledFor.$lte = new Date(dateTo);
+  if (providerId) {
+    if (!isValidObjectId(providerId)) throw new Error("Invalid providerId");
+    query.providerId = providerId;
   }
+
+  if (status) {
+    query.status = status;
+  }
+
+  const scheduledForRange = buildDateQuery({ dateFrom, dateTo });
+  if (scheduledForRange) {
+    query.scheduledFor = scheduledForRange;
+  }
+
+  const appointmentSelect =
+    "patientId organizationId providerId scheduledFor reasonForVisit status createdBy createdAt updatedAt";
+
+  const patientSelect = "fullName wrId phone";
+  const providerSelect = "fullName email phone";
+  const organizationSelect = "organizationName accountId organizationType logo";
+  const accountSelect = "email fullName accountType isVerified";
 
   const [items, total] = await Promise.all([
     Appointment.find(query)
-      .populate("patientId", "fullName wrId phone")
-      .populate("providerId", "fullName email phone")
+      .select(appointmentSelect)
+      .populate({
+        path: "patientId",
+        select: patientSelect,
+        options: { lean: true },
+      })
+      .populate({
+        path: "providerId",
+        select: providerSelect,
+        options: { lean: true },
+      })
       .populate({
         path: "organizationId",
-        select: "organizationName accountId",
+        select: organizationSelect,
+        options: { lean: true },
         populate: {
           path: "accountId",
-          select: "email fullName accountType isVerified",
+          select: accountSelect,
+          options: { lean: true },
         },
       })
-      .sort({ scheduledFor: 1 })
+      .sort({ scheduledFor: 1, _id: 1 })
       .skip(skip)
-      .limit(numericLimit),
-    Appointment.countDocuments(query),
+      .limit(numericLimit)
+      .lean()
+      .exec(),
+
+    Appointment.countDocuments(query).exec(),
   ]);
 
   return {
@@ -130,25 +186,50 @@ export const getAppointmentsService = async ({ authUser, params }) => {
 };
 
 export const getAppointmentByIdService = async (appointmentId) => {
-  if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+  if (!isValidObjectId(appointmentId)) {
+    throw new Error("Invalid appointmentId");
+  }
 
   const appointment = await Appointment.findById(appointmentId)
-    .populate("patientId", "fullName wrId phone")
-    .populate("providerId", "fullName email phone");
+    .select(
+      "patientId organizationId providerId scheduledFor reasonForVisit status createdBy createdAt updatedAt"
+    )
+    .populate({
+      path: "patientId",
+      select: "fullName wrId phone",
+      options: { lean: true },
+    })
+    .populate({
+      path: "providerId",
+      select: "fullName email phone",
+      options: { lean: true },
+    })
+    .lean()
+    .exec();
 
-  if (!appointment) throw new Error("Appointment not found");
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
 
   return appointment;
 };
 
 export const updateAppointmentService = async (appointmentId, payload = {}) => {
-  if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+  if (!isValidObjectId(appointmentId)) {
+    throw new Error("Invalid appointmentId");
+  }
 
-  const appointment = await Appointment.findById(appointmentId);
-  if (!appointment) throw new Error("Appointment not found");
+  const existingAppointment = await Appointment.findById(appointmentId)
+    .select("_id status")
+    .lean()
+    .exec();
 
-  if (["completed", "cancelled", "no-show"].includes(appointment.status)) {
-    throw new Error(`Cannot update a ${appointment.status} appointment`);
+  if (!existingAppointment) {
+    throw new Error("Appointment not found");
+  }
+
+  if (["completed", "cancelled", "no-show"].includes(existingAppointment.status)) {
+    throw new Error(`Cannot update a ${existingAppointment.status} appointment`);
   }
 
   const allowedFields = [
@@ -158,13 +239,24 @@ export const updateAppointmentService = async (appointmentId, payload = {}) => {
     "status",
   ];
 
+  const update = {};
+
   for (const key of allowedFields) {
     if (payload[key] !== undefined) {
-      appointment[key] = payload[key];
+      update[key] = payload[key];
     }
   }
 
-  await appointment.save();
+  if (update.providerId && !isValidObjectId(update.providerId)) {
+    throw new Error("Invalid providerId");
+  }
+
+  const appointment = await Appointment.findByIdAndUpdate(
+    appointmentId,
+    { $set: update },
+    { new: true, runValidators: true }
+  ).exec();
+
   return appointment;
 };
 
@@ -172,12 +264,19 @@ export const checkInAppointmentService = async ({
   appointmentId,
   checkedInBy,
 }) => {
-  if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
-  if (checkedInBy && !isValidObjectId(checkedInBy))
-    throw new Error("Invalid checkedInBy");
+  if (!isValidObjectId(appointmentId)) {
+    throw new Error("Invalid appointmentId");
+  }
 
-  const appointment = await Appointment.findById(appointmentId);
-  if (!appointment) throw new Error("Appointment not found");
+  if (checkedInBy && !isValidObjectId(checkedInBy)) {
+    throw new Error("Invalid checkedInBy");
+  }
+
+  const appointment = await Appointment.findById(appointmentId).exec();
+
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
 
   if (appointment.status === "cancelled") {
     throw new Error("Cancelled appointment cannot be checked in");
@@ -187,9 +286,16 @@ export const checkInAppointmentService = async ({
     throw new Error("Completed appointment cannot be checked in");
   }
 
-  let queueItem = await VisitQueue.findOne({ appointmentId: appointment._id });
+  let queueItem = await VisitQueue.findOne({
+    appointmentId: appointment._id,
+  }).exec();
+
   if (queueItem) {
-    return { appointment, queueItem, message: "Queue item already exists" };
+    return {
+      appointment,
+      queueItem,
+      message: "Queue item already exists",
+    };
   }
 
   appointment.status = "checked-in";
@@ -207,14 +313,22 @@ export const checkInAppointmentService = async ({
     checkedInBy: checkedInBy || null,
   });
 
-  return { appointment, queueItem };
+  return {
+    appointment,
+    queueItem,
+  };
 };
 
 export const markAppointmentNoShowService = async (appointmentId) => {
-  if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+  if (!isValidObjectId(appointmentId)) {
+    throw new Error("Invalid appointmentId");
+  }
 
-  const appointment = await Appointment.findById(appointmentId);
-  if (!appointment) throw new Error("Appointment not found");
+  const appointment = await Appointment.findById(appointmentId).exec();
+
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
 
   if (appointment.status === "completed") {
     throw new Error("Completed appointment cannot be marked as no-show");
@@ -223,13 +337,262 @@ export const markAppointmentNoShowService = async (appointmentId) => {
   appointment.status = "no-show";
   await appointment.save();
 
-  const queueItem = await VisitQueue.findOne({
-    appointmentId: appointment._id,
-  });
-  if (queueItem && !["completed"].includes(queueItem.workflowStatus)) {
-    queueItem.workflowStatus = "no-show";
-    await queueItem.save();
-  }
+  await VisitQueue.updateOne(
+    {
+      appointmentId: appointment._id,
+      workflowStatus: { $ne: "completed" },
+    },
+    {
+      $set: {
+        workflowStatus: "no-show",
+      },
+    }
+  ).exec();
 
   return appointment;
 };
+
+
+
+
+
+
+
+
+
+
+// import mongoose from "mongoose";
+// import { Appointment } from "./appointment_model.js";
+// import { VisitQueue } from "../visitQueue/visitQueue_model.js";
+// import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+
+// const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+
+// export const createAppointmentService = async ({
+//   patientId,
+//   organizationId,
+//   providerId = null,
+//   scheduledFor,
+//   reasonForVisit = null,
+//   authUser,
+//   createdBy = null,
+// }) => {
+//   console.log("🚀 ~ createAppointmentService ~ authUser:", authUser);
+//   if (!patientId || !organizationId || !scheduledFor) {
+//     throw new Error("patientId, organizationId and scheduledFor are required");
+//   }
+
+//   const {
+//     actor,
+//     patientId: patientIds,
+//     isSelf,
+//   } = await resolvePatientAccessContext({
+//     patientId: authUser.sub,
+//     authUser,
+//   });
+
+//   if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
+//   if (!isValidObjectId(organizationId))
+//     throw new Error("Invalid organizationId");
+//   if (providerId && !isValidObjectId(providerId))
+//     throw new Error("Invalid providerId");
+//   if (createdBy && !isValidObjectId(createdBy))
+//     throw new Error("Invalid createdBy");
+
+//   const appointment = await Appointment.create({
+//     patientId: patientIds,
+//     organizationId,
+//     providerId,
+//     scheduledFor,
+//     reasonForVisit,
+//     createdBy,
+//   });
+
+//   return appointment;
+// };
+
+// export const getAppointmentsService = async ({ authUser, params }) => {
+//   const {
+//     providerId,
+//     patientId,
+//     status,
+//     page = 1,
+//     limit = 20,
+//     dateFrom,
+//     dateTo,
+//   } = params;
+
+//   const query = {};
+
+//   const numericPage = Number(page) || 1;
+//   const numericLimit = Number(limit) || 20;
+//   const skip = (numericPage - 1) * numericLimit;
+
+//   // 1. Base access control
+//   if (authUser.accountType === "organization") {
+//     if (!authUser.organizationId) {
+//       throw new Error("Organization user is missing organizationId");
+//     }
+
+//     query.organizationId = authUser.organizationId;
+
+//     // org can optionally filter by patient
+//     if (patientId) {
+//       const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
+//         patientId,
+//         authUser,
+//       });
+
+//       query.patientId = resolvedPatientId;
+//     }
+//   } else {
+//     // individual patient/user can only see their own appointments
+//     const { patientId: resolvedPatientId } = await resolvePatientAccessContext({
+//       patientId: authUser.sub,
+//       authUser,
+//     });
+
+//     query.patientId = resolvedPatientId;
+//   }
+
+//   // 2. Optional filters
+//   if (providerId) query.providerId = providerId;
+//   if (status) query.status = status;
+
+//   if (dateFrom || dateTo) {
+//     query.scheduledFor = {};
+//     if (dateFrom) query.scheduledFor.$gte = new Date(dateFrom);
+//     if (dateTo) query.scheduledFor.$lte = new Date(dateTo);
+//   }
+
+//   const [items, total] = await Promise.all([
+//     Appointment.find(query)
+//       .populate("patientId", "fullName wrId phone")
+//       .populate("providerId", "fullName email phone")
+//       .populate({
+//         path: "organizationId",
+//         select: "organizationName accountId",
+//         populate: {
+//           path: "accountId",
+//           select: "email fullName accountType isVerified",
+//         },
+//       })
+//       .sort({ scheduledFor: 1 })
+//       .skip(skip)
+//       .limit(numericLimit),
+//     Appointment.countDocuments(query),
+//   ]);
+
+//   return {
+//     items,
+//     total,
+//     page: numericPage,
+//     limit: numericLimit,
+//     totalPages: Math.ceil(total / numericLimit),
+//   };
+// };
+
+// export const getAppointmentByIdService = async (appointmentId) => {
+//   if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+
+//   const appointment = await Appointment.findById(appointmentId)
+//     .populate("patientId", "fullName wrId phone")
+//     .populate("providerId", "fullName email phone");
+
+//   if (!appointment) throw new Error("Appointment not found");
+
+//   return appointment;
+// };
+
+// export const updateAppointmentService = async (appointmentId, payload = {}) => {
+//   if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+
+//   const appointment = await Appointment.findById(appointmentId);
+//   if (!appointment) throw new Error("Appointment not found");
+
+//   if (["completed", "cancelled", "no-show"].includes(appointment.status)) {
+//     throw new Error(`Cannot update a ${appointment.status} appointment`);
+//   }
+
+//   const allowedFields = [
+//     "providerId",
+//     "scheduledFor",
+//     "reasonForVisit",
+//     "status",
+//   ];
+
+//   for (const key of allowedFields) {
+//     if (payload[key] !== undefined) {
+//       appointment[key] = payload[key];
+//     }
+//   }
+
+//   await appointment.save();
+//   return appointment;
+// };
+
+// export const checkInAppointmentService = async ({
+//   appointmentId,
+//   checkedInBy,
+// }) => {
+//   if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+//   if (checkedInBy && !isValidObjectId(checkedInBy))
+//     throw new Error("Invalid checkedInBy");
+
+//   const appointment = await Appointment.findById(appointmentId);
+//   if (!appointment) throw new Error("Appointment not found");
+
+//   if (appointment.status === "cancelled") {
+//     throw new Error("Cancelled appointment cannot be checked in");
+//   }
+
+//   if (appointment.status === "completed") {
+//     throw new Error("Completed appointment cannot be checked in");
+//   }
+
+//   let queueItem = await VisitQueue.findOne({ appointmentId: appointment._id });
+//   if (queueItem) {
+//     return { appointment, queueItem, message: "Queue item already exists" };
+//   }
+
+//   appointment.status = "checked-in";
+//   await appointment.save();
+
+//   queueItem = await VisitQueue.create({
+//     patientId: appointment.patientId,
+//     organizationId: appointment.organizationId,
+//     appointmentId: appointment._id,
+//     providerId: appointment.providerId || null,
+//     source: "appointment",
+//     workflowStatus: "checked-in",
+//     chiefComplaint: appointment.reasonForVisit || null,
+//     checkedInAt: new Date(),
+//     checkedInBy: checkedInBy || null,
+//   });
+
+//   return { appointment, queueItem };
+// };
+
+// export const markAppointmentNoShowService = async (appointmentId) => {
+//   if (!isValidObjectId(appointmentId)) throw new Error("Invalid appointmentId");
+
+//   const appointment = await Appointment.findById(appointmentId);
+//   if (!appointment) throw new Error("Appointment not found");
+
+//   if (appointment.status === "completed") {
+//     throw new Error("Completed appointment cannot be marked as no-show");
+//   }
+
+//   appointment.status = "no-show";
+//   await appointment.save();
+
+//   const queueItem = await VisitQueue.findOne({
+//     appointmentId: appointment._id,
+//   });
+//   if (queueItem && !["completed"].includes(queueItem.workflowStatus)) {
+//     queueItem.workflowStatus = "no-show";
+//     await queueItem.save();
+//   }
+
+//   return appointment;
+// };

@@ -3,6 +3,8 @@ import { vitalModel } from "./vitals_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { buildClinicalAccessFilter, findActiveAccessGrant } from "../access/access_grant_service.js";
+
 // import { Patient } from "../patients/patient_model.js"; // adjust path/model name
 // import { Encounter } from "../encounters/encounter_model.js"; // optional, if validating encounter existence
 
@@ -401,4 +403,52 @@ const hasOrganizationCreateAccess = async ({ patientId, organizationId }) => {
   // return Boolean(relation);
 
   return true;
+};
+
+export const getPatientVitalsForProvider = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+
+    const providerUserId = req.user._id;
+    const organizationId = req.user.organizationProfileId || null;
+
+    const grant = await findActiveAccessGrant({
+      patientId,
+      userId: providerUserId,
+      organizationId,
+      category: "vitals",
+    });
+
+    if (!grant) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have consent to access this patient's vitals.",
+      });
+    }
+
+    const filter = buildClinicalAccessFilter({
+      grant,
+      patientId,
+      category: "vitals",
+    });
+
+    const vitals = await vitalModel
+      .find(filter)
+      .sort({ measuredAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      access: {
+        grantId: grant._id,
+        accessScope: grant.accessScope,
+        expiresAt: grant.expiresAt,
+        recordFrom: grant.recordFrom,
+        recordTo: grant.recordTo,
+      },
+      data: vitals,
+    });
+  } catch (error) {
+    next(error);
+  }
 };

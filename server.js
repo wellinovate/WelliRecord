@@ -19,7 +19,9 @@ import procedureRoutes from "./modules/procedure/procedure_routes.js";
 import immunizationRoutes from "./modules/immunizations/immunization_routes.js";
 import appointmentRoutes from "./modules/appointments/appointment_routes.js";
 import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
+import accessGrantRoutes from "./modules/access/access_grant_routes.js";
 import { connectRedis } from "./shared/config/redis.js";
+import { globalRateLimiter } from "./shared/middlewares/rate_limit.js";
 // import uploadRoute from "./routes/upload.js";
 
 dotenv.config();
@@ -67,6 +69,8 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(globalRateLimiter);
+
 // Routes
 // app.use("/app", welliidRoutes);
 app.use("/api/v1/auth", authRouter);
@@ -83,6 +87,7 @@ app.use("/api/v1/user", userRoutes);
 
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/queue", visitQueueRoutes);
+app.use("/api/v1/access-grants", accessGrantRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("WelliID Issuer Service is running..."));

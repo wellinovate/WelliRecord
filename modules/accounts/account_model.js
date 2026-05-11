@@ -152,7 +152,11 @@ accountSchema.methods.toSafeObject = function () {
 };
 
 accountSchema.statics.findByEmailWithPassword = function (email) {
-  return this.findOne({ email }).select("+password");
+  return this.findOne({ email })
+    .select(
+      "+password email accountType role status isActive img phone isVerified patientIdentityId lastLoginAt passwordChangedAt createdAt updatedAt"
+    )
+    .exec();
 };
 
 export const Account = mongoose.model("Account", accountSchema);

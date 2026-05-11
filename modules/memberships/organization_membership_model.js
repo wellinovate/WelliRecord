@@ -7,6 +7,7 @@ const organizationMembershipSchema = new Schema(
     organizationId: {
       type: Schema.Types.ObjectId,
       ref: "Account",
+      // ref: "OrganizationProfile",
       required: true,
       index: true,
     },

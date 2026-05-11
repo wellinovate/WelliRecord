@@ -16,6 +16,7 @@ export const signAccessToken = (results) => {
     email: account.email,
     fullName: profile.fullName,
     accountType: account.accountType,
+    wrId: profile?.wrId,
     role: account.role ?? null,
     profileId: profile?._id ? String(profile._id) : profile?.id ? String(profile.id) : null,
   };

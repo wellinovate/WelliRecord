@@ -1,24 +1,25 @@
 import mongoose from "mongoose";
-const Schema = mongoose.Schema;
+
+const { Schema } = mongoose;
 
 const accessGrantSchema = new Schema(
   {
     patientId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Patient",
+      type: Schema.Types.ObjectId,
+      ref: "UserProfile",
       required: true,
       index: true,
     },
 
     grantedBy: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
 
     requestedBy: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       default: null,
       index: true,
@@ -32,15 +33,15 @@ const accessGrantSchema = new Schema(
     },
 
     granteeUserId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       default: null,
       index: true,
     },
 
     granteeOrganizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
+      type: Schema.Types.ObjectId,
+      ref: "OrganizationProfile",
       default: null,
       index: true,
     },
@@ -68,14 +69,46 @@ const accessGrantSchema = new Schema(
     },
 
     recordId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       default: null,
       index: true,
     },
 
     encounterId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Encounter",
+      default: null,
+      index: true,
+    },
+
+    /**
+     * This controls WHICH RECORD DATES the provider can see.
+     * null recordFrom means: from the beginning of the patient's history.
+     * null recordTo means: up to now / ongoing.
+     */
+    recordFrom: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    recordTo: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    /**
+     * This controls HOW LONG the grant itself is valid.
+     */
+    startsAt: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
+
+    expiresAt: {
+      type: Date,
       default: null,
       index: true,
     },
@@ -93,6 +126,10 @@ const accessGrantSchema = new Schema(
         type: Boolean,
         default: false,
       },
+      write: {
+        type: Boolean,
+        default: false,
+      },
     },
 
     purpose: {
@@ -102,22 +139,10 @@ const accessGrantSchema = new Schema(
       default: null,
     },
 
-    startsAt: {
-      type: Date,
-      default: Date.now,
-      index: true,
-    },
-
-    expiresAt: {
-      type: Date,
-      default: null,
-      index: true,
-    },
-
     status: {
       type: String,
       enum: ["pending", "active", "revoked", "expired", "rejected"],
-      default: "pending",
+      default: "active",
       index: true,
     },
 
@@ -128,6 +153,12 @@ const accessGrantSchema = new Schema(
 
     revokedAt: {
       type: Date,
+      default: null,
+    },
+
+    revokedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
 
@@ -150,44 +181,68 @@ const accessGrantSchema = new Schema(
   },
 );
 
-accessGrantSchema.pre("save", function (next) {
-  try {
-    if (this.expiresAt && this.expiresAt <= this.startsAt) {
-      return next(new Error("expiresAt must be later than startsAt"));
-    }
-
-    if (
-      (this.granteeType === "provider" && !this.granteeUserId) ||
-      (this.granteeType === "organization" && !this.granteeOrganizationId)
-    ) {
-      return next(
-        new Error("Missing grantee reference for selected granteeType"),
-      );
-    }
-
-    if (this.status === "active" && !this.reviewedAt) {
-      this.reviewedAt = new Date();
-    }
-
-    if (this.status === "revoked" && !this.revokedAt) {
-      this.revokedAt = new Date();
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+accessGrantSchema.pre("validate", function (next) {
+  if (this.expiresAt && this.expiresAt <= this.startsAt) {
+    return next(new Error("expiresAt must be later than startsAt"));
   }
+
+  if (this.recordFrom && this.recordTo && this.recordTo <= this.recordFrom) {
+    return next(new Error("recordTo must be later than recordFrom"));
+  }
+
+  if (this.granteeType === "provider" && !this.granteeUserId) {
+    return next(new Error("granteeUserId is required for provider grants"));
+  }
+
+  if (this.granteeType === "organization" && !this.granteeOrganizationId) {
+    return next(
+      new Error("granteeOrganizationId is required for organization grants"),
+    );
+  }
+
+  if (this.accessScope === "category" && !this.category) {
+    return next(new Error("category is required for category access"));
+  }
+
+  if (this.accessScope === "single-record" && !this.recordId) {
+    return next(new Error("recordId is required for single-record access"));
+  }
+
+  if (this.accessScope === "encounter" && !this.encounterId) {
+    return next(new Error("encounterId is required for encounter access"));
+  }
+
+  if (this.status === "active" && !this.reviewedAt) {
+    this.reviewedAt = new Date();
+  }
+
+  if (this.status === "revoked" && !this.revokedAt) {
+    this.revokedAt = new Date();
+  }
+
+  next();
+});
+
+accessGrantSchema.index({
+  patientId: 1,
+  granteeUserId: 1,
+  status: 1,
+  startsAt: 1,
+  expiresAt: 1,
 });
 
 accessGrantSchema.index({
   patientId: 1,
   granteeOrganizationId: 1,
   status: 1,
+  startsAt: 1,
+  expiresAt: 1,
 });
 
 accessGrantSchema.index({
   patientId: 1,
-  granteeUserId: 1,
+  accessScope: 1,
+  category: 1,
   status: 1,
 });
 
