@@ -91,7 +91,7 @@ app.use("/api/v1/queue", visitQueueRoutes);
 app.use("/api/v1/access-grants", accessGrantRoutes);
 
 // Health check
-app.get("/", (req, res) => res.send("WelliID Issuer Service is running..."));
+app.get("/", (req, res) => res.send("Wellirecord staging is running..."));
 
 // Start server
 // const PORT = process.env.PORT || 3001;
