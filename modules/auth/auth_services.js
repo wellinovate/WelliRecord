@@ -251,7 +251,7 @@ export const loginAccount = async ({ email, password }) => {
     const profileStart = performance.now();
 
     profile = await UserProfile.findOne({ accountId: account._id })
-      .select("_id firstName lastName email phone avatar dateOfBirth gender wrId")
+      .select("_id firstName fullName lastName email phone avatar dateOfBirth gender wrId")
       .lean();
 
     console.log(

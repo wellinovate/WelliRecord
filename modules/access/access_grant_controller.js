@@ -1,37 +1,112 @@
-import { grantFullHistoryAccess } from "./access_grant_service.js";
+import { vitalModel } from "../vitals/vitals_model.js";
 import { accessGrantModel } from "./access_grant_model.js";
+// import { accessAuditModel } from "./access_audit_model.js";
 
-export const createFullHistoryGrant = async (req, res, next) => {
+import {
+  grantPatientAccess,
+  findActiveAccessGrant,
+  buildClinicalAccessFilter,
+} from "./access_grant_service.js";
+
+import { validateCreateAccessGrant } from "./access_grant_validation.js";
+
+const getAuthUserId = (req) => {
+  // console.log("🚀 ~ getAuthUserId ~ req:", req.user)
+  return  req.user?.sub;
+};
+
+const getAuthPatientProfileId = (req) => {
+  // return req.user?.profileId || req.user?.userProfileId || req.profileId;
+  // console.log("🚀 ~ getAuthPatientProfileId ~ req.user?.sub:", req.user)
+  return req.user?.profileId;
+};
+
+const getAuthOrganizationId = (req) => {
+  return (
+    req.user?.organizationProfileId ||
+    req.user?.organizationId ||
+    req.organizationProfileId ||
+    null
+  );
+};
+
+export const createAccessGrant = async (req, res, next) => {
   try {
     const { patientId } = req.params;
+    console.log("🚀 ~ createAccessGrant ~ patientId:", patientId)
+
+    const validation = validateCreateAccessGrant(req.body);
+    // console.log("🚀 ~ createAccessGrant ~ validation:", validation)
+   
+
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid access grant payload",
+        errors: validation.errors,
+      });
+    }
 
     const {
       granteeUserId,
       granteeOrganizationId,
-      granteeType = "provider",
-      durationDays = 7,
+      granteeType,
+      accessScope,
+      category,
+      recordId,
+      encounterId,
+      recordFrom,
+      recordTo,
+      durationDays,
+      expiresAt,
+      permissions,
       purpose,
-    } = req.body;
+      notes,
+    } = validation.data;
+    
+    const grantedBy = getAuthUserId(req);
+    // console.log("🚀 ~ createAccessGrant ~ grantedBy:", grantedBy)
+    const authPatientProfileId = getAuthPatientProfileId(req);
 
-    const grantedBy = req.user._id;
-
-    // Critical: make sure the logged-in user owns this patient profile.
-    // Do not skip this.
-    if (String(req.user.profileId) !== String(patientId)) {
+    if (!grantedBy) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication user not found.",
+      });
+    }
+    
+    console.log("🚀 ~ createAccessGrant ~ authPatientProfileId:", authPatientProfileId)
+    console.log("🚀 ~ createAccessGrant ~ patientId:", patientId)
+    if (String(grantedBy) !== String(patientId)) {
       return res.status(403).json({
         success: false,
         message: "Only the patient can grant access to this record.",
       });
     }
-
-    const grant = await grantFullHistoryAccess({
-      patientId,
+    
+    console.log("🚀 ~ createAccessGrant ~ YYYYYYYYYYYY:", granteeOrganizationId)
+    const grant = await grantPatientAccess({
+      patientId : authPatientProfileId,
       grantedBy,
+
       granteeUserId,
       granteeOrganizationId,
       granteeType,
+
+      accessScope,
+      category,
+      recordId,
+      encounterId,
+
+      recordFrom,
+      recordTo,
+
       durationDays,
+      expiresAt,
+
+      permissions,
       purpose,
+      notes,
     });
 
     return res.status(201).json({
@@ -40,6 +115,7 @@ export const createFullHistoryGrant = async (req, res, next) => {
       data: grant,
     });
   } catch (error) {
+  console.log("🚀 ~ createAccessGrant ~ error:", error)
     next(error);
   }
 };
@@ -47,12 +123,19 @@ export const createFullHistoryGrant = async (req, res, next) => {
 export const getMyGrantedAccess = async (req, res, next) => {
   try {
     const { patientId } = req.params;
+    console.log("🚀 ~ getMyGrantedAccess ~ patientId:", patientId)
 
-    /**
-     * Important:
-     * The logged-in patient should only see grants for their own profile.
-     */
-    if (String(req.user.profileId) !== String(patientId)) {
+    const userId = getAuthUserId(req);
+    const authPatientProfileId = getAuthPatientProfileId(req);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication user not found.",
+      });
+    }
+
+    if (String(userId) !== String(patientId)) {
       return res.status(403).json({
         success: false,
         message: "You are not allowed to view access grants for this patient.",
@@ -61,12 +144,12 @@ export const getMyGrantedAccess = async (req, res, next) => {
 
     const grants = await accessGrantModel
       .find({
-        patientId,
-        grantedBy: req.user._id,
+        patientId: authPatientProfileId,
+        grantedBy: userId,
       })
       .populate({
         path: "granteeUserId",
-        select: "email role accountType",
+        select: "email organizationName wrOrgId role accountType",
       })
       .populate({
         path: "granteeOrganizationId",
@@ -74,6 +157,7 @@ export const getMyGrantedAccess = async (req, res, next) => {
       })
       .sort({ createdAt: -1 })
       .lean();
+    console.log("🚀 ~ getMyGrantedAccess ~ grants:", grants)
 
     return res.status(200).json({
       success: true,
@@ -81,7 +165,6 @@ export const getMyGrantedAccess = async (req, res, next) => {
       data: grants,
     });
   } catch (error) {
-    console.log("🚀 ~ getMyGrantedAccess ~ error:", error);
     next(error);
   }
 };
@@ -90,14 +173,15 @@ export const getPatientVitalsForProvider = async (req, res, next) => {
   try {
     const { patientId } = req.params;
 
-    const providerUserId = req.user._id;
+    const providerUserId = getAuthUserId(req);
+    const organizationId = getAuthOrganizationId(req);
 
-    /**
-     * Use the correct organization profile field from your auth payload.
-     * Change this if your middleware stores it differently.
-     */
-    const organizationId =
-      req.user.organizationProfileId || req.user.organizationId || null;
+    if (!providerUserId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication user not found.",
+      });
+    }
 
     const grant = await findActiveAccessGrant({
       patientId,
@@ -124,16 +208,16 @@ export const getPatientVitalsForProvider = async (req, res, next) => {
       .sort({ measuredAt: -1 })
       .lean();
 
-    await accessAuditModel.create({
-      patientId,
-      accessedBy: providerUserId,
-      organizationId,
-      grantId: grant._id,
-      category: "vitals",
-      action: "view",
-      ipAddress: req.ip,
-      userAgent: req.headers["user-agent"],
-    });
+    // await accessAuditModel.create({
+    //   patientId,
+    //   accessedBy: providerUserId,
+    //   organizationId,
+    //   grantId: grant._id,
+    //   category: "vitals",
+    //   action: "view",
+    //   ipAddress: req.ip,
+    //   userAgent: req.headers["user-agent"],
+    // });
 
     return res.status(200).json({
       success: true,
@@ -157,8 +241,20 @@ export const getPatientVitalsForProvider = async (req, res, next) => {
 export const revokeAccessGrant = async (req, res, next) => {
   try {
     const { grantId } = req.params;
+    console.log("🚀 ~ revokeAccessGrant ~ grantId:", grantId)
+
+    const userId = getAuthUserId(req);
+    console.log("🚀 ~ revokeAccessGrant ~ userId:", userId)
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication user not found.",
+      });
+    }
 
     const grant = await accessGrantModel.findById(grantId);
+    console.log("🚀 ~ revokeAccessGrant ~ grant:", grant)
 
     if (!grant) {
       return res.status(404).json({
@@ -167,16 +263,24 @@ export const revokeAccessGrant = async (req, res, next) => {
       });
     }
 
-    if (String(grant.grantedBy) !== String(req.user._id)) {
+    if (String(grant.grantedBy) !== String(userId)) {
       return res.status(403).json({
         success: false,
         message: "You cannot revoke this access grant.",
       });
     }
 
+    if (grant.status === "revoked") {
+      return res.status(200).json({
+        success: true,
+        message: "Access grant is already revoked.",
+        data: grant,
+      });
+    }
+
     grant.status = "revoked";
     grant.revokedAt = new Date();
-    grant.revokedBy = req.user._id;
+    grant.revokedBy = userId;
 
     await grant.save();
 
@@ -186,7 +290,7 @@ export const revokeAccessGrant = async (req, res, next) => {
       data: grant,
     });
   } catch (error) {
-    next(error);
+    console.log("🚀 ~ revokeAccessGrant ~ error:", error)
   }
 };
 
@@ -205,10 +309,3 @@ export const expireOldAccessGrants = async () => {
     },
   );
 };
-
-// import cron from "node-cron";
-// import { expireOldAccessGrants } from "./access_grant_jobs.js";
-
-// cron.schedule("*/10 * * * *", async () => {
-//   await expireOldAccessGrants();
-// });

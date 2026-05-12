@@ -6,7 +6,7 @@ export const globalRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
 
   // Low in development so you can actually test it
-  limit: isProduction ? 300 : 10,
+  limit: isProduction ? 300 : 100,
 
   standardHeaders: true,
   legacyHeaders: false,

@@ -1,47 +1,146 @@
+import mongoose from "mongoose";
 import { accessGrantModel } from "./access_grant_model.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
 
-export const grantFullHistoryAccess = async ({
+const validateGranteeExists = async ({
+  granteeType,
+  granteeUserId,
+  granteeOrganizationId,
+}) => {
+  if (granteeType === "provider") {
+    if (!mongoose.Types.ObjectId.isValid(granteeUserId)) {
+      const error = new Error("Invalid provider user ID.");
+      console.log("🚀 ~ validateGranteeExists ~ error:", error)
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const provider = await OrganizationProfile.findOne({
+      _id: granteeUserId,
+      organizationType: "individaul_provider",
+    });
+
+    if (!provider) {
+      const error = new Error("Provider account not found.");
+      console.log("🚀 ~ validateGranteeExists ~ error:", error)
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return provider;
+  }
+
+  if (granteeType === "organization") {
+    if (!mongoose.Types.ObjectId.isValid(granteeOrganizationId)) {
+      const error = new Error("Invalid organization ID.");
+      console.log("🚀 ~ validateGranteeExists ~ error:", error)
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const organization = await OrganizationProfile.findById(
+      granteeOrganizationId,
+    );
+
+    if (!organization) {
+      const error = new Error("Organization account not found.");
+      console.log("🚀 ~ validateGranteeExists ~ error:", error)
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return organization;
+  }
+
+  const error = new Error("Unsupported grantee type.");
+  console.log("🚀 ~ validateGranteeExists ~ error:", error)
+  error.statusCode = 400;
+  throw error;
+};
+
+export const grantPatientAccess = async ({
   patientId,
   grantedBy,
+
   granteeUserId,
   granteeOrganizationId = null,
   granteeType = "provider",
+
+  accessScope,
+  category = null,
+  recordId = null,
+  encounterId = null,
+
+  recordFrom = null,
+  recordTo = null,
+
   durationDays = 7,
+  expiresAt = null,
+
+  permissions = {},
   purpose = null,
+  notes = null,
 }) => {
+  console.log("🚀 ~ grantPatientAccess ~ granteeOrganizationId:", granteeOrganizationId)
   const now = new Date();
 
-  const expiresAt = new Date(now);
-  expiresAt.setDate(expiresAt.getDate() + durationDays);
+  try {
+    await validateGranteeExists({
+      granteeType,
+      granteeUserId,
+      granteeOrganizationId,
+    });
 
-  const grant = await accessGrantModel.create({
-    patientId,
-    grantedBy,
-    granteeType,
-    granteeUserId,
-    granteeOrganizationId,
-    accessScope: "full-record",
+    let finalExpiresAt = expiresAt ? new Date(expiresAt) : null;
 
-    // full past history
-    recordFrom: null,
-    recordTo: null,
+    if (!finalExpiresAt && durationDays) {
+      finalExpiresAt = new Date(now);
+      finalExpiresAt.setDate(finalExpiresAt.getDate() + Number(durationDays));
+    }
 
-    startsAt: now,
-    expiresAt,
+    const safePermissions = {
+      view: permissions.view ?? true,
+      download: permissions.download ?? false,
+      reshare: permissions.reshare ?? false,
+      write: permissions.write ?? false,
+    };
+    console.log("🚀 ~ grantPatientAccess ~ safePermissions:", safePermissions)
 
-    permissions: {
-      view: true,
-      download: false,
-      reshare: false,
-      write: false,
-    },
+    const grant = await accessGrantModel.create({
+      patientId,
+      grantedBy,
 
-    purpose,
-    status: "active",
-    reviewedAt: now,
-  });
+      granteeType,
 
-  return grant;
+      granteeUserId: granteeType === "provider" ? granteeUserId : null,
+
+      granteeOrganizationId:
+        granteeType === "organization" ? granteeOrganizationId : null,
+
+      accessScope,
+      category,
+      recordId,
+      encounterId,
+
+      recordFrom: recordFrom ? new Date(recordFrom) : null,
+      recordTo: recordTo ? new Date(recordTo) : null,
+
+      startsAt: now,
+      expiresAt: finalExpiresAt,
+
+      permissions: safePermissions,
+
+      purpose,
+      notes,
+
+      status: "active",
+      reviewedAt: now,
+    });
+
+    return grant;
+  } catch (error) {
+    console.log("🚀 ~ grantPatientAccess ~ error:", error);
+  }
 };
 
 export const grantRecentHistoryAccess = async ({
@@ -86,7 +185,6 @@ export const grantRecentHistoryAccess = async ({
     reviewedAt: now,
   });
 };
-
 
 export const findActiveAccessGrant = async ({
   patientId,
@@ -172,11 +270,7 @@ const CATEGORY_DATE_FIELD = {
   immunizations: "createdAt",
 };
 
-export const buildClinicalAccessFilter = ({
-  grant,
-  patientId,
-  category,
-}) => {
+export const buildClinicalAccessFilter = ({ grant, patientId, category }) => {
   const dateField = CATEGORY_DATE_FIELD[category] || "createdAt";
 
   const filter = {

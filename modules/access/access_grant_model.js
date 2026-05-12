@@ -13,14 +13,14 @@ const accessGrantSchema = new Schema(
 
     grantedBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Account",
       required: true,
       index: true,
     },
 
     requestedBy: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "OrganizationProfile",
       default: null,
       index: true,
     },
@@ -34,7 +34,7 @@ const accessGrantSchema = new Schema(
 
     granteeUserId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
+      ref: "OrganizationProfile",
       default: null,
       index: true,
     },
@@ -181,35 +181,33 @@ const accessGrantSchema = new Schema(
   },
 );
 
-accessGrantSchema.pre("validate", function (next) {
+accessGrantSchema.pre("validate", function () {
   if (this.expiresAt && this.expiresAt <= this.startsAt) {
-    return next(new Error("expiresAt must be later than startsAt"));
+    throw new Error("expiresAt must be later than startsAt");
   }
 
   if (this.recordFrom && this.recordTo && this.recordTo <= this.recordFrom) {
-    return next(new Error("recordTo must be later than recordFrom"));
+    throw new Error("recordTo must be later than recordFrom");
   }
 
   if (this.granteeType === "provider" && !this.granteeUserId) {
-    return next(new Error("granteeUserId is required for provider grants"));
+    throw new Error("granteeUserId is required for provider grants");
   }
 
   if (this.granteeType === "organization" && !this.granteeOrganizationId) {
-    return next(
-      new Error("granteeOrganizationId is required for organization grants"),
-    );
+    throw new Error("granteeOrganizationId is required for organization grants");
   }
 
   if (this.accessScope === "category" && !this.category) {
-    return next(new Error("category is required for category access"));
+    throw new Error("category is required for category access");
   }
 
   if (this.accessScope === "single-record" && !this.recordId) {
-    return next(new Error("recordId is required for single-record access"));
+    throw new Error("recordId is required for single-record access");
   }
 
   if (this.accessScope === "encounter" && !this.encounterId) {
-    return next(new Error("encounterId is required for encounter access"));
+    throw new Error("encounterId is required for encounter access");
   }
 
   if (this.status === "active" && !this.reviewedAt) {
@@ -219,8 +217,6 @@ accessGrantSchema.pre("validate", function (next) {
   if (this.status === "revoked" && !this.revokedAt) {
     this.revokedAt = new Date();
   }
-
-  next();
 });
 
 accessGrantSchema.index({
