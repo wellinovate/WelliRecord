@@ -1,4 +1,6 @@
 import rateLimit from "express-rate-limit";
+import crypto from "node:crypto";
+
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -67,3 +69,12 @@ export const authRateLimiter = rateLimit({
     });
   },
 });
+
+
+export function requestIdMiddleware(req, res, next) {
+  req.requestId = crypto.randomUUID();
+
+  res.setHeader("X-Request-Id", req.requestId);
+
+  next();
+}

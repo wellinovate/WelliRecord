@@ -10,17 +10,51 @@ function getPagination(query) {
 }
 
 export async function getMedicalHistorySummary(req, res, next) {
+  const totalStart = performance.now();
   try {
     const authUser = req.user;
+    const accessStart = performance.now();
     const { actor, patientId, isSelf } = await resolvePatientAccessContext({
       patientId: req.user.sub,
       authUser,
     });
 
+    const accessMs = performance.now() - accessStart;
+
+    const serviceStart = performance.now();
+
+    // const data = await medicalHistoryService.getMedicalHistorySummary(
+    //   patientId,
+    // );
 
     const data = await medicalHistoryService.getMedicalHistorySummary(
       patientId,
+      {
+        requestId: req.requestId,
+      },
     );
+
+    const serviceMs = performance.now() - serviceStart;
+    const totalMs = performance.now() - totalStart;
+
+    console.log("⏱ MEDICAL_HISTORY_SUMMARY:", {
+      totalMs: Number(totalMs.toFixed(2)),
+      accessResolutionMs: Number(accessMs.toFixed(2)),
+      serviceMs: Number(serviceMs.toFixed(2)),
+      patientId: String(patientId),
+      actorType: actor?.type,
+      isSelf,
+      recordsReturned: Array.isArray(data) ? data.length : undefined,
+    });
+    console.log("⏱ MEDICAL_HISTORY_SUMMARY:", {
+      requestId: req.requestId,
+      totalMs: Number(totalMs.toFixed(2)),
+      accessResolutionMs: Number(accessMs.toFixed(2)),
+      serviceMs: Number(serviceMs.toFixed(2)),
+      patientId: String(patientId),
+      actorType: actor?.type,
+      isSelf,
+    });
 
     return res.status(200).json({
       success: true,
@@ -34,13 +68,16 @@ export async function getMedicalHistorySummary(req, res, next) {
 }
 export async function getMedicalHistorySummaryByProviders(req, res, next) {
   try {
-    const {patientId} = req.params
+    const { patientId } = req.params;
     const authUser = req.user;
-    const { actor, patientId: patientIds, isSelf } = await resolvePatientAccessContext({
+    const {
+      actor,
+      patientId: patientIds,
+      isSelf,
+    } = await resolvePatientAccessContext({
       patientId: patientId,
       authUser,
     });
-
 
     const data = await medicalHistoryService.getMedicalHistorySummary(
       patientIds,
@@ -103,13 +140,12 @@ export async function getPatientDiagnoses(req, res, next) {
 
 export async function getPatientMedications(req, res, next) {
   try {
-
     const authUser = req.user;
     const { actor, patientId, isSelf } = await resolvePatientAccessContext({
       patientId: req.user.sub,
       authUser,
     });
-    console.log("🚀 ~ getPatientMedications ~ patientId:", patientId)
+    console.log("🚀 ~ getPatientMedications ~ patientId:", patientId);
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientMedications(patientId, {
@@ -225,8 +261,7 @@ export async function getPatientAllergies(req, res, next) {
 export const fetchUserProfile = async (req, res) => {
   try {
     const accountId = req.user.sub; // from auth middleware
-    console.log("🚀 ~ fetchUserProfile ~ accountId:", accountId)
-
+    console.log("🚀 ~ fetchUserProfile ~ accountId:", accountId);
 
     if (!accountId) {
       return res.status(401).json({
@@ -236,8 +271,6 @@ export const fetchUserProfile = async (req, res) => {
     }
 
     // const cacheKey = `user:profile:${accountId}`;
-
-
 
     // // 1. Check Redis first
     // const cachedProfile = await redisClient.get(cacheKey);
@@ -267,12 +300,7 @@ export const fetchUserProfile = async (req, res) => {
   }
 };
 
-
-
-export const updateUserProfileController = async (
-  req,
-  res
-) => {
+export const updateUserProfileController = async (req, res) => {
   try {
     const userId = req.user?.sub;
     // console.log("🚀 ~ updateUserProfileController ~ userId:", userId)
@@ -284,12 +312,14 @@ export const updateUserProfileController = async (
       });
     }
 
-    const updatedProfile = await medicalHistoryService.updateUserProfileService({
-      userId,
-      payload: req.body,
-    });
+    const updatedProfile = await medicalHistoryService.updateUserProfileService(
+      {
+        userId,
+        payload: req.body,
+      },
+    );
 
-     if (!updatedProfile) {
+    if (!updatedProfile) {
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -322,8 +352,7 @@ export const updateUserProfileController = async (
 
     return res.status(statusCode).json({
       success: false,
-      message:
-        statusCode === 500 ? "Failed to update profile" : error.message,
+      message: statusCode === 500 ? "Failed to update profile" : error.message,
     });
   }
 };

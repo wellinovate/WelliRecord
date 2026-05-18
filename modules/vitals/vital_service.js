@@ -3,7 +3,11 @@ import { vitalModel } from "./vitals_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
-import { buildClinicalAccessFilter, findActiveAccessGrant } from "../access/access_grant_service.js";
+import {
+  buildClinicalAccessFilter,
+  findActiveAccessGrant,
+} from "../access/access_grant_service.js";
+import { redis } from "../../shared/config/upstash_redis.js";
 
 // import { Patient } from "../patients/patient_model.js"; // adjust path/model name
 // import { Encounter } from "../encounters/encounter_model.js"; // optional, if validating encounter existence
@@ -17,7 +21,6 @@ export const createVitalService = async ({ payload, authUser }) => {
       patientId: payload.patientId,
       authUser,
     });
-    
 
     // if (payload) return;
     let recordedBy = null;
@@ -29,8 +32,6 @@ export const createVitalService = async ({ payload, authUser }) => {
     } else {
       recordedBy = authUser?.sub || null;
     }
-
-
 
     if (!actor.userId) {
       const error = new Error("Authenticated user is required");
@@ -218,7 +219,7 @@ export const getPatientVitalsService = async ({
 
     vitalModel.countDocuments(filter),
   ]);
-  console.log("🚀 ~ getPatientVitalsService ~ vitals:", vitals)
+  console.log("🚀 ~ getPatientVitalsService ~ vitals:", vitals);
 
   return {
     items: vitals.map((item) => ({
@@ -287,90 +288,87 @@ const resolveActorContext = async (authUser) => {
 };
 
 export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
-  console.log("🚀 ~ resolvePatientAccessContext ~ patientId:", patientId);
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   const actor = await resolveActorContext(authUser);
 
+  // const cacheKey = `patient-access:${patientId}:${actor.userId}:${actor.role}`;
+
+  // // 1. Try cache first
+  // const cached = await redis.get(cacheKey);
+
+  // if (cached) {
+  //   return cached;
+  // }
+
+  let resolvedPatient = null;
+
+  // ORGANIZATION ACTOR
   if (actor.isOrganizationActor === true) {
-    const patientFromPatientIdentity = await PatientIdentity.findById(
+    resolvedPatient =
+      (await PatientIdentity.findById(patientId).lean()) ||
+      (await UserProfile.findById(patientId).lean());
+
+    if (!resolvedPatient) {
+      const error = new Error("Patient not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const result = {
+      actor,
       patientId,
-    ).session(session);
-    if (patientFromPatientIdentity) {
-      const isSelf =
-        actor.isPatientActor &&
-        String(patientId || "") === String(actor.userId || "");
+      isSelf:
+        actor.isPatientActor && String(patientId) === String(actor.userId),
+    };
 
-      return {
-        actor,
-        patientId,
-        isSelf,
-      };
-    } else {
-      const patientFromUserProfile = await UserProfile.findById(
-        patientId,
-      ).session(session);
+    // Cache result
+    // await redis.set(cacheKey, result, {
+    //   ex: CACHE_TTL,
+    // });
 
-      if (!patientFromUserProfile) {
-        const error = new Error("Patient not found");
-        error.statusCode = 404;
-        throw error;
-      }
-
-      const isSelf =
-        actor.isPatientActor &&
-        String(patientId || "") === String(actor.userId || "");
-
-      return {
-        actor,
-        patientId,
-        isSelf,
-      };
-    }
+    return result;
   }
 
+  // PATIENT ACTOR
   if (actor.isPatientActor === true) {
-    const patientFromUserProfile = await UserProfile.findOne({
-      accountId: patientId,
-    }).session(session);
-    if (patientFromUserProfile) {
-      const isSelf =
-        actor.isPatientActor &&
-        String(patientFromUserProfile.accountId || "") ===
-          String(actor.userId || "");
+    resolvedPatient = await UserProfile.findOne({
+      accountId: actor.userId,
+    }).lean();
 
-      return {
+    if (resolvedPatient) {
+      const result = {
         actor,
-        patientId: patientFromUserProfile._id,
-        isSelf,
+        patientId: resolvedPatient._id,
+        isSelf: String(resolvedPatient.accountId) === String(actor.userId),
       };
+
+      // await redis.set(cacheKey, result, {
+      //   ex: CACHE_TTL,
+      // });
+
+      return result;
     }
   }
 
-  const patientFromUserProfile = await UserProfile.findById(patientId).session(
-    session,
-  );
+  // FALLBACK
+  // resolvedPatient = await UserProfile.findById(patientId).lean();
 
-  if (!patientFromUserProfile) {
-    const error = new Error("Patient not found");
-    error.statusCode = 404;
-    throw error;
-  }
-  const isSelf =
-    actor.isPatientActor &&
-    String(patientId || "") === String(actor.userId || "");
+  // if (!resolvedPatient) {
+  //   const error = new Error("Patient not found");
+  //   error.statusCode = 404;
+  //   throw error;
+  // }
 
-  return {
-    actor,
-    patientId,
-    isSelf,
-  };
+  // const result = {
+  //   actor,
+  //   patientId,
+  //   isSelf: actor.isPatientActor && String(patientId) === String(actor.userId),
+  // };
 
-  // Optional: verify patient exists
+  // await redis.set(cacheKey, result, {
+  //   ex: CACHE_TTL,
+  // });
 
-  // Example: patient-owned account case
-  // Adapt this to your actual model relationship.
+  // return result;
 };
 
 const hasOrganizationFullReadAccess = async ({ patientId, organizationId }) => {

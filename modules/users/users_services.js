@@ -1,5 +1,6 @@
 import { generateUsername } from "../../shared/utils/generateUsername.js";
 import { UserProfile } from "./user_profile_model.js";
+import { performance } from "node:perf_hooks";
 
 import mongoose from "mongoose";
 
@@ -41,27 +42,29 @@ function toObjectId(id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new Error("Invalid patientId");
   }
+
   return new mongoose.Types.ObjectId(id);
 }
 
-function buildBaseMatch(patientId) {
+function buildBaseMatch(patientObjectId) {
   return {
-    patientId: toObjectId(patientId),
+    patientId: patientObjectId,
   };
 }
 
-async function getPagedRecords(Model, patientId, options, sort) {
-  const match = buildBaseMatch(patientId);
+async function getPagedRecords(
+  Model,
+  patientObjectId,
+  options,
+  sort = { createdAt: -1 },
+) {
+  const match = buildBaseMatch(patientObjectId);
 
   const [records, total] = await Promise.all([
-    Model.findById(patientId)
-      .sort(sort)
-      .skip(options.skip)
-      .limit(options.limit)
-      .lean(),
+    Model.find(match).sort(sort).skip(options.skip).limit(options.limit).lean(),
+
     Model.countDocuments(match),
   ]);
-  console.log("🚀 ~ getPagedRecords ~ records:", records);
 
   return {
     total,
@@ -69,15 +72,29 @@ async function getPagedRecords(Model, patientId, options, sort) {
   };
 }
 
-async function getCategorySummary(Model, patientId, category, metricBuilder) {
-  const match = buildBaseMatch(patientId);
+async function getCategorySummary({
+  Model,
+  patientObjectId,
+  category,
+  metricBuilder,
+  select = "_id createdAt updatedAt recordedAt",
+  sort = { updatedAt: -1, recordedAt: -1, createdAt: -1 },
+  requestId,
+}) {
+  const start = performance.now();
+
+  const match = { patientId: patientObjectId };
 
   const [total, latestRecord] = await Promise.all([
     Model.countDocuments(match),
-    Model.findOne(match)
-      .sort({ updatedAt: -1, recordedAt: -1, createdAt: -1 })
-      .lean(),
+    Model.findOne(match).sort(sort).select(select).lean(),
   ]);
+
+  console.log(`⏱ SUMMARY ${category}:`, {
+    requestId,
+    durationMs: Number((performance.now() - start).toFixed(2)),
+    total,
+  });
 
   return {
     category,
@@ -91,7 +108,12 @@ async function getCategorySummary(Model, patientId, category, metricBuilder) {
   };
 }
 
-export async function getMedicalHistorySummary(patientId) {
+export async function getMedicalHistorySummary(patientId, options = {}) {
+  const { requestId } = options;
+  const totalStart = performance.now();
+
+  const patientObjectId = toObjectId(patientId);
+
   const [
     vitals,
     diagnoses,
@@ -101,114 +123,122 @@ export async function getMedicalHistorySummary(patientId) {
     labResults,
     allergies,
   ] = await Promise.all([
-    getCategorySummary(vitalModel, patientId, "vitals", (latest) => {
-      if (!latest) return null;
+    getCategorySummary({
+      Model: vitalModel,
+      patientObjectId,
+      category: "vitals",
+      requestId,
+      select: "_id bloodPressure heartRate createdAt updatedAt recordedAt",
+      metricBuilder: (latest) => {
+        if (!latest) return null;
 
-      return {
-        latestBloodPressure:
-          latest.bloodPressure?.systolic && latest.bloodPressure?.diastolic
-            ? `${latest.bloodPressure.systolic}/${latest.bloodPressure.diastolic} mmHg`
-            : null,
-        latestHeartRate: latest.heartRate ?? null,
-      };
+        return {
+          latestBloodPressure:
+            latest.bloodPressure?.systolic && latest.bloodPressure?.diastolic
+              ? `${latest.bloodPressure.systolic}/${latest.bloodPressure.diastolic} mmHg`
+              : null,
+          latestHeartRate: latest.heartRate ?? null,
+        };
+      },
     }),
 
-    getCategorySummary(
-      diagnosisModel,
-      patientId,
-      "diagnoses",
-      (latest, total) => {
-        if (!latest) {
-          return { activeCount: 0 };
-        }
-
+    getCategorySummary({
+      Model: diagnosisModel,
+      patientObjectId,
+      category: "diagnoses",
+      requestId,
+      select:
+        "_id diagnosisName conditionName status createdAt updatedAt recordedAt",
+      metricBuilder: (latest, total) => {
         return {
           activeCount: total,
-          latestDiagnosis: latest.diagnosisName || latest.conditionName || null,
+          latestDiagnosis:
+            latest?.diagnosisName || latest?.conditionName || null,
         };
       },
-    ),
+    }),
 
-    getCategorySummary(
-      medicationModel,
-      patientId,
-      "medications",
-      (latest, total) => {
-        if (!latest) {
-          return { activeCount: 0 };
-        }
-
+    getCategorySummary({
+      Model: medicationModel,
+      patientObjectId,
+      category: "medications",
+      requestId,
+      select:
+        "_id medicationName drugName status createdAt updatedAt recordedAt",
+      metricBuilder: (latest, total) => {
         return {
           activeCount: total,
-          latestMedication: latest.medicationName || latest.drugName || null,
+          latestMedication: latest?.medicationName || latest?.drugName || null,
         };
       },
-    ),
+    }),
 
-    getCategorySummary(
-      procedureModel,
-      patientId,
-      "procedures",
-      (latest, total) => {
-        if (!latest) {
-          return { totalProcedures: 0 };
-        }
-
+    getCategorySummary({
+      Model: procedureModel,
+      patientObjectId,
+      category: "procedures",
+      requestId,
+      select:
+        "_id procedureName title performedAt createdAt updatedAt recordedAt",
+      sort: { performedAt: -1, updatedAt: -1, createdAt: -1 },
+      metricBuilder: (latest, total) => {
         return {
           totalProcedures: total,
-          latestProcedure: latest.procedureName || latest.title || null,
+          latestProcedure: latest?.procedureName || latest?.title || null,
         };
       },
-    ),
+    }),
 
-    getCategorySummary(
-      immunizationModel,
-      patientId,
-      "immunizations",
-      (latest, total) => {
-        if (!latest) {
-          return { totalImmunizations: 0 };
-        }
-
+    getCategorySummary({
+      Model: immunizationModel,
+      patientObjectId,
+      category: "immunizations",
+      requestId,
+      select: "_id vaccineName dateGiven createdAt updatedAt recordedAt",
+      sort: { dateGiven: -1, updatedAt: -1, createdAt: -1 },
+      metricBuilder: (latest, total) => {
         return {
           totalImmunizations: total,
-          latestVaccine: latest.vaccineName || null,
+          latestVaccine: latest?.vaccineName || null,
         };
       },
-    ),
+    }),
 
-    getCategorySummary(
-      labResultModel,
-      patientId,
-      "lab_results",
-      (latest, total) => {
-        if (!latest) {
-          return { totalLabResults: 0 };
-        }
+    getCategorySummary({
+      Model: labResultModel,
+      patientObjectId,
+      category: "lab_results",
+      requestId,
 
+      select: "_id testName labName resultDate createdAt updatedAt recordedAt",
+      sort: { resultDate: -1, updatedAt: -1, createdAt: -1 },
+      metricBuilder: (latest, total) => {
         return {
           totalLabResults: total,
-          latestTestName: latest.testName || latest.labName || null,
+          latestTestName: latest?.testName || latest?.labName || null,
         };
       },
-    ),
+    }),
 
-    getCategorySummary(
-      allergyModel,
-      patientId,
-      "allergies",
-      (latest, total) => {
-        if (!latest) {
-          return { totalAllergies: 0 };
-        }
+    getCategorySummary({
+      Model: allergyModel,
+      patientObjectId,
+      category: "allergies",
+      requestId,
 
+      select: "_id allergen substance severity createdAt updatedAt recordedAt",
+      metricBuilder: (latest, total) => {
         return {
           totalAllergies: total,
-          latestAllergen: latest.allergen || latest.substance || null,
+          latestAllergen: latest?.allergen || latest?.substance || null,
         };
       },
-    ),
+    }),
   ]);
+
+  console.log("⏱ SUMMARY service total:", {
+    durationMs: Number((performance.now() - totalStart).toFixed(2)),
+  });
 
   return {
     vitals,
@@ -305,7 +335,7 @@ const sanitizeNullableString = (value) => {
 };
 
 export const updateUserProfileService = async ({ userId, payload }) => {
-  console.log("🚀 ~ updateUserProfileService ~ payload:", payload)
+  console.log("🚀 ~ updateUserProfileService ~ payload:", payload);
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid user id");
   }

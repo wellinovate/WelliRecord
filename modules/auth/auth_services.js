@@ -2,9 +2,13 @@ import crypto from "crypto";
 import { AppError } from "../../shared/errors/AppError.js";
 import {
   generateEmailVerificationToken,
+  generateLoginChallengeToken,
   generateWelliRecordId,
+  getLoginOtpExpiry,
   getVerificationTokenExpiry,
+  hashLoginChallengeToken,
   hashVerificationToken,
+  maskPhone,
 } from "../../shared/utils/helper.js";
 import { withTransaction } from "../../shared/utils/withTransaction.js";
 import { Account } from "../accounts/account_model.js";
@@ -19,6 +23,8 @@ import { createUserProfile } from "../users/users_services.js";
 import { sendVerificationEmail } from "../../shared/utils/resend.js";
 import bcrypt from "bcryptjs";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
+import { sendLoginOtp, verifyLoginOtp } from "../../shared/utils/termii.js";
+import { LoginOtpChallenge } from "./login_otp_challenge_model.js";
 
 export const registerAccount = async (payload) => {
   console.log("🚀 ~ registerAccount ~ payload:", payload);
@@ -158,13 +164,19 @@ export const registerOrganizationAccount = async (payload) => {
 };
 
 // export const loginAccount = async ({ email, password }) => {
-//   const normalizedEmail = email.trim().toLowerCase();
-//   console.log("🚀 ~ loginAccount ~ normalizedEmail:", normalizedEmail);
+//   const totalStart = performance.now();
 
-//   const account = await Account.findOne({ email: normalizedEmail }).select(
-//     "+password",
+//   const normalizedEmail = email.trim().toLowerCase();
+
+//   const findStart = performance.now();
+
+//   const account = await Account.findByEmailWithPassword(normalizedEmail);
+
+//   console.log(
+//     "⏱ find account:",
+//     (performance.now() - findStart).toFixed(2),
+//     "ms"
 //   );
-//   // console.log("🚀 ~ loginAccount ~ account:", account)
 
 //   if (!account) {
 //     throw new Error("Invalid email or password");
@@ -174,183 +186,383 @@ export const registerOrganizationAccount = async (payload) => {
 //     throw new Error("Account is not active");
 //   }
 
+//   const currentRounds = Number(account.password.split("$")[2]);
+
+//   console.log("bcrypt rounds:", currentRounds);
+
+//   const passwordStart = performance.now();
+
 //   const isMatch = await account.comparePassword(password);
+
+//   console.log(
+//     "⏱ password compare:",
+//     (performance.now() - passwordStart).toFixed(2),
+//     "ms"
+//   );
 
 //   if (!isMatch) {
 //     throw new Error("Invalid email or password");
 //   }
 
 //   let profile = null;
+//   let memberships = [];
 
 //   if (account.accountType === "user") {
-//     profile = await UserProfile.findOne({ accountId: account._id });
-//   } else if (account.accountType === "organization") {
-//     profile = await OrganizationProfile.findOne({ accountId: account._id });
+//     const profileStart = performance.now();
+
+//     profile = await UserProfile.findOne({ accountId: account._id })
+//       .select("_id firstName fullName lastName email phone avatar dateOfBirth gender wrId")
+//       .lean();
+
+//     console.log(
+//       "⏱ user profile:",
+//       (performance.now() - profileStart).toFixed(2),
+//       "ms"
+//     );
+
+//     if (!profile) {
+//       throw new Error("User profile not found");
+//     }
+
+//     if (account.role !== "patient") {
+//       const membershipStart = performance.now();
+
+//       memberships = await OrganizationMembership.find({
+//         userId: profile._id,
+//         status: "active",
+//       })
+//         .select(
+//           "_id userId organizationId role status departmentId permissions createdAt"
+//         )
+//         .populate({
+//           path: "organizationId",
+//           select:
+//             "organizationName organizationId organizationType logo address contactEmail phone",
+//         })
+//         .lean();
+
+//       console.log(
+//         "⏱ memberships:",
+//         (performance.now() - membershipStart).toFixed(2),
+//         "ms"
+//       );
+//     }
+//   }
+
+//   if (account.accountType === "organization") {
+//     const orgProfileStart = performance.now();
+
+//     profile = await OrganizationProfile.findOne({
+//       accountId: account._id,
+//     })
+//       .select(
+//         "_id organizationName organizationId organizationType logo address contactEmail phone"
+//       )
+//       .lean();
+
+//     console.log(
+//       "⏱ organization profile:",
+//       (performance.now() - orgProfileStart).toFixed(2),
+//       "ms"
+//     );
+
+//     if (!profile) {
+//       throw new Error("Organization profile not found");
+//     }
 //   }
 
 //   Account.updateOne(
-//   { _id: account._id },
-//   { $set: { lastLoginAt: new Date() } }
-// ).catch((err) => {
-//   console.error("Failed to update lastLoginAt:", err.message);
-// });
+//     { _id: account._id },
+//     { $set: { lastLoginAt: new Date() } }
+//   ).catch((err) => {
+//     console.error("Failed to update lastLoginAt:", err.message);
+//   });
+
+//   if (currentRounds > 10) {
+//     setImmediate(() => {
+//       bcrypt
+//         .hash(password, 10)
+//         .then((newHash) => {
+//           return Account.updateOne(
+//             { _id: account._id },
+//             {
+//               $set: {
+//                 password: newHash,
+//                 passwordChangedAt: new Date(),
+//               },
+//             }
+//           );
+//         })
+//         .catch((err) => {
+//           console.error("Password rehash failed:", err.message);
+//         });
+//     });
+//   }
+
+//   const safeAccount = account.toSafeObject();
+
+//   console.log(
+//     "⏱ TOTAL LOGIN:",
+//     (performance.now() - totalStart).toFixed(2),
+//     "ms"
+//   );
 
 //   return {
-//     account: account.toSafeObject()
-//       ? account.toSafeObject()
-//       : account.toObject(),
-//     profile: profile ? profile.toObject() : null,
+//     account: safeAccount,
+//     profile,
+//     memberships,
 //   };
 // };
 
 export const loginAccount = async ({ email, password }) => {
+  if (!email || !password) {
+    throw new AppError(
+      "Email and password are required",
+      400,
+      "MISSING_LOGIN_FIELDS",
+    );
+  }
   const totalStart = performance.now();
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  const findStart = performance.now();
-
   const account = await Account.findByEmailWithPassword(normalizedEmail);
 
-  console.log(
-    "⏱ find account:",
-    (performance.now() - findStart).toFixed(2),
-    "ms"
-  );
-
   if (!account) {
-    throw new Error("Invalid email or password");
+    throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
 
   if (!account.isActive || account.status !== "active") {
-    throw new Error("Account is not active");
+    throw new AppError("Account is not active", 403, "ACCOUNT_INACTIVE");
   }
-
-  const currentRounds = Number(account.password.split("$")[2]);
-
-  console.log("bcrypt rounds:", currentRounds);
-
-  const passwordStart = performance.now();
 
   const isMatch = await account.comparePassword(password);
 
+  if (!isMatch) {
+    throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+  }
+
+  const phone = account.phone;
+
+  if (!phone) {
+    throw new AppError(
+      "No phone number is attached to this account. Please contact support.",
+      400,
+      "PHONE_NOT_FOUND",
+    );
+  }
+
+  let otp;
+
+  try {
+    otp = await sendLoginOtp({ phoneNumber: phone });
+  } catch (error) {
+    if (error.message === "SMS_PROVIDER_INSUFFICIENT_BALANCE") {
+      throw new AppError(
+        "Login code could not be sent right now. Please contact support.",
+        503,
+        "OTP_PROVIDER_UNAVAILABLE",
+      );
+    }
+
+    if (error.message === "INVALID_PHONE_NUMBER") {
+      throw new AppError(
+        "Invalid phone number attached to this account. Please contact support.",
+        400,
+        "INVALID_ACCOUNT_PHONE",
+      );
+    }
+
+    throw new AppError(
+      "Unable to send login code. Please try again.",
+      502,
+      "OTP_SEND_FAILED",
+    );
+  }
+
+  const challengeToken = generateLoginChallengeToken();
+  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
+
+  await LoginOtpChallenge.create({
+    accountId: account._id,
+    challengeTokenHash,
+    termiiPinId: otp.pinId,
+    phone,
+    expiresAt: getLoginOtpExpiry(),
+  });
+
   console.log(
-    "⏱ password compare:",
-    (performance.now() - passwordStart).toFixed(2),
-    "ms"
+    "⏱ LOGIN PASSWORD STEP:",
+    (performance.now() - totalStart).toFixed(2),
+    "ms",
   );
 
-  if (!isMatch) {
-    throw new Error("Invalid email or password");
+  return {
+    requiresOtp: true,
+    challengeToken,
+    maskedPhone: maskPhone(phone),
+    message: "Login code sent successfully.",
+  };
+};
+
+export const verifyLoginCodeService = async ({ challengeToken, code }) => {
+  const totalStart = performance.now();
+
+  if (!challengeToken || !code) {
+    throw new AppError(
+      "Challenge token and code are required",
+      400,
+      "OTP_REQUIRED",
+    );
+  }
+
+  const normalizedCode = String(code).trim();
+
+  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
+
+  const challenge = await LoginOtpChallenge.findOne({
+    challengeTokenHash,
+    usedAt: null,
+    expiresAt: { $gt: new Date() },
+  });
+
+  if (!challenge) {
+    throw new AppError(
+      "Login verification has expired",
+      400,
+      "LOGIN_CHALLENGE_EXPIRED",
+    );
+  }
+
+  if (challenge.attempts >= challenge.maxAttempts) {
+    throw new AppError(
+      "Too many incorrect attempts",
+      429,
+      "OTP_ATTEMPTS_EXCEEDED",
+    );
+  }
+
+  const termiiResult = await verifyLoginOtp({
+    pinId: challenge.termiiPinId,
+    pin: code,
+  });
+
+  const verified =
+    termiiResult?.verified === true ||
+    termiiResult?.status === "verified" ||
+    termiiResult?.message?.toLowerCase?.().includes("verified");
+
+  if (!verified) {
+    await LoginOtpChallenge.updateOne(
+      {
+        _id: challenge._id,
+        usedAt: null,
+      },
+      {
+        $inc: { attempts: 1 },
+      },
+    );
+
+    throw new AppError(
+      "Invalid or expired login code",
+      400,
+      "INVALID_LOGIN_CODE",
+    );
+  }
+
+  const consumeResult = await LoginOtpChallenge.updateOne(
+    {
+      _id: challenge._id,
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+    },
+    {
+      $set: {
+        usedAt: new Date(),
+      },
+    },
+  );
+
+  if (consumeResult.modifiedCount !== 1) {
+    throw new AppError(
+      "Login verification has already been used",
+      400,
+      "LOGIN_CHALLENGE_ALREADY_USED",
+    );
+  }
+
+  const account = await Account.findById(challenge.accountId);
+
+  if (!account) {
+    throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
+  }
+
+  if (!account.isActive || account.status !== "active") {
+    throw new AppError("Account is not active", 403, "ACCOUNT_INACTIVE");
   }
 
   let profile = null;
-  let memberships = [];
+  // let memberships = [];
 
   if (account.accountType === "user") {
-    const profileStart = performance.now();
-
     profile = await UserProfile.findOne({ accountId: account._id })
-      .select("_id firstName fullName lastName email phone avatar dateOfBirth gender wrId")
+      .select(
+        "_id  fullName  email phone avatar  gender wrId",
+      )
       .lean();
 
-    console.log(
-      "⏱ user profile:",
-      (performance.now() - profileStart).toFixed(2),
-      "ms"
-    );
-
     if (!profile) {
-      throw new Error("User profile not found");
-    }
-
-    if (account.role !== "patient") {
-      const membershipStart = performance.now();
-
-      memberships = await OrganizationMembership.find({
-        userId: profile._id,
-        status: "active",
-      })
-        .select(
-          "_id userId organizationId role status departmentId permissions createdAt"
-        )
-        .populate({
-          path: "organizationId",
-          select:
-            "organizationName organizationId organizationType logo address contactEmail phone",
-        })
-        .lean();
-
-      console.log(
-        "⏱ memberships:",
-        (performance.now() - membershipStart).toFixed(2),
-        "ms"
+      throw new AppError(
+        "User profile not found",
+        404,
+        "USER_PROFILE_NOT_FOUND",
       );
     }
+
+    // if (account.role !== "patient") {
+    //   memberships = await OrganizationMembership.find({
+    //     userId: profile._id,
+    //     status: "active",
+    //   })
+    //     .select("_id userId organizationId role status departmentId permissions createdAt")
+    //     .populate({
+    //       path: "organizationId",
+    //       select:
+    //         "organizationName organizationId organizationType logo address contactEmail phone",
+    //     })
+    //     .lean();
+    // }
   }
 
   if (account.accountType === "organization") {
-    const orgProfileStart = performance.now();
-
     profile = await OrganizationProfile.findOne({
       accountId: account._id,
     })
       .select(
-        "_id organizationName organizationId organizationType logo address contactEmail phone"
+        "_id organizationName organizationId organizationType logo phone",
       )
       .lean();
 
-    console.log(
-      "⏱ organization profile:",
-      (performance.now() - orgProfileStart).toFixed(2),
-      "ms"
-    );
-
     if (!profile) {
-      throw new Error("Organization profile not found");
+      throw new AppError(
+        "Organization profile not found",
+        404,
+        "ORGANIZATION_PROFILE_NOT_FOUND",
+      );
     }
   }
 
   Account.updateOne(
     { _id: account._id },
-    { $set: { lastLoginAt: new Date() } }
+    { $set: { lastLoginAt: new Date() } },
   ).catch((err) => {
     console.error("Failed to update lastLoginAt:", err.message);
   });
 
-  if (currentRounds > 10) {
-    setImmediate(() => {
-      bcrypt
-        .hash(password, 10)
-        .then((newHash) => {
-          return Account.updateOne(
-            { _id: account._id },
-            {
-              $set: {
-                password: newHash,
-                passwordChangedAt: new Date(),
-              },
-            }
-          );
-        })
-        .catch((err) => {
-          console.error("Password rehash failed:", err.message);
-        });
-    });
-  }
-
-  const safeAccount = account.toSafeObject();
-
-  console.log(
-    "⏱ TOTAL LOGIN:",
-    (performance.now() - totalStart).toFixed(2),
-    "ms"
-  );
-
   return {
-    account: safeAccount,
+    account: account.toSafeObject(),
     profile,
-    memberships,
+    // memberships,
   };
 };
 

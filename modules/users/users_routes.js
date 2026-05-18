@@ -12,6 +12,8 @@ import { getMyProceduresController } from "../procedure/procedure_controller.js"
 
 const router = express.Router();
 
+
+
 router.get(
   "/medical-history/summary",
   protect,

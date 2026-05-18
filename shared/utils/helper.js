@@ -114,13 +114,33 @@ export const maskEmail = (email) => {
   return `${visible}***@${domain}`;
 };
 
-export const maskPhone = (phone) => {
-  if (!phone) return null;
+// export const maskPhone = (phone) => {
+//   if (!phone) return null;
 
-  const cleaned = String(phone);
-  if (cleaned.length < 7) return "******";
+//   const cleaned = String(phone);
+//   if (cleaned.length < 7) return "******";
 
-  return `${cleaned.slice(0, 6)}*****${cleaned.slice(-3)}`;
+//   return `${cleaned.slice(0, 6)}*****${cleaned.slice(-3)}`;
+// };
+
+
+export const generateLoginChallengeToken = () => {
+  return crypto.randomBytes(32).toString("hex");
+};
+
+export const hashLoginChallengeToken = (token) => {
+  return crypto.createHash("sha256").update(token).digest("hex");
+};
+
+export const getLoginOtpExpiry = () => {
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+  return expiresAt;
+};
+
+export const maskPhone = (phone = "") => {
+  if (phone.length < 6) return phone;
+  return `${phone.slice(0, 4)}****${phone.slice(-3)}`;
 };
 
 // utils/generateEncounterCode.js

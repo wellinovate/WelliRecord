@@ -4,6 +4,7 @@ import {
   getPatientEncountersService,
 } from "./encounter_services.js";
 import { getPatientEncountersQuerySchema } from "./encounter_validation.js";
+import { performance } from "node:perf_hooks";
 
 export const createEncounterController = async (req, res, next) => {
   try {

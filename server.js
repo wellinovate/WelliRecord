@@ -21,7 +21,7 @@ import appointmentRoutes from "./modules/appointments/appointment_routes.js";
 import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
 import accessGrantRoutes from "./modules/access/access_grant_routes.js";
 import { connectRedis } from "./shared/config/redis.js";
-import { globalRateLimiter } from "./shared/middlewares/rate_limit.js";
+import { globalRateLimiter, requestIdMiddleware } from "./shared/middlewares/rate_limit.js";
 // import uploadRoute from "./routes/upload.js";
 
 dotenv.config();
@@ -52,6 +52,8 @@ app.use(morgan("dev"));
 app.use(cors(corsOptions));
 app.use(bodyParse.json({ limit: "10mb" }));
 app.use(cookieParser());
+
+app.use(requestIdMiddleware);
 
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
@@ -92,6 +94,15 @@ app.use("/api/v1/access-grants", accessGrantRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("Wellirecord staging is running..."));
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "wellirecord-api",
+    // environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Start server
 // const PORT = process.env.PORT || 3001;

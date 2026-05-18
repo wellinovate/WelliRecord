@@ -3,7 +3,7 @@ import {
   signAccessToken,
   signAccessTokenGoogle,
 } from "../../shared/utils/helper.js";
-import { loginAccount, registerAccount, resendVerificationEmailService, verifyEmailService } from "./auth_services.js";
+import { loginAccount, registerAccount, resendVerificationEmailService, verifyEmailService, verifyLoginCodeService } from "./auth_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createAccount } from "../accounts/account_service.js";
 import { Account } from "../accounts/account_model.js";
@@ -22,9 +22,23 @@ export const register = async (req, res, next) => {
   }
 };
 
-export const login = async (req, res, next) => {
+export const loginController = async (req, res, next) => {
   try {
     const result = await loginAccount(req.validatedBody);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+    console.log("🚀 ~ loginController ~ error:", error)
+  }
+};
+
+export const login = async (req, res, next) => {
+  try {
+    const result = await verifyLoginCodeService(req.body);
     // console.log("🚀 ~ login ~ result:", result)
 
     const results = {
