@@ -7,27 +7,32 @@ dotenv.config();
 export const signAccessToken = (results) => {
   const { account, profile } = results;
 
-   if (!account?._id && !account?.id) {
+  if (!account?._id && !account?.id) {
     throw new Error("Cannot sign token without account id");
   }
 
-    const payload = {
+  const payload = {
     sub: String(account._id || account.id),
     email: account.email,
+    isVerified: account.isVerified,
     fullName: profile.fullName,
     accountType: account.accountType,
     wrId: profile?.wrId,
     role: account.role ?? null,
-    profileId: profile?._id ? String(profile._id) : profile?.id ? String(profile.id) : null,
+    profileId: profile?._id
+      ? String(profile._id)
+      : profile?.id
+      ? String(profile.id)
+      : null,
   };
 
   if (account.accountType === "organization") {
     payload.organizationId = profile?._id
       ? String(profile._id)
       : profile?.id
-        ? String(profile.id)
-        : null;
-
+      ? String(profile.id)
+      : null;
+    payload.wrOrgId = profile?.wrOrgId ?? null;
 
     payload.fullName = profile.organizationName;
     payload.wrOrgId = profile?.wrOrgId ?? null;
@@ -62,7 +67,7 @@ export const signAccessToken = (results) => {
   //   );
   // }
 
-   return jwt.sign(payload, process.env.JWT_SECRET_KEY, {
+  return jwt.sign(payload, process.env.JWT_SECRET_KEY, {
     expiresIn: "1d",
     issuer: "wellirecord-api",
     audience: "wellirecord-client",
@@ -123,7 +128,6 @@ export const maskEmail = (email) => {
 //   return `${cleaned.slice(0, 6)}*****${cleaned.slice(-3)}`;
 // };
 
-
 export const generateLoginChallengeToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
@@ -175,7 +179,6 @@ export const generateWelliRecordId = () => {
   const timestamp = Date.now().toString().slice(-4);
   return `WR-${timestamp}-${random}`;
 };
-
 
 export const mailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,

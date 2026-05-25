@@ -9,12 +9,15 @@ import {
 } from "./visitQueue_service.js";
 
 export const createWalkInQueueController = async (req, res, next) => {
+  // console.log("🚀 ~ createWalkInQueueController ~ req:", req)
   try {
+    console.log("🚀 ~ createWalkInQueueController ~ req:", "reach 1")
     const queueItem = await createWalkInQueueService({
       ...req.body,
       authUser: req.user,
       checkedInBy: req.user?.sub || null,
     });
+    console.log("🚀 ~ createWalkInQueueController ~ req:", "reach 2")
 
     return res.status(201).json({
       success: true,
@@ -22,6 +25,7 @@ export const createWalkInQueueController = async (req, res, next) => {
       data: queueItem,
     });
   } catch (error) {
+    console.log("🚀 ~ createWalkInQueueController ~ error:", error)
     next(error);
   }
 };

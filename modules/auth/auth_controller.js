@@ -39,7 +39,7 @@ export const loginController = async (req, res, next) => {
 export const login = async (req, res, next) => {
   try {
     const result = await verifyLoginCodeService(req.body);
-    // console.log("🚀 ~ login ~ result:", result)
+    console.log("🚀 ~ login ~ result:", result)
 
     const results = {
       account: result.account,

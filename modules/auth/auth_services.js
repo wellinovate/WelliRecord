@@ -507,7 +507,7 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
   if (account.accountType === "user") {
     profile = await UserProfile.findOne({ accountId: account._id })
       .select(
-        "_id  fullName  email phone avatar  gender wrId",
+        "_id  fullName  email phone avatar  gender wrId isVerified",
       )
       .lean();
 
@@ -539,7 +539,7 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
       accountId: account._id,
     })
       .select(
-        "_id organizationName organizationId organizationType logo phone",
+        "_id organizationName organizationId organizationType logo phone wrOrgId",
       )
       .lean();
 

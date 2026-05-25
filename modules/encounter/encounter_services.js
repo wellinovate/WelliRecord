@@ -140,7 +140,7 @@ export const getPatientEncountersService = async ({
     const wrOrgId = actor.wrOrgId || authUser?.orgId || null;
     const organization = await OrganizationProfile.findOne({
       wrOrgId: wrOrgId,
-    });
+    }).lean();
     organizationId = organization._id;
   }
 

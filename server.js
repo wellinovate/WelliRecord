@@ -21,7 +21,10 @@ import appointmentRoutes from "./modules/appointments/appointment_routes.js";
 import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
 import accessGrantRoutes from "./modules/access/access_grant_routes.js";
 import { connectRedis } from "./shared/config/redis.js";
-import { globalRateLimiter, requestIdMiddleware } from "./shared/middlewares/rate_limit.js";
+import {
+  globalRateLimiter,
+  requestIdMiddleware,
+} from "./shared/middlewares/rate_limit.js";
 // import uploadRoute from "./routes/upload.js";
 
 dotenv.config();
@@ -58,15 +61,27 @@ app.use(requestIdMiddleware);
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1_000_000;
 
-    console.log(
-      `${req.method} ${req.originalUrl} ${
-        res.statusCode
-      } - ${durationMs.toFixed(2)} ms`,
-    );
+    const method = req.method.padEnd(7);
+    const url = req.originalUrl || req.url;
+    const status = res.statusCode;
+    const ip = req.ip || req.socket.remoteAddress;
+
+    // Color coding for quick visual feedback
+    let statusStr = status;
+    if (status >= 500) statusStr = `\x1b[31m${status}\x1b[0m`;        // Red
+    else if (status >= 400) statusStr = `\x1b[33m${status}\x1b[0m`;   // Yellow
+    else if (status >= 200) statusStr = `\x1b[32m${status}\x1b[0m`;   // Green
+
+    let durationStr = durationMs.toFixed(2) + ' ms';
+    if (durationMs > 1000) durationStr = `\x1b[31m${durationStr}\x1b[0m`;     // Red - Very Slow
+    else if (durationMs > 300) durationStr = `\x1b[33m${durationStr}\x1b[0m`; // Yellow - Slow
+    else durationStr = `\x1b[32m${durationStr}\x1b[0m`;                      // Green - Fast
+
+    console.log(`${method} ${url} ${statusStr} ${durationStr} ${ip}`);
   });
 
   next();

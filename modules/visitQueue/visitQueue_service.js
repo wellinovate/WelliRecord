@@ -5,6 +5,7 @@ import { Encounter } from "../encounter/encounter_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { generateEncounterCode } from "../../shared/utils/helper.js";
 import { vitalModel } from "../vitals/vitals_model.js";
+import { linkPatientToOrganizationService } from "../organizations/patient/patient_service.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -18,6 +19,7 @@ export const createWalkInQueueService = async ({
   authUser,
   checkedInBy = null,
 }) => {
+
   const {
     actor,
     patientId: patientIds,
@@ -26,6 +28,7 @@ export const createWalkInQueueService = async ({
     patientId: patientId,
     authUser,
   });
+ 
   console.log(
     "🚀 ~ createWalkInQueueService ~ organizationId:",
     actor.organizationId,
@@ -55,6 +58,13 @@ export const createWalkInQueueService = async ({
     checkedInAt: new Date(),
     checkedInBy,
   });
+
+   const result = await linkPatientToOrganizationService({
+        patientIdentityId: patientIds,
+        organizationId: authUser.organizationId,
+        createdBy: authUser.sub,
+      });
+   console.log("🚀 ~ createWalkInQueueService ~ result:", result)
 
   return queueItem;
 };

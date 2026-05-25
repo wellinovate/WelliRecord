@@ -125,6 +125,15 @@ export const getPatientLabResultsService = async ({
   const organizationId = actor.isOrganizationActor && actor.organizationId;
   const skip = (page - 1) * limit;
 
+   if(actor.isPatientActor) {
+   const ownsRecord  = String(authUser.profileId) === String(patientIds);
+   if(!ownsRecord) {
+    const error = new Error("You can only view your own lab results");
+    error.statusCode = 403;
+    throw error;
+  }
+  }
+
   const filter = {
     patientId: patientIds,
     recordStatus: "active",

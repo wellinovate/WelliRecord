@@ -70,7 +70,7 @@ export const getMyVitalsController = async (req, res, next) => {
 
     const authUser = req.user;
     const patientId = authUser.sub
-    console.log("🚀 ~ getMyVitalsController ~ patientId:", patientId)
+    // console.log("🚀 ~ getMyVitalsController ~ patientId:", patientId)
 
     
 
@@ -81,7 +81,7 @@ export const getMyVitalsController = async (req, res, next) => {
       limit,
       authUser,
     });
-    console.log("🚀 ~ getMyVitalsController ~ result:", result)
+    // console.log("🚀 ~ getMyVitalsController ~ result:", result)
 
     return res.status(200).json({
       success: true,

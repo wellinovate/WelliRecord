@@ -160,6 +160,14 @@ export const getPatientVitalsService = async ({
   limit = 10,
   authUser,
 }) => {
+
+  // Input validation
+  if (!patientId || !authUser) {
+    const error = new Error("Missing required parameters");
+    error.statusCode = 400;
+    throw error;
+  }
+  
   const {
     actor,
     patientId: patientIds,
@@ -168,10 +176,20 @@ export const getPatientVitalsService = async ({
     patientId,
     authUser,
   });
+
   const organizationId = actor.isOrganizationActor
     ? authUser?.sub || null
     : null;
   const skip = (page - 1) * limit;
+
+  if(actor.isPatientActor) {
+   const ownsRecord  = String(authUser.profileId) === String(patientIds);
+   if(!ownsRecord) {
+    const error = new Error("You can only view your own vitals");
+    error.statusCode = 403;
+    throw error;
+  }
+  }
 
   const filter = {
     patientId: patientIds,
@@ -253,6 +271,7 @@ export const getPatientVitalsService = async ({
 };
 
 const resolveActorContext = async (authUser) => {
+  // console.log("🚀 ~ resolveActorContext ~ authUser:", authUser)
   const userId = authUser?._id || authUser?.sub || null;
   const accountType =
     authUser?.accountType || authUser?.account?.accountType || null;
@@ -267,10 +286,10 @@ const resolveActorContext = async (authUser) => {
   let organizationName = null;
 
   if (isOrganizationActor) {
-    const wrOrgId = authUser?.orgId || null;
     const organization = await OrganizationProfile.findOne({
-      wrOrgId: wrOrgId,
+      wrOrgId: authUser?.wrOrgId,
     });
+    console.log("🚀 ~ resolveActorContext ~ organization:", organization)
     organizationId = organization._id;
     organizationName = organization.organizationName;
   }
@@ -289,6 +308,7 @@ const resolveActorContext = async (authUser) => {
 
 export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
   const actor = await resolveActorContext(authUser);
+  // console.log("🚀 ~ resolvePatientAccessContext ~ actor:", actor)
 
   // const cacheKey = `patient-access:${patientId}:${actor.userId}:${actor.role}`;
 
@@ -341,6 +361,12 @@ export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
         isSelf: String(resolvedPatient.accountId) === String(actor.userId),
       };
 
+      if (String(resolvedPatient.accountId) !== String(patientId)) {
+        const error = new Error("Forbidden");
+        error.statusCode = 403;
+        throw error;
+      }
+
       // await redis.set(cacheKey, result, {
       //   ex: CACHE_TTL,
       // });
@@ -348,27 +374,6 @@ export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
       return result;
     }
   }
-
-  // FALLBACK
-  // resolvedPatient = await UserProfile.findById(patientId).lean();
-
-  // if (!resolvedPatient) {
-  //   const error = new Error("Patient not found");
-  //   error.statusCode = 404;
-  //   throw error;
-  // }
-
-  // const result = {
-  //   actor,
-  //   patientId,
-  //   isSelf: actor.isPatientActor && String(patientId) === String(actor.userId),
-  // };
-
-  // await redis.set(cacheKey, result, {
-  //   ex: CACHE_TTL,
-  // });
-
-  // return result;
 };
 
 const hasOrganizationFullReadAccess = async ({ patientId, organizationId }) => {

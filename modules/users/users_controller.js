@@ -37,15 +37,7 @@ export async function getMedicalHistorySummary(req, res, next) {
     const serviceMs = performance.now() - serviceStart;
     const totalMs = performance.now() - totalStart;
 
-    console.log("⏱ MEDICAL_HISTORY_SUMMARY:", {
-      totalMs: Number(totalMs.toFixed(2)),
-      accessResolutionMs: Number(accessMs.toFixed(2)),
-      serviceMs: Number(serviceMs.toFixed(2)),
-      patientId: String(patientId),
-      actorType: actor?.type,
-      isSelf,
-      recordsReturned: Array.isArray(data) ? data.length : undefined,
-    });
+  
     console.log("⏱ MEDICAL_HISTORY_SUMMARY:", {
       requestId: req.requestId,
       totalMs: Number(totalMs.toFixed(2)),
@@ -66,6 +58,7 @@ export async function getMedicalHistorySummary(req, res, next) {
     next(error);
   }
 }
+
 export async function getMedicalHistorySummaryByProviders(req, res, next) {
   try {
     const { patientId } = req.params;

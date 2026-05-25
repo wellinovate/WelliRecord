@@ -153,6 +153,15 @@ export const getPatientMedicationsService = async ({
   );
   const skip = (page - 1) * limit;
 
+   if(actor.isPatientActor) {
+   const ownsRecord  = String(authUser.profileId) === String(patientIds);
+   if(!ownsRecord) {
+    const error = new Error("You can only view your own medications");
+    error.statusCode = 403;
+    throw error;
+  }
+  }
+
   const filter = {
     patientId: patientIds,
     recordStatus: "active",

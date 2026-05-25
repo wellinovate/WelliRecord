@@ -9,7 +9,7 @@ import {
 export const getPatientsController = async (req, res, next) => {
   try {
     const { search, page, limit } = req.query;
-    const organizationId = req.user?.sub;
+    const organizationId = req.user?.organizationId;
 
     if (!organizationId) {
       return res.status(400).json({
@@ -105,6 +105,7 @@ export const searchPatientForOrganizationController = async (
     
     // const organizationId = req.user?.organizationId;
     const organizationId = req.user.sub;
+    console.log("🚀 ~ searchPatientForOrganizationController ~ req.user:", req.user)
     console.log("🚀 ~ searchPatientForOrganizationController ~ organizationId:", organizationId)
 
     if (!organizationId) {
@@ -171,7 +172,7 @@ export const linkPatientToOrganizationController = async (req, res, next) => {
   try {
     const { patientIdentityId } = req.validated;
     // const organizationId = req.user?.organizationId;
-    const organizationId = req.user.sub;
+    const organizationId = req.user.organizationId;
     const createdBy = req.user?.sub;
 
     if (!organizationId) {
