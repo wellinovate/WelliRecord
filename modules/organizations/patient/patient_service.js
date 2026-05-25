@@ -9,6 +9,7 @@ import { Account } from "../../accounts/account_model.js";
 import { Encounter } from "../../encounter/encounter_model.js";
 import { UserProfile } from "../../users/user_profile_model.js";
 import { PatientOrganization } from "../patient_organization_model.js";
+import { resolvePatientAccessContext } from "../../vitals/vital_service.js";
 
 export const getPatientsService = async ({
   organizationId,
@@ -129,6 +130,7 @@ export const getPatientsService = async ({
 export const getPatientDetailService = async ({
   patientId,
   organizationId,
+  authUser,
 }) => {
   if (!mongoose.Types.ObjectId.isValid(patientId)) {
     const error = new Error("Invalid patientId");
@@ -136,9 +138,21 @@ export const getPatientDetailService = async ({
     throw error;
   }
 
+  const {
+      actor,
+      patientId: resolvedPatientId,
+    } = await resolvePatientAccessContext({
+      patientId,
+      authUser,
+    });
+      console.log("🚀 ~ getPatientDetailService ~ resolvedPatientId:", resolvedPatientId)
+      console.log("🚀 ~ getPatientDetailService ~ actor:", actor)
+
+
+
   const relationByPatientId = await PatientOrganization.findOne({
-    patientId,
-    organizationId,
+    patientId: resolvedPatientId,
+    organizationId: actor?.organizationId,
     status: "active",
   })
     .populate({
@@ -154,8 +168,8 @@ export const getPatientDetailService = async ({
   console.log("🚀 ~ getPatientDetailService ~ relationByPatientId:", relationByPatientId)
 
   const relationByPatientIdentity = await PatientOrganization.findOne({
-    patientIdentity: patientId,
-    organizationId,
+    patientIdentity: resolvedPatientId,
+    organizationId: actor?.organizationId,
     status: "active",
   })
     .populate({

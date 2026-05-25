@@ -260,6 +260,106 @@ export const findActiveAccessGrant = async ({
   return grant;
 };
 
+
+export const resolveConsentAccess = async ({
+  actor,
+  patientId,
+  category,
+  baseFilter = {},
+}) => {
+  /**
+   * SELF ACCESS
+   */
+  if (actor.isPatientActor) {
+    return {
+      mode: "self",
+
+      permissions: {
+        view: true,
+        download: true,
+      },
+
+      filter: {
+        ...baseFilter,
+        patientId,
+      },
+    };
+  }
+
+  /**
+   * ORGANIZATION ACCESS
+   */
+  if (actor.isOrganizationActor) {
+    /**
+     * 1. Check explicit patient consent
+     */
+    const grant = await findActiveAccessGrant({
+      patientId,
+      organizationId: actor.organizationId,
+      userId: actor.userId,
+      category,
+    });
+
+    /**
+     * EXPLICIT CONSENT ACCESS
+     */
+    if (grant) {
+      return {
+        mode: "consent",
+
+        grant,
+
+        permissions: grant.permissions,
+
+        filter: {
+          ...baseFilter,
+
+          ...buildClinicalAccessFilter({
+            grant,
+            patientId,
+            category,
+          }),
+        },
+      };
+    }
+
+    /**
+     * 2. Fallback to implicit operational access
+     *
+     * Org can only see records created by itself.
+     */
+    return {
+      mode: "operational",
+
+      grant: null,
+
+      permissions: {
+        view: true,
+        download: false,
+      },
+
+      filter: {
+        ...baseFilter,
+
+        patientId,
+
+        $or: [
+          {
+            organizationId: actor.organizationId,
+          },
+          {
+            providerId: actor.userId,
+          },
+        ],
+      },
+    };
+  }
+
+  const error = new Error("Unauthorized");
+  error.statusCode = 403;
+  throw error;
+};
+
 const CATEGORY_DATE_FIELD = {
   vitals: "measuredAt",
   medications: "createdAt",

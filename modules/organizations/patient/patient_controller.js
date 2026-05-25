@@ -40,6 +40,7 @@ export const getPatientDetailController = async (req, res, next) => {
     const { patientId } = req.params;
     console.log("🚀 ~ getPatientDetailController ~ patientId:", patientId);
     const organizationId = req.user?.sub;
+    const authUser = req.user;
 
     if (!organizationId) {
       return res.status(403).json({
@@ -51,6 +52,7 @@ export const getPatientDetailController = async (req, res, next) => {
     const result = await getPatientDetailService({
       patientId,
       organizationId,
+      authUser,
     });
 
     return res.status(200).json({

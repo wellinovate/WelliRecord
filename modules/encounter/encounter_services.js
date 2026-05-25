@@ -27,6 +27,7 @@ export const createEncounterService = async ({ payload, authUser }) => {
       patientId: payload.patientId,
       authUser,
     });
+      console.log("🚀 ~ createEncounterService ~ actor:", actor)
 
     const wrOrgId = actor.wrOrgId || authUser?.orgId || null;
     console.log("🚀 ~ createEncounterService ~ wrOrgId:", wrOrgId);

@@ -6,6 +6,7 @@ import { OrganizationProfile } from "../organizations/organizations_model.js";
 import {
   buildClinicalAccessFilter,
   findActiveAccessGrant,
+  resolveConsentAccess,
 } from "../access/access_grant_service.js";
 import { redis } from "../../shared/config/upstash_redis.js";
 
@@ -154,113 +155,68 @@ export const createVitalService = async ({ payload, authUser }) => {
   }
 };
 
+
 export const getPatientVitalsService = async ({
   patientId,
   page = 1,
   limit = 10,
   authUser,
 }) => {
-
-  // Input validation
   if (!patientId || !authUser) {
     const error = new Error("Missing required parameters");
     error.statusCode = 400;
     throw error;
   }
-  
+
   const {
     actor,
-    patientId: patientIds,
-    isSelf,
+    patientId: resolvedPatientId,
   } = await resolvePatientAccessContext({
     patientId,
     authUser,
   });
 
-  const organizationId = actor.isOrganizationActor
-    ? authUser?.sub || null
-    : null;
   const skip = (page - 1) * limit;
 
-  if(actor.isPatientActor) {
-   const ownsRecord  = String(authUser.profileId) === String(patientIds);
-   if(!ownsRecord) {
-    const error = new Error("You can only view your own vitals");
-    error.statusCode = 403;
-    throw error;
-  }
-  }
+  /**
+   * Resolve access centrally
+   */
+  const access = await resolveConsentAccess({
+  actor,
+  patientId: resolvedPatientId,
+  category: "vitals",
 
-  const filter = {
-    patientId: patientIds,
-    recordStatus: "active",
+  baseFilter: {
     clinicalStatus: "active",
-  };
-
-  // if (actor.isPatientActor) {
-  //   if (!isSelf) {
-  //     const error = new Error("You can only view your own vitals");
-  //     error.statusCode = 403;
-  //     throw error;
-  //   }
-  //   // patient sees all own vitals
-  // } else if (actor.isOrganizationActor) {
-  //   const hasFullAccess = await hasOrganizationFullReadAccess({
-  //     patientId: patientIds,
-  //     organizationId: organizationId,
-  //   });
-
-  //   if (hasFullAccess) {
-  //     // org sees all vitals
-  //   } else {
-  //     // org only sees vitals created by itself
-  //     filter.organizationId = actor.organizationId;
-  //   }
-  // } else {
-  //   const error = new Error("Unauthorized actor type");
-  //   error.statusCode = 403;
-  //   throw error;
-  // }
-
-  if (actor.isOrganizationActor) {
-    filter.organizationId = organizationId;
-  }
+    recordStatus: "active",
+  },
+});
 
   const [vitals, total] = await Promise.all([
     vitalModel
-      .find(filter)
+      .find(access.filter)
       .populate("recordedBy", "organizationName email")
       .sort({ measuredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
 
-    vitalModel.countDocuments(filter),
+    vitalModel.countDocuments(access.filter),
   ]);
-  console.log("🚀 ~ getPatientVitalsService ~ vitals:", vitals);
 
   return {
-    items: vitals.map((item) => ({
-      id: item._id,
-      patientId: item.patientId,
-      source: item.source,
-      measuredAt: item.measuredAt,
-      bloodPressure: item.bloodPressure || null,
-      heartRate: item.heartRate ?? null,
-      temperature: item.temperature || null,
-      respiratoryRate: item.respiratoryRate ?? null,
-      oxygenSaturation: item.oxygenSaturation ?? null,
-      organiztion: item.organizationId?._id || null,
-      organizationEmail: item.organizationId?.email,
-      organizationFullName: item.organizationId?.organizationName || null,
-      weight: item.weight || null,
-      height: item.height || null,
-      bmi: item.bmi ?? null,
-      bloodGlucose: item.bloodGlucose || null,
-      notes: item.notes || null,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    })),
+    access: {
+      mode: access.mode,
+
+      consentGrantId: access.grant?._id || null,
+
+      permissions: access.permissions,
+
+      expiresAt: access.grant?.expiresAt || null,
+    },
+
+    items: vitals,
+
     pagination: {
       total,
       page,
@@ -269,6 +225,122 @@ export const getPatientVitalsService = async ({
     },
   };
 };
+
+// export const getPatientVitalsService = async ({
+//   patientId,
+//   page = 1,
+//   limit = 10,
+//   authUser,
+// }) => {
+
+//   // Input validation
+//   if (!patientId || !authUser) {
+//     const error = new Error("Missing required parameters");
+//     error.statusCode = 400;
+//     throw error;
+//   }
+  
+//   const {
+//     actor,
+//     patientId: patientIds,
+//     isSelf,
+//   } = await resolvePatientAccessContext({
+//     patientId,
+//     authUser,
+//   });
+
+//   const organizationId = actor.isOrganizationActor
+//     ? authUser?.sub || null
+//     : null;
+//   const skip = (page - 1) * limit;
+
+//   if(actor.isPatientActor) {
+//    const ownsRecord  = String(authUser.profileId) === String(patientIds);
+//    if(!ownsRecord) {
+//     const error = new Error("You can only view your own vitals");
+//     error.statusCode = 403;
+//     throw error;
+//   }
+//   }
+
+//   const filter = {
+//     patientId: patientIds,
+//     recordStatus: "active",
+//     clinicalStatus: "active",
+//   };
+
+//   // if (actor.isPatientActor) {
+//   //   if (!isSelf) {
+//   //     const error = new Error("You can only view your own vitals");
+//   //     error.statusCode = 403;
+//   //     throw error;
+//   //   }
+//   //   // patient sees all own vitals
+//   // } else if (actor.isOrganizationActor) {
+//   //   const hasFullAccess = await hasOrganizationFullReadAccess({
+//   //     patientId: patientIds,
+//   //     organizationId: organizationId,
+//   //   });
+
+//   //   if (hasFullAccess) {
+//   //     // org sees all vitals
+//   //   } else {
+//   //     // org only sees vitals created by itself
+//   //     filter.organizationId = actor.organizationId;
+//   //   }
+//   // } else {
+//   //   const error = new Error("Unauthorized actor type");
+//   //   error.statusCode = 403;
+//   //   throw error;
+//   // }
+
+//   if (actor.isOrganizationActor) {
+//     filter.organizationId = organizationId;
+//   }
+
+//   const [vitals, total] = await Promise.all([
+//     vitalModel
+//       .find(filter)
+//       .populate("recordedBy", "organizationName email")
+//       .sort({ measuredAt: -1, createdAt: -1 })
+//       .skip(skip)
+//       .limit(limit)
+//       .lean(),
+
+//     vitalModel.countDocuments(filter),
+//   ]);
+//   console.log("🚀 ~ getPatientVitalsService ~ vitals:", vitals);
+
+//   return {
+//     items: vitals.map((item) => ({
+//       id: item._id,
+//       patientId: item.patientId,
+//       source: item.source,
+//       measuredAt: item.measuredAt,
+//       bloodPressure: item.bloodPressure || null,
+//       heartRate: item.heartRate ?? null,
+//       temperature: item.temperature || null,
+//       respiratoryRate: item.respiratoryRate ?? null,
+//       oxygenSaturation: item.oxygenSaturation ?? null,
+//       organiztion: item.organizationId?._id || null,
+//       organizationEmail: item.organizationId?.email,
+//       organizationFullName: item.organizationId?.organizationName || null,
+//       weight: item.weight || null,
+//       height: item.height || null,
+//       bmi: item.bmi ?? null,
+//       bloodGlucose: item.bloodGlucose || null,
+//       notes: item.notes || null,
+//       createdAt: item.createdAt,
+//       updatedAt: item.updatedAt,
+//     })),
+//     pagination: {
+//       total,
+//       page,
+//       limit,
+//       totalPages: Math.ceil(total / limit),
+//     },
+//   };
+// };
 
 const resolveActorContext = async (authUser) => {
   // console.log("🚀 ~ resolveActorContext ~ authUser:", authUser)
@@ -283,15 +355,17 @@ const resolveActorContext = async (authUser) => {
   const isPatientActor = accountType === "user" || accountType === "patient";
 
   let organizationId = null;
+  let wrOrgId = null;
   let organizationName = null;
 
   if (isOrganizationActor) {
     const organization = await OrganizationProfile.findOne({
       wrOrgId: authUser?.wrOrgId,
     });
-    console.log("🚀 ~ resolveActorContext ~ organization:", organization)
+    // console.log("🚀 ~ resolveActorContext ~ organization:", organization)
     organizationId = organization._id;
     organizationName = organization.organizationName;
+    wrOrgId = organization.wrOrgId;
   }
 
   // const organizationId = (isOrganizationActor && authUser?.sub) || null;
@@ -300,6 +374,7 @@ const resolveActorContext = async (authUser) => {
     userId,
     organizationId,
     organizationName,
+    wrOrgId,
     accountType,
     isOrganizationActor,
     isPatientActor,

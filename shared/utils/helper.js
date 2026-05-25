@@ -18,13 +18,14 @@ export const signAccessToken = (results) => {
     fullName: profile.fullName,
     accountType: account.accountType,
     wrId: profile?.wrId,
-    role: account.role ?? null,
+    role: account.role,
     profileId: profile?._id
       ? String(profile._id)
       : profile?.id
       ? String(profile.id)
       : null,
   };
+  console.log("🚀 ~ signAccessToken ~ profile.wrOrgId:", profile.wrOrgId)
 
   if (account.accountType === "organization") {
     payload.organizationId = profile?._id
@@ -32,10 +33,10 @@ export const signAccessToken = (results) => {
       : profile?.id
       ? String(profile.id)
       : null;
-    payload.wrOrgId = profile?.wrOrgId ?? null;
+    // payload.wrOrgId = profile?.wrOrgId ?? null;
 
+    payload.wrOrgId = profile.wrOrgId;
     payload.fullName = profile.organizationName;
-    payload.wrOrgId = profile?.wrOrgId ?? null;
   }
 
   // if (account.accountType === "organization") {
