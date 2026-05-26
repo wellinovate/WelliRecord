@@ -27,7 +27,7 @@ import { sendLoginOtp, verifyLoginOtp } from "../../shared/utils/termii.js";
 import { LoginOtpChallenge } from "./login_otp_challenge_model.js";
 
 export const registerAccount = async (payload) => {
-  console.log("🚀 ~ registerAccount ~ payload:", payload);
+  // console.log("🚀 ~ registerAccount ~ payload:", payload);
   if (payload.accountType === "user") {
     return registerUserAccount(payload);
   }

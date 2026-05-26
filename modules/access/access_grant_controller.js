@@ -33,7 +33,7 @@ const getAuthOrganizationId = (req) => {
 export const createAccessGrant = async (req, res, next) => {
   try {
     const { patientId } = req.params;
-    console.log("🚀 ~ createAccessGrant ~ patientId:", patientId)
+    // console.log("🚀 ~ createAccessGrant ~ patientId:", patientId)
 
     const validation = validateCreateAccessGrant(req.body);
     // console.log("🚀 ~ createAccessGrant ~ validation:", validation)
@@ -75,8 +75,8 @@ export const createAccessGrant = async (req, res, next) => {
       });
     }
     
-    console.log("🚀 ~ createAccessGrant ~ authPatientProfileId:", authPatientProfileId)
-    console.log("🚀 ~ createAccessGrant ~ patientId:", patientId)
+    // console.log("🚀 ~ createAccessGrant ~ authPatientProfileId:", authPatientProfileId)
+    // console.log("🚀 ~ createAccessGrant ~ patientId:", patientId)
     if (String(grantedBy) !== String(patientId)) {
       return res.status(403).json({
         success: false,
@@ -84,7 +84,7 @@ export const createAccessGrant = async (req, res, next) => {
       });
     }
     
-    console.log("🚀 ~ createAccessGrant ~ YYYYYYYYYYYY:", granteeOrganizationId)
+    // console.log("🚀 ~ createAccessGrant ~ YYYYYYYYYYYY:", granteeOrganizationId)
     const grant = await grantPatientAccess({
       patientId : authPatientProfileId,
       grantedBy,
@@ -123,7 +123,7 @@ export const createAccessGrant = async (req, res, next) => {
 export const getMyGrantedAccess = async (req, res, next) => {
   try {
     const { patientId } = req.params;
-    console.log("🚀 ~ getMyGrantedAccess ~ patientId:", patientId)
+    // console.log("🚀 ~ getMyGrantedAccess ~ patientId:", patientId)
 
     const userId = getAuthUserId(req);
     const authPatientProfileId = getAuthPatientProfileId(req);
@@ -241,10 +241,10 @@ export const getPatientVitalsForProvider = async (req, res, next) => {
 export const revokeAccessGrant = async (req, res, next) => {
   try {
     const { grantId } = req.params;
-    console.log("🚀 ~ revokeAccessGrant ~ grantId:", grantId)
+    // console.log("🚀 ~ revokeAccessGrant ~ grantId:", grantId)
 
     const userId = getAuthUserId(req);
-    console.log("🚀 ~ revokeAccessGrant ~ userId:", userId)
+    // console.log("🚀 ~ revokeAccessGrant ~ userId:", userId)
 
     if (!userId) {
       return res.status(401).json({
