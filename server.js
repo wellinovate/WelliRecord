@@ -56,6 +56,8 @@ app.use(cors(corsOptions));
 app.use(bodyParse.json({ limit: "10mb" }));
 app.use(cookieParser());
 
+app.set("trust proxy", 1);
+
 app.use(requestIdMiddleware);
 
 app.use((req, res, next) => {
