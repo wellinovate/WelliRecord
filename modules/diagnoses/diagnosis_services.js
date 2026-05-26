@@ -3,6 +3,7 @@ import { diagnosisModel } from "./diagnoses_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { resolveConsentAccess } from "../access/access_grant_service.js";
 
 export const createDiagnosisService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -46,7 +47,6 @@ export const createDiagnosisService = async ({ payload, authUser }) => {
         throw error;
       }
     }
-
 
     const docs = await diagnosisModel.create(
       [
@@ -117,42 +117,36 @@ export const getPatientDiagnosesService = async ({
 }) => {
   const {
     actor,
-    patientId: patientIds,
+    patientId: resolvedPatientId,
     isSelf,
   } = await resolvePatientAccessContext({
     patientId,
     authUser,
   });
-  const organizationId = actor.isOrganizationActor && actor.organizationId;
+
   const skip = (page - 1) * limit;
 
-   if(actor.isPatientActor) {
-   const ownsRecord  = String(authUser.profileId) === String(patientIds);
-   if(!ownsRecord) {
-    const error = new Error("You can only view your own Diagnoses");
-    error.statusCode = 403;
-    throw error;
-  }
-  }
+  const access = await resolveConsentAccess({
+    actor,
+    authUser,
+    patientId: resolvedPatientId,
+    category: "diagnoses",
 
-  const filter = {
-    patientId: patientIds,
-    recordStatus: "active",
-  };
-
-  if (actor.isOrganizationActor) {
-    filter.organizationId = organizationId;
-  }
+    baseFilter: {
+      clinicalStatus: "active",
+      recordStatus: "active",
+    },
+  });
 
   const [items, total] = await Promise.all([
     diagnosisModel
-      .find(filter)
+      .find(access.filter)
       .sort({ diagnosedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
 
-    diagnosisModel.countDocuments(filter),
+    diagnosisModel.countDocuments(access.filter),
   ]);
 
   return {

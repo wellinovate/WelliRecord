@@ -263,14 +263,23 @@ export const findActiveAccessGrant = async ({
 
 export const resolveConsentAccess = async ({
   actor,
+  authUser,
   patientId,
   category,
   baseFilter = {},
 }) => {
+  
+  
   /**
    * SELF ACCESS
-   */
-  if (actor.isPatientActor) {
+  */
+ if (actor.isPatientActor) {
+    if(actor.userId.toString() !== authUser.sub.toString()) {
+      const error = new Error("Unauthorized: Actor user ID does not match authenticated user.");
+      console.log("🚀 ~ resolveConsentAccess ~ error:", error)
+      error.statusCode = 403;
+      throw error;
+    }
     return {
       mode: "self",
 

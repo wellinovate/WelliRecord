@@ -4,9 +4,10 @@ import { PatientIdentity } from "../organizations/patient/patient_identity_model
 import { UserProfile } from "../users/user_profile_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { resolveConsentAccess } from "../access/access_grant_service.js";
 
 export const createMedicationService = async ({ payload, authUser }) => {
-  console.log("🚀 ~ createMedicationService ~ payload:", payload)
+  console.log("🚀 ~ createMedicationService ~ payload:", payload);
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -60,7 +61,7 @@ export const createMedicationService = async ({ payload, authUser }) => {
     const docs = await medicationModel.create(
       [
         {
-          patientId: payload.patientId,
+          patientId: patientId,
           recordedBy,
           providerId: recordedBy,
           organizationId,
@@ -138,43 +139,33 @@ export const getPatientMedicationsService = async ({
   limit = 10,
   authUser,
 }) => {
+  console.log("🚀 ~ getPatientMedicationsService ~ patientId:", patientId)
   const {
     actor,
-    patientId: patientIds,
+    patientId: resolvedPatientId,
     isSelf,
   } = await resolvePatientAccessContext({
     patientId,
     authUser,
   });
-  const organizationId = actor.isOrganizationActor && actor.organizationId;
-  console.log(
-    "🚀 ~ getPatientMedicationsService ~ organizationId:",
-    organizationId,
-  );
   const skip = (page - 1) * limit;
 
-   if(actor.isPatientActor) {
-   const ownsRecord  = String(authUser.profileId) === String(patientIds);
-   if(!ownsRecord) {
-    const error = new Error("You can only view your own medications");
-    error.statusCode = 403;
-    throw error;
-  }
-  }
+  const access = await resolveConsentAccess({
+    actor,
+    authUser,
+    patientId: resolvedPatientId,
+    category: "medications",
 
-  const filter = {
-    patientId: patientIds,
-    recordStatus: "active",
-    // clinicalStatus: "active",
-  };
+    baseFilter: {
+      // clinicalStatus: "active",
+      recordStatus: "active",
+    },
+  });
 
-  if (actor.isOrganizationActor) {
-    filter.organizationId = organizationId;
-  }
-
+      console.log("🚀 ~ getPatientMedicationsService ~ access.filter:", access.filter)
   const [items, total] = await Promise.all([
     medicationModel
-      .find(filter)
+      .find(access.filter)
       .populate({
         path: "prescribedBy",
         select: "organizationName contactPersonName accountId ",
@@ -188,7 +179,7 @@ export const getPatientMedicationsService = async ({
       .limit(limit)
       .lean(),
 
-    medicationModel.countDocuments(filter),
+    medicationModel.countDocuments(access.filter),
   ]);
   console.log("🚀 ~ getPatientMedicationsService ~ items:", items);
 
@@ -212,7 +203,8 @@ export const getPatientMedicationsService = async ({
         item.prescribedBy?.accountId?.accountType || null,
       prescribedByEmail: item.prescribedBy?.email || null,
       prescribedByFullName: item.prescribedBy?.organizationName || null,
-      prescribedByContactPersonName: item.prescribedBy?.contactPersonName || null,
+      prescribedByContactPersonName:
+        item.prescribedBy?.contactPersonName || null,
       prescribedAt: item.prescribedAt || null,
       startDate: item.startDate || null,
       endDate: item.endDate || null,

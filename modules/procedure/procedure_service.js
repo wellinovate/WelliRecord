@@ -152,7 +152,7 @@ export const getPatientProceduresService = async ({
 
     procedureModel.countDocuments(filter),
   ]);
-  console.log("🚀 ~ getPatientProceduresService ~ items:", items)
+  // console.log("🚀 ~ getPatientProceduresService ~ items:", items)
 
   return {
     items: items.map((item) => ({

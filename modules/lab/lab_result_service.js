@@ -3,6 +3,7 @@ import { labResultModel } from "./lab_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { resolveConsentAccess } from "../access/access_grant_service.js";
 
 export const createLabResultService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -116,41 +117,36 @@ export const getPatientLabResultsService = async ({
 }) => {
   const {
     actor,
-    patientId: patientIds,
+    patientId: resolvedPatientId,
     isSelf,
   } = await resolvePatientAccessContext({
     patientId,
     authUser,
   });
-  const organizationId = actor.isOrganizationActor && actor.organizationId;
   const skip = (page - 1) * limit;
 
-   if(actor.isPatientActor) {
-   const ownsRecord  = String(authUser.profileId) === String(patientIds);
-   if(!ownsRecord) {
-    const error = new Error("You can only view your own lab results");
-    error.statusCode = 403;
-    throw error;
-  }
-  }
 
-  const filter = {
-    patientId: patientIds,
-    recordStatus: "active",
-  };
 
-  if (actor.isOrganizationActor) {
-    filter.organizationId = organizationId;
-  }
+const access = await resolveConsentAccess({
+    actor,
+    authUser,
+    patientId: resolvedPatientId,
+    category: "labs",
+
+    baseFilter: {
+      // clinicalStatus: "active",
+      recordStatus: "active",
+    },
+  });
 
   const [items, total] = await Promise.all([
     labResultModel
-      .find(filter)
+      .find(access.filter)
       .sort({ resultedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
-    labResultModel.countDocuments(filter),
+    labResultModel.countDocuments(access.filter),
   ]);
 
   return {

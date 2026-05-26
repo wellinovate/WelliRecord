@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { immunizationModel } from "./immunizations_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { resolveConsentAccess } from "../access/access_grant_service.js";
 
 export const createImmunizationService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -105,35 +106,36 @@ export const getPatientImmunizationsService = async ({
 }) => {
   const {
     actor,
-    patientId: patientIds,
+    patientId: resolvedPatientId,
     isSelf,
   } = await resolvePatientAccessContext({
     patientId,
     authUser,
   });
-  const organizationId = actor.isOrganizationActor
-    ? authUser?.sub || null
-    : null;
+
   const skip = (page - 1) * limit;
 
-  const filter = {
-    patientId,
-    recordStatus: "active",
-  };
-
-  if (actor.isOrganizationActor) {
-    filter.organizationId = organizationId;
-  }
+  const access = await resolveConsentAccess({
+      actor,
+      authUser,
+      patientId: resolvedPatientId,
+      category: "immunizations",
+  
+      baseFilter: {
+        clinicalStatus: "active",
+        recordStatus: "active",
+      },
+    });
 
   const [items, total] = await Promise.all([
     immunizationModel
-      .find(filter)
+      .find(access.filter)
       .sort({ administeredAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
 
-    immunizationModel.countDocuments(filter),
+    immunizationModel.countDocuments(access.filter),
   ]);
 
   return {

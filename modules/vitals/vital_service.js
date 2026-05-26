@@ -155,7 +155,6 @@ export const createVitalService = async ({ payload, authUser }) => {
   }
 };
 
-
 export const getPatientVitalsService = async ({
   patientId,
   page = 1,
@@ -168,13 +167,11 @@ export const getPatientVitalsService = async ({
     throw error;
   }
 
-  const {
-    actor,
-    patientId: resolvedPatientId,
-  } = await resolvePatientAccessContext({
-    patientId,
-    authUser,
-  });
+  const { actor, patientId: resolvedPatientId } =
+    await resolvePatientAccessContext({
+      patientId,
+      authUser,
+    });
 
   const skip = (page - 1) * limit;
 
@@ -182,15 +179,16 @@ export const getPatientVitalsService = async ({
    * Resolve access centrally
    */
   const access = await resolveConsentAccess({
-  actor,
-  patientId: resolvedPatientId,
-  category: "vitals",
+    actor,
+    authUser,
+    patientId: resolvedPatientId,
+    category: "vitals",
 
-  baseFilter: {
-    clinicalStatus: "active",
-    recordStatus: "active",
-  },
-});
+    baseFilter: {
+      clinicalStatus: "active",
+      recordStatus: "active",
+    },
+  });
 
   const [vitals, total] = await Promise.all([
     vitalModel
@@ -239,7 +237,7 @@ export const getPatientVitalsService = async ({
 //     error.statusCode = 400;
 //     throw error;
 //   }
-  
+
 //   const {
 //     actor,
 //     patientId: patientIds,
