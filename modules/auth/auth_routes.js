@@ -13,7 +13,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 const router = express.Router();
 
-router.post("/register", authRegisterLimiter, validateRegisterRequest,  register);
+router.post("/register", validateRegisterRequest,  register);
 router.post("/login", loginLimiter, validateLoginRequest,  loginController);
 router.post("/login/verify-code", login);
 router.post("/google/login", googleLoginController);

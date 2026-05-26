@@ -18,6 +18,7 @@ export const register = async (req, res, next) => {
       data: result,
     });
   } catch (error) {
+    console.log("🚀 ~ register ~ error:", error)
     next(error);
   }
 };

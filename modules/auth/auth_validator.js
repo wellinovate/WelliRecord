@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const optionalString = z.preprocess(
+  (val) => (val === null ? undefined : val),
+  z.string().trim().optional()
+);
+
 const personalRegisterSchema = z.object({
   accountType: z.literal("user"),
   fullName: z.string().trim().min(2, "Full name is required"),
@@ -9,9 +14,9 @@ const personalRegisterSchema = z.object({
     .email("Valid email is required")
     .transform((val) => val.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  phone: z.string().optional(),
+  phone: z.string().trim().min(7, "Phone number must be at least 7 digits"),
   gender: z.string().trim().min(2, "Gender is required"),
-  address: z.string().optional(),
+  address: optionalString,
   role: z.string().optional(),
   authProvider: z.literal("local").optional(),
 });
@@ -64,6 +69,8 @@ const loginSchema = z.object({
 });
 
 export const validateRegisterRequest = (req, res, next) => {
+  console.log("Incoming register body:", req.body);
+
   const { accountType } = req.body;
 
   let schema;
@@ -75,20 +82,30 @@ export const validateRegisterRequest = (req, res, next) => {
   } else {
     return res.status(400).json({
       success: false,
-      message: "Invalid profile type",
+      message: "Invalid account type. Use either 'user' or 'organization'.",
+      receivedAccountType: accountType,
     });
   }
 
   const result = schema.safeParse(req.body);
 
   if (!result.success) {
+    const errors = result.error.issues.map((err) => {
+      const field = err.path.length ? err.path.join(".") : "root";
+
+      return {
+        field,
+        message: err.message,
+        fullMessage: `${field}: ${err.message}`,
+      };
+    });
+
+    console.log("Validation errors:", errors);
+
     return res.status(400).json({
       success: false,
-      message: "Validation failed",
-      errors: result.error.errors?.map((err) => ({
-        field: err.path.join("."),
-        message: err.message,
-      })),
+      message: errors[0]?.fullMessage || "Validation failed",
+      errors,
     });
   }
 
