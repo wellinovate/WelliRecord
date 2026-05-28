@@ -26,10 +26,8 @@ export const createVitalService = async ({ payload, authUser }) => {
     // if (payload) return;
     let recordedBy = null;
 
-    // const organizationIdFromUser = authUser?.sub || null;
     if (actor.isOrganizationActor === true) {
       recordedBy = actor.organizationId;
-      console.log("🚀 ~ createVitalService ~ recordedBy:", recordedBy);
     } else {
       recordedBy = authUser?.sub || null;
     }
@@ -72,7 +70,7 @@ export const createVitalService = async ({ payload, authUser }) => {
       : payload.createdContext || "provider-chart";
 
     const providerId = actor.isOrganizationActor ? actor.userId : null;
-    const organizationId = actor.isOrganizationActor && actor.organizationId;
+    const organizationId = actor.isOrganizationActor ? actor.organizationId : undefined;;
 
     // const check = patientFromUserProfile || patientFromPatientIdentity;
     if (!patientId) {
@@ -89,7 +87,7 @@ export const createVitalService = async ({ payload, authUser }) => {
     const vital = await vitalModel.create(
       [
         {
-          patientId: payload.patientId,
+          patientId: patientId,
           recordedBy,
           providerId: provider,
           organizationId,
@@ -185,8 +183,8 @@ export const getPatientVitalsService = async ({
     category: "vitals",
 
     baseFilter: {
-      clinicalStatus: "active",
-      recordStatus: "active",
+      // clinicalStatus: "active",
+      // recordStatus: "active",
     },
   });
 
@@ -307,7 +305,6 @@ export const getPatientVitalsService = async ({
 
 //     vitalModel.countDocuments(filter),
 //   ]);
-//   console.log("🚀 ~ getPatientVitalsService ~ vitals:", vitals);
 
 //   return {
 //     items: vitals.map((item) => ({
@@ -341,11 +338,9 @@ export const getPatientVitalsService = async ({
 // };
 
 const resolveActorContext = async (authUser) => {
-  // console.log("🚀 ~ resolveActorContext ~ authUser:", authUser)
   const userId = authUser?._id || authUser?.sub || null;
   const accountType =
     authUser?.accountType || authUser?.account?.accountType || null;
-  // console.log("🚀 ~ resolveActorContext ~ accountType:", accountType);
 
   const isOrganizationActor = accountType === "organization";
   // accountType === "provider" ||
@@ -360,7 +355,6 @@ const resolveActorContext = async (authUser) => {
     const organization = await OrganizationProfile.findOne({
       wrOrgId: authUser?.wrOrgId,
     });
-    // console.log("🚀 ~ resolveActorContext ~ organization:", organization)
     organizationId = organization._id;
     organizationName = organization.organizationName;
     wrOrgId = organization.wrOrgId;
@@ -381,7 +375,6 @@ const resolveActorContext = async (authUser) => {
 
 export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
   const actor = await resolveActorContext(authUser);
-  // console.log("🚀 ~ resolvePatientAccessContext ~ actor:", actor)
 
   // const cacheKey = `patient-access:${patientId}:${actor.userId}:${actor.role}`;
 

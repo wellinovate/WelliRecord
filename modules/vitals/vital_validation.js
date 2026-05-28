@@ -11,7 +11,6 @@ const objectIdSchema = z
 export const createVitalSchema = z.object({
   patientId: objectIdSchema,
   providerId: objectIdSchema.optional(),
-  organizationId: objectIdSchema.optional(),
   encounterId: objectIdSchema.optional(),
 
   source: z.enum(["patient", "provider", "device", "imported"]).optional(),

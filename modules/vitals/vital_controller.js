@@ -15,13 +15,14 @@ import { getPatientVitalsQuerySchema } from "./vital_validation.js";
 export const createVitalController = async (req, res, next) => {
   try {
     const payload = req.validated;
+    // console.log("🚀 ~ createVitalController ~ payload:", payload)
     const authUser = req.user;
 
     const result = await createVitalService({
       payload,
       authUser,
     });
-    console.log("🚀 ~ createVitalController ~ result:", result)
+    // console.log("🚀 ~ createVitalController ~ result:", result)
 
     return res.status(201).json({
       success: true,
