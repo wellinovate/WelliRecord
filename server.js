@@ -20,7 +20,7 @@ import immunizationRoutes from "./modules/immunizations/immunization_routes.js";
 import appointmentRoutes from "./modules/appointments/appointment_routes.js";
 import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
 import accessGrantRoutes from "./modules/access/access_grant_routes.js";
-import { connectRedis } from "./shared/config/redis.js";
+// import { connectRedis } from "./shared/config/redis.js";
 import {
   globalRateLimiter,
   requestIdMiddleware,
@@ -33,7 +33,7 @@ const app = express();
 // app.use(bodyParser.json());
 
 connectDB();
-connectRedis();
+// connectRedis();
 
 const corsOptions = {
   origin: [

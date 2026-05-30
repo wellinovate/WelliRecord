@@ -11,10 +11,11 @@ jobs:
     env:
       PORT: 3001
       NODE_ENV: staging
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      REDIS_URL: ${{ secrets.REDIS_URL }}
+      DATABASE: ${{ secrets.DATABASE }}
+      TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
+      TERMII_BASE_URL: ${{ secrets.TERMII_BASE_URL }}
+      TERMII_SENDER_ID: ${{ secrets.TERMII_SENDER_ID }}
+      TERMII_OTP_CHANNEL: ${{ secrets.TERMII_OTP_CHANNEL }}
 
     steps:
       # 1. Checkout
