@@ -6,7 +6,7 @@ import {
   validateLoginRequest,
   validateRegisterRequest,
 } from "./auth_validator.js";
-import { googleLoginController, login, loginController, register, resendVerificationEmailController, verifyEmailController } from "./auth_controller.js";
+import { googleLoginController, login, loginController, register, resendLoginOtpController, resendVerificationEmailController, verifyEmailController } from "./auth_controller.js";
 import { authRegisterLimiter, loginLimiter, resendVerificationLimiter, verifyEmailLimiter } from "../../shared/utils/authRegisterLimiter.js";
 
 const storage = multer.memoryStorage();
@@ -16,6 +16,7 @@ const router = express.Router();
 router.post("/register", validateRegisterRequest,  register);
 router.post("/login", loginLimiter, validateLoginRequest,  loginController);
 router.post("/login/verify-code", login);
+router.post("/resend-verify-code", resendLoginOtpController);
 router.post("/google/login", googleLoginController);
 router.get("/verify-email", verifyEmailLimiter, verifyEmailController);
 router.post(

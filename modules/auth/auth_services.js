@@ -26,6 +26,8 @@ import { OrganizationMembership } from "../memberships/organization_membership_m
 import { sendLoginOtp, verifyLoginOtp } from "../../shared/utils/termii.js";
 import { LoginOtpChallenge } from "./login_otp_challenge_model.js";
 
+
+
 export const registerAccount = async (payload) => {
   // console.log("🚀 ~ registerAccount ~ payload:", payload);
   if (payload.accountType === "user") {
@@ -506,9 +508,7 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
 
   if (account.accountType === "user") {
     profile = await UserProfile.findOne({ accountId: account._id })
-      .select(
-        "_id  fullName  email phone avatar  gender wrId isVerified",
-      )
+      .select("_id  fullName  email phone avatar  gender wrId isVerified")
       .lean();
 
     if (!profile) {
@@ -563,6 +563,63 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
     account: account.toSafeObject(),
     profile,
     // memberships,
+  };
+};
+
+
+
+export const resendLoginOtpService = async ({ email }) => {
+  // 1. Find account
+  const account = await Account.findOne({ email: email.toLowerCase().trim() });
+  if (!account) {
+    throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
+  }
+
+  if (!account.phone) {
+    throw new AppError("No phone attached to account", 400, "PHONE_NOT_FOUND");
+  }
+
+  // 2. Check cooldown (optional: 60s or 2min)
+  const lastOtp = await LoginOtpChallenge.findOne({
+    accountId: account._id,
+  }).sort({ createdAt: -1 });
+  if (lastOtp) {
+    const cooldownMs = 60 * 1000; // 1 minute
+    const now = Date.now();
+    if (lastOtp.createdAt.getTime() + cooldownMs > now) {
+      throw new AppError(
+        "Please wait before requesting another OTP",
+        429,
+        "OTP_COOLDOWN",
+      );
+    }
+  }
+
+  // 3. Send new OTP via Termii
+  let otp;
+  try {
+    otp = await sendLoginOtp({ phoneNumber: account.phone });
+  } catch (err) {
+    throw new AppError("Unable to send OTP now", 502, "OTP_SEND_FAILED");
+  }
+
+  // 4. Generate challenge token
+  const challengeToken = generateLoginChallengeToken();
+  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
+
+  // 5. Save OTP challenge
+  await LoginOtpChallenge.create({
+    accountId: account._id,
+    challengeTokenHash,
+    termiiPinId: otp.pinId,
+    phone: account.phone,
+    expiresAt: getLoginOtpExpiry(),
+  });
+
+  return {
+    message: "OTP resent successfully",
+    challengeToken,
+    maskedPhone: account.phone.replace(/\d(?=\d{4})/g, "*"),
   };
 };
 

@@ -3,7 +3,14 @@ import {
   signAccessToken,
   signAccessTokenGoogle,
 } from "../../shared/utils/helper.js";
-import { loginAccount, registerAccount, resendVerificationEmailService, verifyEmailService, verifyLoginCodeService } from "./auth_services.js";
+import {
+  loginAccount,
+  registerAccount,
+  resendLoginOtpService,
+  resendVerificationEmailService,
+  verifyEmailService,
+  verifyLoginCodeService,
+} from "./auth_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createAccount } from "../accounts/account_service.js";
 import { Account } from "../accounts/account_model.js";
@@ -18,7 +25,7 @@ export const register = async (req, res, next) => {
       data: result,
     });
   } catch (error) {
-    console.log("🚀 ~ register ~ error:", error)
+    console.log("🚀 ~ register ~ error:", error);
     next(error);
   }
 };
@@ -33,14 +40,14 @@ export const loginController = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
-    console.log("🚀 ~ loginController ~ error:", error)
+    console.log("🚀 ~ loginController ~ error:", error);
   }
 };
 
 export const login = async (req, res, next) => {
   try {
     const result = await verifyLoginCodeService(req.body);
-    console.log("🚀 ~ login ~ result:", result)
+    console.log("🚀 ~ login ~ result:", result);
 
     const results = {
       account: result.account,
@@ -201,6 +208,25 @@ export const verifyEmailController = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resendLoginOtpController = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const result = await resendLoginOtpService({ email });
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: {
+        challengeToken: result.challengeToken,
+        maskedPhone: result.maskedPhone,
+      },
     });
   } catch (error) {
     next(error);
