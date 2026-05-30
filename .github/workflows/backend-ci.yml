@@ -18,7 +18,7 @@ jobs:
       TERMII_OTP_CHANNEL: ${{ secrets.TERMII_OTP_CHANNEL }}
 
     steps:
-      # 1. Checkout
+      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -41,12 +41,14 @@ jobs:
       - name: Build project
         run: npm run build --if-present
 
-      # 6. Start server in background
+      # 6. Start server in background and log output
       - name: Start server
         run: |
+          echo "Starting server..."
           npm run start > server.log 2>&1 &
+          SERVER_PID=$!
           echo "Waiting for server to be ready..."
-          for i in {1..30}; do
+          for i in {1..60}; do   # wait up to 2 minutes
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health || true)
             if [ "$STATUS" -eq 200 ]; then
               echo "Server is up!"
@@ -62,8 +64,11 @@ jobs:
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health)
           if [ "$STATUS" -ne 200 ]; then
             echo "Health check failed!"
-            echo "------ Server Logs ------"
+            echo "------ Last 50 Server Log Lines ------"
+            tail -n 50 server.log
+            echo "------ Full Server Log ------"
             cat server.log
+            kill $SERVER_PID || true
             exit 1
           fi
 
