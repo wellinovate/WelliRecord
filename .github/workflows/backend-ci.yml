@@ -8,6 +8,13 @@ on:
 jobs:
   test-build-health-merge:
     runs-on: ubuntu-latest
+    env:
+      PORT: 3001
+      NODE_ENV: staging
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
 
     steps:
       # 1. Checkout
@@ -25,20 +32,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4. Test
+      # 4. Run tests
       - name: Run tests
         run: npm test --if-present
 
-      # 5. Build
+      # 5. Build project
       - name: Build project
         run: npm run build --if-present
 
       # 6. Start server in background
       - name: Start server
         run: |
-          npm run start &
-          echo "Waiting for server to start..."
-          for i in {1..15}; do
+          npm run start > server.log 2>&1 &
+          echo "Waiting for server to be ready..."
+          for i in {1..30}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health || true)
             if [ "$STATUS" -eq 200 ]; then
               echo "Server is up!"
@@ -54,6 +61,8 @@ jobs:
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health)
           if [ "$STATUS" -ne 200 ]; then
             echo "Health check failed!"
+            echo "------ Server Logs ------"
+            cat server.log
             exit 1
           fi
 
@@ -67,5 +76,3 @@ jobs:
           target_branch: main
           title: "Auto-merge staging → main after health check"
           body: "Merged automatically as health check passed"
-
-      
