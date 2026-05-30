@@ -26,6 +26,7 @@ export const register = async (req, res, next) => {
     });
   } catch (error) {
     console.log("🚀 ~ register ~ error:", error);
+    console.log("🚀 ~ register ~ error:", error);
     next(error);
   }
 };
