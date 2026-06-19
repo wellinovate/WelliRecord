@@ -60,6 +60,8 @@ app.use(cookieParser());
 
 app.use(requestIdMiddleware);
 
+
+
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
 
@@ -118,6 +120,25 @@ app.get("/health", (req, res) => {
     service: "wellirecord-api",
     // environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error("ERROR:", err);
+
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    code: err.code || "INTERNAL_SERVER_ERROR",
   });
 });
 
