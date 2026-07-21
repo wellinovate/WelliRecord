@@ -98,6 +98,33 @@ const organizationProfileSchema = new Schema(
       trim: true,
       default: null,
     },
+
+    verificationStatus: {
+      type: String,
+      enum: ["not_submitted", "pending", "approved", "rejected"],
+      default: "not_submitted",
+      index: true,
+    },
+
+    verificationDocumentUrl: {
+      type: String,
+      default: null,
+    },
+
+    verificationDocumentName: {
+      type: String,
+      default: null,
+    },
+
+    verificationDocumentUploadedAt: {
+      type: Date,
+      default: null,
+    },
+
+    verificationDecisionNote: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,

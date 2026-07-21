@@ -1,7 +1,12 @@
 import express from "express";
 
 import multer from "multer";
-import { registerPatientController, searchProvidersController } from "./organizatons_controller.js";
+import {
+  registerPatientController,
+  searchProvidersController,
+  uploadVerificationDocumentController,
+  getVerificationStatusController,
+} from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
 import { protect } from "../auth/auth_middleware.js";
 import { addDoctorSchema, linkPatientSchema, searchPatientSchema, validate } from "./patient/patient_validator.js";
@@ -12,6 +17,14 @@ import { addDoctorToOrganizationController, getDoctorsController, searchDoctorFo
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 const router = express.Router();
+
+router.post(
+  "/verify-org/document",
+  protect,
+  upload.single("document"),
+  uploadVerificationDocumentController,
+);
+router.get("/verify-org/status", protect, getVerificationStatusController);
 
 router.post("/register-patient", protect, registerPatientController);
 router.get("/patients", protect, getPatientsController);
