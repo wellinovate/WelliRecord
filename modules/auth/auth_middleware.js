@@ -41,3 +41,25 @@ export const protect = (req, res, next) => {
     });
   }
 };
+
+/**
+ * Must run after `protect`. Restricts access to accounts whose role is
+ * admin or super_admin, per the JWT's `role` claim.
+ */
+export const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: "Not authenticated",
+    });
+  }
+
+  if (req.user.role !== "admin" && req.user.role !== "super_admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Admin access required",
+    });
+  }
+
+  next();
+};

@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
-
 const { Schema } = mongoose;
-
 const organizationProfileSchema = new Schema(
   {
     accountId: {
@@ -18,14 +16,12 @@ const organizationProfileSchema = new Schema(
       sparse: true,
       index: true,
     },
-
     organizationName: {
       type: String,
       required: true,
       trim: true,
       index: true,
     },
-
     organizationType: {
       type: String,
       enum: [
@@ -44,85 +40,80 @@ const organizationProfileSchema = new Schema(
       required: true,
       index: true,
     },
-
     officeAddress: {
       type: String,
       trim: true,
       default: null,
     },
-
     registrationNumber: {
       type: String,
       trim: true,
       default: null,
     },
-
     licenseNumber: {
       type: String,
       trim: true,
       default: null,
     },
-
     contactPersonName: {
       type: String,
       trim: true,
       default: null,
     },
-
     logo: {
       type: String,
       default: null,
     },
-
     phone: {
       type: String,
       trim: true,
       default: null,
     },
-
     email: {
       type: String,
       trim: true,
       lowercase: true,
       default: null,
     },
-
     isLicensed: {
       type: Boolean,
       default: false,
       index: true,
     },
-
     contactPersonRole: {
       type: String,
       trim: true,
       default: null,
     },
-
     verificationStatus: {
       type: String,
       enum: ["not_submitted", "pending", "approved", "rejected"],
       default: "not_submitted",
       index: true,
     },
-
     verificationDocumentUrl: {
       type: String,
       default: null,
     },
-
     verificationDocumentName: {
       type: String,
       default: null,
     },
-
     verificationDocumentUploadedAt: {
       type: Date,
       default: null,
     },
-
     verificationDecisionNote: {
       type: String,
+      default: null,
+    },
+    verificationReviewedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Account",
+      default: null,
+    },
+    verificationReviewedAt: {
+      type: Date,
       default: null,
     },
   },
@@ -131,9 +122,7 @@ const organizationProfileSchema = new Schema(
     versionKey: false,
   },
 );
-
 organizationProfileSchema.index({ organizationName: "text" });
-
 export const OrganizationProfile = mongoose.model(
   "OrganizationProfile",
   organizationProfileSchema,
