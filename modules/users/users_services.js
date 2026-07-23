@@ -439,6 +439,38 @@ export const updateUserProfileService = async ({ userId, payload }) => {
     });
   }
 
+if ("notificationPreferences" in payload) {
+    if (
+      typeof payload.notificationPreferences !== "object" ||
+      payload.notificationPreferences === null ||
+      Array.isArray(payload.notificationPreferences)
+    ) {
+      throw new Error("notificationPreferences must be an object");
+    }
+
+    const allowedKeys = [
+      "labResultsReady",
+      "consentRequests",
+      "appointmentReminders",
+      "emergencyModeAlerts",
+      "medicationReminders",
+      "accessAuditLog",
+    ];
+
+    const existingPrefs = profile.notificationPreferences?.toObject
+      ? profile.notificationPreferences.toObject()
+      : profile.notificationPreferences || {};
+
+    const sanitizedPrefs = { ...existingPrefs };
+    for (const key of allowedKeys) {
+      if (key in payload.notificationPreferences) {
+        sanitizedPrefs[key] = Boolean(payload.notificationPreferences[key]);
+      }
+    }
+
+    updateData.notificationPreferences = sanitizedPrefs;
+  }
+
   if (Object.keys(updateData).length === 0) {
     throw new Error("No valid fields provided for update");
   }
