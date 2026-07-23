@@ -11,6 +11,18 @@ const emergencyContactSchema = new Schema(
   { _id: false },
 );
 
+const notificationPreferencesSchema = new Schema(
+  {
+    labResultsReady: { type: Boolean, default: true },
+    consentRequests: { type: Boolean, default: true },
+    appointmentReminders: { type: Boolean, default: true },
+    emergencyModeAlerts: { type: Boolean, default: true },
+    medicationReminders: { type: Boolean, default: false },
+    accessAuditLog: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const userProfileSchema = new Schema(
   {
     accountId: {
@@ -123,6 +135,11 @@ const userProfileSchema = new Schema(
     emergencyContacts: {
       type: [emergencyContactSchema],
       default: [],
+    },
+
+    notificationPreferences: {
+      type: notificationPreferencesSchema,
+      default: () => ({}),
     },
   },
   {
