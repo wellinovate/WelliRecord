@@ -6,6 +6,7 @@ import {
   searchProvidersController,
   uploadVerificationDocumentController,
   getVerificationStatusController,
+  searchNearbyOrganizationsController,
 } from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
 import { protect } from "../auth/auth_middleware.js";
@@ -32,6 +33,7 @@ router.get("/memberships/doctors", protect, getDoctorsController);
 router.get("/patients/:patientId", protect, getPatientDetailController);
 
 router.get("/search", searchProvidersController);
+router.get("/nearby", searchNearbyOrganizationsController);
 
 router.post(
   "/patient/search",
