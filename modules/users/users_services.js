@@ -1,5 +1,6 @@
 import { generateUsername } from "../../shared/utils/generateUsername.js";
 import { UserProfile } from "./user_profile_model.js";
+import { Account } from "../accounts/account_model.js";
 import { performance } from "node:perf_hooks";
 
 import mongoose from "mongoose";
@@ -283,9 +284,11 @@ export async function getPatientAllergies(patientId, options) {
 
 export const getUserProfile = async (accountId) => {
   try {
+    const account = await Account.findById(accountId).select("email isVerified");
+
     const profile = await UserProfile.findOne({
       accountId: accountId,
-    }).populate("accountId", "email"); // optional
+    });
     // .lean();
     console.log("🚀 ~ getUserProfile ~ profile:", profile);
 
@@ -297,7 +300,10 @@ export const getUserProfile = async (accountId) => {
     }
 
     if (!profile) {
-      throw new Error("Profile not found");
+      return {
+        id: null,
+        isVerified: Boolean(account?.isVerified),
+      };
     }
 
     return {
@@ -315,6 +321,7 @@ export const getUserProfile = async (accountId) => {
       emergencyContacts: profile.emergencyContacts,
       notificationPreferences: profile.notificationPreferences,
       isLicensed: profile.isLicensed,
+      isVerified: Boolean(account?.isVerified),
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
     };
