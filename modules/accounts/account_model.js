@@ -22,6 +22,7 @@ const accountSchema = new Schema(
         "caregiver",
         "staff",
         "admin",
+        "provider_admin",
       ],
       required: function () {
         return this.accountType === "user";

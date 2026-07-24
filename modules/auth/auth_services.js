@@ -118,7 +118,7 @@ export const registerOrganizationAccount = async (payload) => {
     const account = await createAccount(
       {
         accountType: "organization",
-        role: null,
+        role: "provider_admin",
         email: payload.email,
         password: payload.password,
         phone: payload.phone,
