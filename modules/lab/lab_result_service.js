@@ -184,10 +184,15 @@ export const getAllPatientLabResultsService = async ({
 }) => {
   
   let organizationId;
-    const wrOrgId = authUser?.orgId || null;
+    const wrOrgId = authUser?.wrOrgId || null;
     const organization = await OrganizationProfile.findOne({
       wrOrgId: wrOrgId,
     });
+    if (!organization) {
+      const err = new Error("Organization not found for this account");
+      err.statusCode = 404;
+      throw err;
+    }
     organizationId = organization._id;
     const skip = (page - 1) * limit;
   
