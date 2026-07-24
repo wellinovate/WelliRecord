@@ -313,6 +313,7 @@ export const getUserProfile = async (accountId) => {
       dateOfBirth: profile.dateOfBirth,
       avatar: profile.logo, // rename here
       emergencyContacts: profile.emergencyContacts,
+      notificationPreferences: profile.notificationPreferences,
       isLicensed: profile.isLicensed,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
