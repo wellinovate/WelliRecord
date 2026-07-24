@@ -51,6 +51,23 @@ const organizationProfileSchema = new Schema(
       default: null,
     },
 
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number],
+        default: undefined,
+      },
+    },
+
+    geocodedAt: {
+      type: Date,
+      default: null,
+    },
+
     registrationNumber: {
       type: String,
       trim: true,
@@ -106,6 +123,7 @@ const organizationProfileSchema = new Schema(
 );
 
 organizationProfileSchema.index({ organizationName: "text" });
+organizationProfileSchema.index({ location: "2dsphere" });
 
 export const OrganizationProfile = mongoose.model(
   "OrganizationProfile",

@@ -2,6 +2,7 @@ import {
   registerNewPatientService,
   registerPatientService,
   searchProvidersService,
+  searchNearbyOrganizationsService,
 } from "./organizations_services.js";
 
 export const registerPatientController = async (req, res, next) => {
@@ -115,6 +116,24 @@ export const searchProvidersController = async (req, res, next) => {
       success: true,
       message: "Care directory fetched successfully",
       ...result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const searchNearbyOrganizationsController = async (req, res, next) => {
+  try {
+    const items = await searchNearbyOrganizationsService({
+      lat: req.query.lat,
+      lng: req.query.lng,
+      radiusKm: req.query.radiusKm,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Nearby registered facilities fetched successfully",
+      items,
     });
   } catch (error) {
     next(error);

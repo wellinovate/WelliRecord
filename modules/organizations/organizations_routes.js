@@ -1,7 +1,7 @@
 import express from "express";
 
 import multer from "multer";
-import { registerPatientController, searchProvidersController } from "./organizatons_controller.js";
+import { registerPatientController, searchProvidersController, searchNearbyOrganizationsController } from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
 import { protect } from "../auth/auth_middleware.js";
 import { addDoctorSchema, linkPatientSchema, searchPatientSchema, validate } from "./patient/patient_validator.js";
@@ -19,6 +19,7 @@ router.get("/memberships/doctors", protect, getDoctorsController);
 router.get("/patients/:patientId", protect, getPatientDetailController);
 
 router.get("/search", searchProvidersController);
+router.get("/nearby", searchNearbyOrganizationsController);
 
 router.post(
   "/patient/search",

@@ -2,9 +2,12 @@ import mongoose from "mongoose";
 import { PatientIdentity } from "./patient/patient_identity_model.js";
 import { OrganizationProfile } from "./organizations_model.js";
 import { PatientOrganization } from "./patient_organization_model.js";
+import { geocodeAddress } from "../../shared/utils/googleMaps.js";
 
 
 export const createOrganizationProfile = async (payload, session) => {
+  const location = await geocodeAddress(payload.officeAddress);
+
   const [profile] = await OrganizationProfile.create(
     [
       {
@@ -17,6 +20,7 @@ export const createOrganizationProfile = async (payload, session) => {
         licenseNumber: payload.licenseNumber || null,
         contactPersonName: payload.contactPersonName || null,
         contactPersonRole: payload.contactPersonRole || null,
+        ...(location && { location, geocodedAt: new Date() }),
       },
     ],
     { session }
@@ -171,6 +175,62 @@ export const registerNewPatientService = async ({
 
 
 
+
+export const searchNearbyOrganizationsService = async ({
+  lat,
+  lng,
+  radiusKm = 10,
+}) => {
+  const parsedLat = Number(lat);
+  const parsedLng = Number(lng);
+  const parsedRadiusKm = Math.max(0.5, Math.min(50, Number(radiusKm) || 10));
+
+  if (Number.isNaN(parsedLat) || Number.isNaN(parsedLng)) {
+    const err = new Error("Valid lat and lng are required");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const searchableTypes = [
+    "healthcare_provider",
+    "diagnostic",
+    "pharmacy",
+    "individaul_provider",
+  ];
+
+  const radiusMeters = parsedRadiusKm * 1000;
+
+  const items = await OrganizationProfile.find({
+    organizationType: { $in: searchableTypes },
+    isLicensed: true,
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [parsedLng, parsedLat],
+        },
+        $maxDistance: radiusMeters,
+      },
+    },
+  })
+    .limit(100)
+    .lean();
+
+  return items.map((item) => ({
+    _id: item._id,
+    organizationName: item.organizationName,
+    organizationType: item.organizationType,
+    officeAddress: item.officeAddress || null,
+    phone: item.phone || null,
+    wrOrgId: item.wrOrgId,
+    location: item.location
+      ? {
+          lat: item.location.coordinates[1],
+          lng: item.location.coordinates[0],
+        }
+      : null,
+  }));
+};
 
 const escapeRegex = (value = "") =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
