@@ -29,7 +29,7 @@ export const createEncounterService = async ({ payload, authUser }) => {
     });
       console.log("🚀 ~ createEncounterService ~ actor:", actor)
 
-    const wrOrgId = actor.wrOrgId || authUser?.orgId || null;
+    const wrOrgId = actor.wrOrgId || authUser?.wrOrgId || null;
     console.log("🚀 ~ createEncounterService ~ wrOrgId:", wrOrgId);
 
     const organization = await OrganizationProfile.findOne({
@@ -138,10 +138,15 @@ export const getPatientEncountersService = async ({
   let organizationId = authUser?.sub || null;
   const skip = (page - 1) * limit;
   if (actor.isOrganizationActor) {
-    const wrOrgId = actor.wrOrgId || authUser?.orgId || null;
+    const wrOrgId = actor.wrOrgId || authUser?.wrOrgId || null;
     const organization = await OrganizationProfile.findOne({
       wrOrgId: wrOrgId,
     }).lean();
+    if (!organization) {
+      const err = new Error("Organization not found for this account");
+      err.statusCode = 404;
+      throw err;
+    }
     organizationId = organization._id;
   }
 
