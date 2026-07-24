@@ -4,6 +4,62 @@ import {
   searchProvidersService,
   searchNearbyOrganizationsService,
 } from "./organizations_services.js";
+import {
+  uploadVerificationDocumentService,
+  getVerificationStatusService,
+} from "./verification_services.js";
+
+export const uploadVerificationDocumentController = async (req, res, next) => {
+  try {
+    const accountId = req.user?.sub;
+
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization context missing",
+      });
+    }
+
+    const profile = await uploadVerificationDocumentService({
+      accountId,
+      file: req.file,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Document submitted for review",
+      data: {
+        verificationStatus: profile.verificationStatus,
+        verificationDocumentName: profile.verificationDocumentName,
+        verificationDocumentUploadedAt: profile.verificationDocumentUploadedAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getVerificationStatusController = async (req, res, next) => {
+  try {
+    const accountId = req.user?.sub;
+
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization context missing",
+      });
+    }
+
+    const status = await getVerificationStatusService({ accountId });
+
+    return res.status(200).json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const registerPatientController = async (req, res, next) => {
   try {
@@ -15,7 +71,7 @@ export const registerPatientController = async (req, res, next) => {
       .filter(Boolean)
       .join(" ");
 
-    // 🔐 from auth middleware
+    // 🔑 from auth middleware
     const organizationId = req.user?.sub;
     console.log(
       "🚀 ~ registerPatientController ~ organizationId:",
@@ -99,9 +155,6 @@ export const registerNewPatientController = async (req, res, next) => {
     next(error);
   }
 };
-
-
-
 
 export const searchProvidersController = async (req, res, next) => {
   try {

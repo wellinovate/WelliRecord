@@ -440,7 +440,7 @@ export const updateUserProfileService = async ({ userId, payload }) => {
     });
   }
 
-if ("notificationPreferences" in payload) {
+  if ("notificationPreferences" in payload) {
     if (
       typeof payload.notificationPreferences !== "object" ||
       payload.notificationPreferences === null ||

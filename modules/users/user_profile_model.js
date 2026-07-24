@@ -136,7 +136,8 @@ const userProfileSchema = new Schema(
       type: [emergencyContactSchema],
       default: [],
     },
-notificationPreferences: {
+
+    notificationPreferences: {
       type: notificationPreferencesSchema,
       default: () => ({}),
     },
