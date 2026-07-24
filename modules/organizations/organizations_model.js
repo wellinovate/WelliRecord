@@ -55,11 +55,9 @@ const organizationProfileSchema = new Schema(
       type: {
         type: String,
         enum: ["Point"],
-        default: "Point",
       },
       coordinates: {
         type: [Number],
-        default: undefined,
       },
     },
 
@@ -123,7 +121,7 @@ const organizationProfileSchema = new Schema(
 );
 
 organizationProfileSchema.index({ organizationName: "text" });
-organizationProfileSchema.index({ location: "2dsphere" });
+organizationProfileSchema.index({ location: "2dsphere" }, { sparse: true });
 
 export const OrganizationProfile = mongoose.model(
   "OrganizationProfile",
