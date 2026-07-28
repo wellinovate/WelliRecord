@@ -76,18 +76,17 @@ export const signAccessToken = (results) => {
 };
 
 export const signAccessTokenGoogle = (user) => {
-  return jwt.sign(
-    {
-      // sub: user._id,
-      sub: user.accountId,
+  return signAccessToken({
+    account: {
+      _id: user.accountId,
+      id: user.accountId,
       email: user.email,
-      fullName: user.fullName || user.firstName || user.name || "",
-      accountType: "user",
-      role: user.role ?? null,
+      isVerified: true,
+      accountType: user.accountType || "user",
+      role: user.role || "patient",
     },
-    process.env.JWT_SECRET_KEY,
-    { expiresIn: "1d" },
-  );
+    profile: user,
+  });
 };
 
 export const normalizeEmail = (email) => {

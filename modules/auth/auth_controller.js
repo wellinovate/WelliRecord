@@ -1,5 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 import {
+  generateWelliRecordId,
   signAccessToken,
   signAccessTokenGoogle,
 } from "../../shared/utils/helper.js";
@@ -93,7 +94,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const googleLoginController = async (req, res) => {
   try {
-    const { credential, profileType } = req.body;
+    const { credential, profileType, phone, role } = req.body;
     let account;
     if (!credential) {
       console.log("🚀 ~ googleLoginController ~ credential:", credential);
@@ -136,46 +137,95 @@ export const googleLoginController = async (req, res) => {
       });
     }
 
-    let user = await UserProfile.findOne({
-      $or: [{ googleId: sub }, { email }],
-    });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!user) {
-      account = await Account.create({
-        accountType: "user",
-        role: payload.role || "patient",
-        email: email,
-        password: sub, // Use Google sub as a placeholder password (not used for authentication)
-        img: picture || "",
-        status: "active",
-        isVerified: false,
-        isActive: true,
-      });
-      user = await UserProfile.create({
-        accountId: account._id,
-        email,
-        googleId: sub,
-        firstName: given_name || name?.split(" ")[0] || "",
-        lastName: family_name || "",
-        fullName: name || "",
-        avatar: picture || "",
-        authProvider: "google",
-        profileType: profileType || "Personal",
-        accountType: "user",
-        isEmailVerified: true,
-      });
+    // Look for existing Account by normalized email first (prevents duplicate accounts)
+    account = await Account.findOne({ email: normalizedEmail });
+
+    let user;
+
+    if (account) {
+      // Find associated UserProfile
+      user = await UserProfile.findOne({ accountId: account._id });
+
+      if (!user) {
+        // If Account exists but UserProfile is missing, create UserProfile for this Account
+        user = await UserProfile.create({
+          accountId: account._id,
+          email: normalizedEmail,
+          googleId: sub,
+          firstName: given_name || name?.split(" ")[0] || "",
+          lastName: family_name || "",
+          fullName: name || "",
+          phone: phone || account.phone || null,
+          avatar: picture || "",
+          authProvider: "google",
+          profileType: profileType || "Personal",
+          accountType: account.accountType || "user",
+          isEmailVerified: true,
+        });
+      } else {
+        // Link Google ID and update verified status
+        if (!user.googleId) {
+          user.googleId = sub;
+        }
+        if (!user.authProvider) {
+          user.authProvider = "google";
+        }
+        user.isEmailVerified = true;
+        if (!user.email) {
+          user.email = normalizedEmail;
+        }
+        await user.save();
+      }
     } else {
-      if (!user.googleId) {
-        user.googleId = sub;
+      // Find UserProfile by googleId or normalized email if Account lookup by email didn't catch it
+      user = await UserProfile.findOne({
+        $or: [{ googleId: sub }, { email: normalizedEmail }],
+      });
+
+      if (user) {
+        account = await Account.findById(user.accountId);
       }
-      if (!user.authProvider) {
-        user.authProvider = "google";
+
+      if (!account || !user) {
+        account = await Account.create({
+          accountType: "user",
+          role: role || payload.role || "patient",
+          email: normalizedEmail,
+          password: sub, // Use Google sub as placeholder password
+          phone: phone || null,
+          img: picture || "",
+          status: "active",
+          isVerified: false,
+          isActive: true,
+        });
+
+        user = await UserProfile.create({
+          accountId: account._id,
+          email: normalizedEmail,
+          googleId: sub,
+          firstName: given_name || name?.split(" ")[0] || "",
+          lastName: family_name || "",
+          fullName: name || "",
+          phone: phone || null,
+          avatar: picture || "",
+          authProvider: "google",
+          profileType: profileType || "Personal",
+          accountType: "user",
+          isEmailVerified: true,
+        });
       }
-      user.isEmailVerified = true;
+    }
+
+    // Ensure wrId is populated on profile
+    if (!user.wrId) {
+      user.wrId = generateWelliRecordId();
       await user.save();
     }
 
-    const token = signAccessTokenGoogle(user);
+    // Sign standard access token with complete payload + issuer/audience
+    const token = signAccessToken({ account, profile: user });
 
     return res.status(200).json({
       success: true,
@@ -184,10 +234,12 @@ export const googleLoginController = async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
-        accountType: "user",
+        accountType: account.accountType || "user",
+        role: account.role || "patient",
         firstName: user.firstName,
         lastName: user.lastName,
         fullName: user.fullName,
+        wrId: user.wrId,
         avatar: user.avatar,
       },
     });
