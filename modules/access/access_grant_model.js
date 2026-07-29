@@ -27,9 +27,32 @@ const accessGrantSchema = new Schema(
 
     granteeType: {
       type: String,
-      enum: ["provider", "organization", "caregiver", "payer", "other"],
+      enum: ["provider", "organization", "caregiver", "payer", "other", "link"],
       required: true,
       index: true,
+    },
+
+    // Only present for granteeType "link" — the WelliBridge share link/QR
+    // flow. Lets a provider with no WelliRecord account view a scoped,
+    // time-limited slice of the patient's record without logging in.
+    shareToken: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
+    // If true, the link becomes unusable after its first successful view
+    // rather than staying valid until expiresAt.
+    oneTimeUse: {
+      type: Boolean,
+      default: false,
+    },
+
+    usedAt: {
+      type: Date,
+      default: null,
     },
 
     granteeUserId: {
@@ -196,6 +219,10 @@ accessGrantSchema.pre("validate", function () {
 
   if (this.granteeType === "organization" && !this.granteeOrganizationId) {
     throw new Error("granteeOrganizationId is required for organization grants");
+  }
+
+  if (this.granteeType === "link" && !this.shareToken) {
+    throw new Error("shareToken is required for link grants");
   }
 
   if (this.accessScope === "category" && !this.category) {
