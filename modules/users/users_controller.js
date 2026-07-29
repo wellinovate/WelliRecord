@@ -1,6 +1,8 @@
 import redisClient from "../../shared/config/redis.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import * as medicalHistoryService from "./users_services.js";
+import { Account } from "../accounts/account_model.js";
+import { signAccessToken } from "../../shared/utils/helper.js";
 
 function getPagination(query) {
   const page = Math.max(Number(query.page) || 1, 1);
@@ -322,10 +324,30 @@ export const updateUserProfileController = async (req, res) => {
     // Clear stale cache
     // await redisClient.del(`user:profile:${userId}`);
 
+    // The access token embeds fullName at login time (signAccessToken in
+    // shared/utils/helper.js) and is valid for 1 day. Without reissuing it
+    // here, a patient who edits their name keeps getting the OLD fullName
+    // decoded straight off the token on every subsequent page load — the
+    // frontend's fetchProfile-on-mount correction (AuthProvider.tsx) can
+    // paper over this in memory, but only after a race it isn't guaranteed
+    // to win, and only until the next reload restarts the same race. Since
+    // this endpoint already has both the account and the fresh profile in
+    // hand, sign a new token here so the client always has a token that
+    // matches what's actually in the database.
+    const account = await Account.findById(userId).select(
+      "email isVerified accountType role",
+    );
+
+    let accessToken = null;
+    if (account) {
+      accessToken = signAccessToken({ account, profile: updatedProfile });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
       data: updatedProfile,
+      accessToken,
     });
   } catch (error) {
     console.error("updateUserProfileController error:", error);
