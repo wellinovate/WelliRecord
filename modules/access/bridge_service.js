@@ -3,6 +3,9 @@ import { accessGrantModel } from "./access_grant_model.js";
 import { buildClinicalAccessFilter } from "./access_grant_service.js";
 import { allergyModel } from "../allergies/allergies_model.js";
 import { medicationModel } from "../medications/medications_model.js";
+import { labResultModel } from "../lab/lab_model.js";
+import { diagnosisModel } from "../diagnoses/diagnoses_model.js";
+import { vitalModel } from "../vitals/vitals_model.js";
 
 /**
  * Generates a URL-safe share token. Not a JWT — this is an opaque,
@@ -146,40 +149,67 @@ export const markBridgeLinkUsed = async (grantId) => {
 
 /**
  * Fetches the actual clinical data bundle for a resolved bridge grant.
- * Scoped to allergies + current medications for now — the two categories
- * that matter for the founding "allergy wasn't there" scenario this
- * whole feature exists to prevent. Additional categories (labs,
- * immunizations, diagnoses, vitals) can be added the same way, following
- * the exact pattern already used in access_grant_controller.js's
- * getPatientVitalsForProvider, which this deliberately mirrors.
+ * Covers the five categories exposed in the WelliBridge share-scope UI
+ * (SCOPE_OPTIONS in DataSovereigntyCenterPage.tsx): allergies,
+ * medications, lab-results, vitals, diagnoses. Immunizations and
+ * procedures are not offered as share scopes yet, so they're left out
+ * until that UI option exists — following the same
+ * only-build-what's-live rule the rest of the product follows.
  *
  * Note: `filter` already includes recordStatus handling via
- * buildClinicalAccessFilter (recordStatus is a real field on both
+ * buildClinicalAccessFilter (recordStatus is a real field on all five
  * models, inherited from the shared clinicalMetadataFields plugin in
  * shared/database/clinical_metadata.js — verified directly, not
- * assumed). clinicalStatus is allergy-specific and additional to that.
+ * assumed). clinicalStatus is additional to that and only applies to
+ * allergies and diagnoses.
  */
 export const getBridgeRecordBundle = async ({ grant, filter }) => {
-  const wantsAllergies =
-    grant.accessScope !== "category" || grant.category === "allergies";
-  const wantsMedications =
-    grant.accessScope !== "category" || grant.category === "medications";
+  const wantsCategory = (category) =>
+    grant.accessScope !== "category" || grant.category === category;
 
-  const [allergies, medications] = await Promise.all([
-    wantsAllergies
-      ? allergyModel
-          .find({ ...filter, clinicalStatus: "active" })
-          .sort({ createdAt: -1 })
-          .lean()
-      : Promise.resolve([]),
+  const wantsAllergies = wantsCategory("allergies");
+  const wantsMedications = wantsCategory("medications");
+  const wantsLabResults = wantsCategory("lab-results");
+  const wantsDiagnoses = wantsCategory("diagnoses");
+  const wantsVitals = wantsCategory("vitals");
 
-    wantsMedications
-      ? medicationModel
-          .find(filter)
-          .sort({ createdAt: -1 })
-          .lean()
-      : Promise.resolve([]),
-  ]);
+  const [allergies, medications, labResults, diagnoses, vitals] =
+    await Promise.all([
+      wantsAllergies
+        ? allergyModel
+            .find({ ...filter, clinicalStatus: "active" })
+            .sort({ createdAt: -1 })
+            .lean()
+        : Promise.resolve([]),
 
-  return { allergies, medications };
+      wantsMedications
+        ? medicationModel
+            .find(filter)
+            .sort({ createdAt: -1 })
+            .lean()
+        : Promise.resolve([]),
+
+      wantsLabResults
+        ? labResultModel
+            .find(filter)
+            .sort({ resultedAt: -1 })
+            .lean()
+        : Promise.resolve([]),
+
+      wantsDiagnoses
+        ? diagnosisModel
+            .find({ ...filter, clinicalStatus: "active" })
+            .sort({ diagnosedAt: -1 })
+            .lean()
+        : Promise.resolve([]),
+
+      wantsVitals
+        ? vitalModel
+            .find(filter)
+            .sort({ measuredAt: -1 })
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+  return { allergies, medications, labResults, diagnoses, vitals };
 };

@@ -114,6 +114,9 @@ export const getSharedRecordController = async (req, res, next) => {
         oneTimeUse: grant.oneTimeUse,
         allergies: bundle.allergies,
         medications: bundle.medications,
+        labResults: bundle.labResults,
+        diagnoses: bundle.diagnoses,
+        vitals: bundle.vitals,
       },
     });
   } catch (error) {
