@@ -137,6 +137,20 @@ const userProfileSchema = new Schema(
       default: [],
     },
 
+    // Self-reported during onboarding wizard. Not treated as clinically
+    // verified — lab results are the authoritative source when they exist.
+    bloodGroup: {
+      type: String,
+      enum: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-", "Unknown", null],
+      default: null,
+    },
+
+    genotype: {
+      type: String,
+      enum: ["AA", "AS", "AC", "SS", "SC", "Unknown", null],
+      default: null,
+    },
+
     notificationPreferences: {
       type: notificationPreferencesSchema,
       default: () => ({}),
