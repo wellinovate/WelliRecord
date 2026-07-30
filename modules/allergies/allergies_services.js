@@ -41,7 +41,7 @@ export const createAllergyService = async ({ payload, authUser }) => {
     const docs = await allergyModel.create(
       [
         {
-          patientId: payload.patientId,
+          patientId: patientIds,
           recordedBy,
           providerId: recordedBy,
           organizationId,
