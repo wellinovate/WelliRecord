@@ -583,7 +583,8 @@ export const uploadAvatarService = async ({ accountId, file }) => {
       },
     );
     uploadStream.end(file.buffer);
-  }).catch(() => {
+  }).catch((cloudinaryError) => {
+    console.error("🚀 ~ uploadAvatarService ~ Cloudinary upload failed:", cloudinaryError);
     const error = new Error("Failed to upload image. Please try again.");
     error.statusCode = 502;
     throw error;
