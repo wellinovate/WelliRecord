@@ -2,6 +2,7 @@ import { generateUsername } from "../../shared/utils/generateUsername.js";
 import { UserProfile } from "./user_profile_model.js";
 import { Account } from "../accounts/account_model.js";
 import { performance } from "node:perf_hooks";
+import cloudinary from "../../shared/config/cloudinary.js";
 
 import mongoose from "mongoose";
 
@@ -317,7 +318,7 @@ export const getUserProfile = async (accountId) => {
       phone: profile.phone,
       gender: profile.gender,
       dateOfBirth: profile.dateOfBirth,
-      avatar: profile.logo, // rename here
+      avatar: profile.avatar,
       emergencyContacts: profile.emergencyContacts,
       notificationPreferences: profile.notificationPreferences,
       bloodGroup: profile.bloodGroup,
@@ -534,4 +535,62 @@ export const updateUserProfileService = async ({ userId, payload }) => {
   ).lean();
 
   return updatedProfile;
+};
+
+const ALLOWED_AVATAR_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+// Uploads a patient's profile photo to Cloudinary and stores the resulting
+// URL on their profile. Mirrors the pattern already used for organization
+// verification document uploads (see verification_services.js).
+export const uploadAvatarService = async ({ accountId, file }) => {
+  if (!file) {
+    const error = new Error("No image was uploaded");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!ALLOWED_AVATAR_MIME_TYPES.includes(file.mimetype)) {
+    const error = new Error("Only JPG, PNG, and WEBP images are accepted");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (file.size > MAX_AVATAR_SIZE_BYTES) {
+    const error = new Error("Image must be under 5MB");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const profile = await UserProfile.findOne({ accountId });
+
+  if (!profile) {
+    const error = new Error("Profile not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const uploadResult = await new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "wellirecord/patient-avatars",
+        resource_type: "image",
+        public_id: `${accountId}_${Date.now()}`,
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      },
+    );
+    uploadStream.end(file.buffer);
+  }).catch(() => {
+    const error = new Error("Failed to upload image. Please try again.");
+    error.statusCode = 502;
+    throw error;
+  });
+
+  profile.avatar = uploadResult.secure_url;
+  await profile.save();
+
+  return profile;
 };

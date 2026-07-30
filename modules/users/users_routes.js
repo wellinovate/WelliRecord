@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import { protect } from "../auth/auth_middleware.js";
 import { getMyVitalsController } from "../vitals/vital_controller.js";
 import * as medicalHistoryController from "./users_controller.js";
@@ -11,6 +12,8 @@ import { getMyImmunizationsController } from "../immunizations/immunization_cont
 import { getMyProceduresController } from "../procedure/procedure_controller.js";
 
 const router = express.Router();
+
+const avatarUpload = multer({ storage: multer.memoryStorage() });
 
 
 
@@ -37,6 +40,12 @@ router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailContro
 
 router.get("/me", protect, medicalHistoryController.fetchUserProfile);
 router.put("/update/profile", protect, medicalHistoryController.updateUserProfileController);
+router.post(
+  "/avatar",
+  protect,
+  avatarUpload.single("avatar"),
+  medicalHistoryController.uploadAvatarController,
+);
 
 router.get(
   "/patients/:patientId/medical-history/vitals",
