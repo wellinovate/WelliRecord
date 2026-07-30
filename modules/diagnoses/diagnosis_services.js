@@ -51,7 +51,7 @@ export const createDiagnosisService = async ({ payload, authUser }) => {
     const docs = await diagnosisModel.create(
       [
         {
-          patientId: payload.patientId,
+          patientId,
           recordedBy,
           providerId: recordedBy,
           organizationId,
