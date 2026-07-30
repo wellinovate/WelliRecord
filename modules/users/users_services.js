@@ -463,6 +463,31 @@ export const updateUserProfileService = async ({ userId, payload }) => {
     updateData.genotype = payload.genotype || null;
   }
 
+  if ("confirmedNone" in payload) {
+    if (
+      typeof payload.confirmedNone !== "object" ||
+      payload.confirmedNone === null ||
+      Array.isArray(payload.confirmedNone)
+    ) {
+      throw new Error("confirmedNone must be an object");
+    }
+
+    const allowedKeys = ["allergies", "medications", "diagnoses"];
+
+    const existingConfirmedNone = profile.confirmedNone?.toObject
+      ? profile.confirmedNone.toObject()
+      : profile.confirmedNone || {};
+
+    const sanitizedConfirmedNone = { ...existingConfirmedNone };
+    for (const key of allowedKeys) {
+      if (key in payload.confirmedNone) {
+        sanitizedConfirmedNone[key] = Boolean(payload.confirmedNone[key]);
+      }
+    }
+
+    updateData.confirmedNone = sanitizedConfirmedNone;
+  }
+
   if ("notificationPreferences" in payload) {
     if (
       typeof payload.notificationPreferences !== "object" ||

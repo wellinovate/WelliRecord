@@ -151,6 +151,17 @@ const userProfileSchema = new Schema(
       default: null,
     },
 
+    // Tracks explicit "I have none of these" answers from the medical
+    // profile checklist (see MedicalProfileWizard). This is onboarding
+    // metadata, not a clinical claim — it exists only so the completion
+    // score can distinguish "confirmed none" from "not asked yet"
+    // without creating fake allergy/medication/diagnosis records.
+    confirmedNone: {
+      allergies: { type: Boolean, default: false },
+      medications: { type: Boolean, default: false },
+      diagnoses: { type: Boolean, default: false },
+    },
+
     notificationPreferences: {
       type: notificationPreferencesSchema,
       default: () => ({}),
