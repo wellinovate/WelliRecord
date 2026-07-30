@@ -371,3 +371,34 @@ export const updateUserProfileController = async (req, res) => {
     });
   }
 };
+
+export const uploadAvatarController = async (req, res) => {
+  try {
+    const accountId = req.user?.sub;
+
+    if (!accountId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const profile = await medicalHistoryService.uploadAvatarService({
+      accountId,
+      file: req.file,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Avatar updated successfully",
+      data: profile,
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+
+    return res.status(statusCode).json({
+      success: false,
+      message: statusCode === 500 ? "Failed to upload avatar" : error.message,
+    });
+  }
+};
