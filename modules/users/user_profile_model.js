@@ -137,6 +137,31 @@ const userProfileSchema = new Schema(
       default: [],
     },
 
+    // Self-reported during onboarding wizard. Not treated as clinically
+    // verified — lab results are the authoritative source when they exist.
+    bloodGroup: {
+      type: String,
+      enum: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-", "Unknown", null],
+      default: null,
+    },
+
+    genotype: {
+      type: String,
+      enum: ["AA", "AS", "AC", "SS", "SC", "Unknown", null],
+      default: null,
+    },
+
+    // Tracks explicit "I have none of these" answers from the medical
+    // profile checklist (see MedicalProfileWizard). This is onboarding
+    // metadata, not a clinical claim — it exists only so the completion
+    // score can distinguish "confirmed none" from "not asked yet"
+    // without creating fake allergy/medication/diagnosis records.
+    confirmedNone: {
+      allergies: { type: Boolean, default: false },
+      medications: { type: Boolean, default: false },
+      diagnoses: { type: Boolean, default: false },
+    },
+
     notificationPreferences: {
       type: notificationPreferencesSchema,
       default: () => ({}),
