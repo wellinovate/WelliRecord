@@ -320,6 +320,9 @@ export const getUserProfile = async (accountId) => {
       avatar: profile.logo, // rename here
       emergencyContacts: profile.emergencyContacts,
       notificationPreferences: profile.notificationPreferences,
+      bloodGroup: profile.bloodGroup,
+      genotype: profile.genotype,
+      confirmedNone: profile.confirmedNone,
       isLicensed: profile.isLicensed,
       isVerified: Boolean(account?.isVerified),
       createdAt: profile.createdAt,
