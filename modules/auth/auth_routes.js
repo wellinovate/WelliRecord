@@ -19,6 +19,7 @@ router.post("/login/verify-code", login);
 router.post("/resend-verify-code", resendLoginOtpController);
 router.post("/google/login", googleLoginController);
 router.get("/verify-email", verifyEmailLimiter, verifyEmailController);
+router.post("/verify-email", verifyEmailLimiter, verifyEmailController);
 router.post(
   "/resend-verification-email",
   resendVerificationLimiter,

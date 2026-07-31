@@ -288,7 +288,7 @@ export const googleLoginController = async (req, res) => {
 
 export const verifyEmailController = async (req, res, next) => {
   try {
-    const { token } = req.query;
+    const token = req.query.token || req.body?.token;
 
     const result = await verifyEmailService(token);
 
