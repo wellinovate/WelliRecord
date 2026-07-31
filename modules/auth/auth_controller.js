@@ -9,12 +9,14 @@ import {
   registerAccount,
   resendLoginOtpService,
   resendVerificationEmailService,
+  startGoogleLoginOtp,
   verifyEmailService,
   verifyLoginCodeService,
 } from "./auth_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createAccount } from "../accounts/account_service.js";
 import { Account } from "../accounts/account_model.js";
+import { AppError } from "../../shared/errors/AppError.js";
 
 export const register = async (req, res, next) => {
   try {
@@ -233,6 +235,27 @@ export const googleLoginController = async (req, res) => {
       await user.save();
     }
 
+    // Whether Google sign-in requires an SMS OTP step depends on whether
+    // this account has a phone number, not on whether it's new. Accounts
+    // created via the signup page already collected a phone before this
+    // request and go through OTP immediately, same as an existing account
+    // logging back in. Accounts created via the login page have no phone
+    // yet (never collected there), so they skip OTP this one time and are
+    // routed to onboarding by the frontend to add one — every login after
+    // that has a phone on file and goes through OTP normally.
+    if (account.phone) {
+      const otpResult = await startGoogleLoginOtp(account);
+
+      return res.status(200).json({
+        success: true,
+        message: otpResult.message,
+        requiresOtp: true,
+        challengeToken: otpResult.challengeToken,
+        maskedPhone: otpResult.maskedPhone,
+        isNewAccount,
+      });
+    }
+
     // Sign standard access token with complete payload + issuer/audience
     const token = signAccessToken({ account, profile: user });
 
@@ -251,11 +274,12 @@ export const googleLoginController = async (req, res) => {
         wrId: user.wrId,
         avatar: user.avatar,
         isNewAccount,
+        hasPhone: Boolean(account.phone),
       },
     });
   } catch (error) {
     console.log("🚀 ~ googleLoginController ~ error:", error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Google login failed",
     });
