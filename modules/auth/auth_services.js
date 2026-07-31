@@ -337,6 +337,13 @@ export const loginAccount = async ({ email, password }) => {
   if (!account.isActive || account.status !== "active") {
     throw new AppError("Account is not active", 403, "ACCOUNT_INACTIVE");
   }
+  if (!account.isVerified) {
+    throw new AppError(
+      "Please verify your email before logging in. Check your inbox for the verification link.",
+      403,
+      "EMAIL_NOT_VERIFIED",
+    );
+  }
 
   const isMatch = await account.comparePassword(password);
 
