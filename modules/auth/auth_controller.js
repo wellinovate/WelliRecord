@@ -143,6 +143,13 @@ export const googleLoginController = async (req, res) => {
     account = await Account.findOne({ email: normalizedEmail });
 
     let user;
+    // Tracks whether this request just created the Account (true first-time
+    // Google sign-in) vs an existing account logging back in. The frontend
+    // uses this to decide whether to send the user through onboarding
+    // (phone number, profile completion) instead of straight to the
+    // dashboard. Recovering a missing UserProfile for an existing Account
+    // does not count as new — that account already completed signup once.
+    let isNewAccount = false;
 
     if (account) {
       // Find associated UserProfile
@@ -189,6 +196,8 @@ export const googleLoginController = async (req, res) => {
       }
 
       if (!account || !user) {
+        isNewAccount = true;
+
         account = await Account.create({
           accountType: "user",
           role: role || payload.role || "patient",
@@ -241,6 +250,7 @@ export const googleLoginController = async (req, res) => {
         fullName: user.fullName,
         wrId: user.wrId,
         avatar: user.avatar,
+        isNewAccount,
       },
     });
   } catch (error) {
