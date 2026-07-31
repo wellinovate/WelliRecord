@@ -407,6 +407,69 @@ export const loginAccount = async ({ email, password }) => {
   };
 };
 
+// Sends an SMS login code to an existing account's phone on file, reusing
+// the same Termii OTP + LoginOtpChallenge mechanism password login already
+// uses. Used by Google sign-in for accounts that already existed before
+// this request (new accounts have no phone yet and skip straight to
+// onboarding instead — see googleLoginController).
+export const startGoogleLoginOtp = async (account) => {
+  const phone = account.phone;
+
+  if (!phone) {
+    throw new AppError(
+      "No phone number is attached to this account. Please contact support.",
+      400,
+      "PHONE_NOT_FOUND",
+    );
+  }
+
+  let otp;
+
+  try {
+    otp = await sendLoginOtp({ phoneNumber: phone });
+  } catch (error) {
+    if (error.message === "SMS_PROVIDER_INSUFFICIENT_BALANCE") {
+      throw new AppError(
+        "Login code could not be sent right now. Please contact support.",
+        503,
+        "OTP_PROVIDER_UNAVAILABLE",
+      );
+    }
+
+    if (error.message === "INVALID_PHONE_NUMBER") {
+      throw new AppError(
+        "Invalid phone number attached to this account. Please contact support.",
+        400,
+        "INVALID_ACCOUNT_PHONE",
+      );
+    }
+
+    throw new AppError(
+      "Unable to send login code. Please try again.",
+      502,
+      "OTP_SEND_FAILED",
+    );
+  }
+
+  const challengeToken = generateLoginChallengeToken();
+  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
+
+  await LoginOtpChallenge.create({
+    accountId: account._id,
+    challengeTokenHash,
+    termiiPinId: otp.pinId,
+    phone,
+    expiresAt: getLoginOtpExpiry(),
+  });
+
+  return {
+    requiresOtp: true,
+    challengeToken,
+    maskedPhone: maskPhone(phone),
+    message: "Login code sent successfully.",
+  };
+};
+
 export const verifyLoginCodeService = async ({ challengeToken, code }) => {
   const totalStart = performance.now();
 
