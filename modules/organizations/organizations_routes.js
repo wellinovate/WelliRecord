@@ -6,6 +6,7 @@ import {
   searchProvidersController,
   uploadVerificationDocumentController,
   getVerificationStatusController,
+  getMyOrganizationController,
   searchNearbyOrganizationsController,
 } from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
@@ -26,6 +27,7 @@ router.post(
   uploadVerificationDocumentController,
 );
 router.get("/verify-org/status", protect, getVerificationStatusController);
+router.get("/me", protect, getMyOrganizationController);
 
 router.post("/register-patient", protect, registerPatientController);
 router.get("/patients", protect, getPatientsController);

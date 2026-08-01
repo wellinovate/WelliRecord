@@ -7,6 +7,7 @@ import {
 import {
   uploadVerificationDocumentService,
   getVerificationStatusService,
+  getMyOrganizationService,
 } from "./verification_services.js";
 
 export const uploadVerificationDocumentController = async (req, res, next) => {
@@ -187,6 +188,28 @@ export const searchNearbyOrganizationsController = async (req, res, next) => {
       success: true,
       message: "Nearby registered facilities fetched successfully",
       items,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyOrganizationController = async (req, res, next) => {
+  try {
+    const accountId = req.user?.sub;
+
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization context missing",
+      });
+    }
+
+    const organization = await getMyOrganizationService({ accountId });
+
+    return res.status(200).json({
+      success: true,
+      data: organization,
     });
   } catch (error) {
     next(error);
