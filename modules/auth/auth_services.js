@@ -100,11 +100,15 @@ export const registerUserAccount = async (payload) => {
       session,
     );
 
-    await sendVerificationEmail({
-      email: payload.email,
-      fullName: payload.fullName,
-      token: rawToken,
-    });
+    try {
+      await sendVerificationEmail({
+        email: payload.email,
+        fullName: payload.fullName,
+        token: rawToken,
+      });
+    } catch (err) {
+      console.error("Signup succeeded but verification email failed to send:", err);
+    }
 
     return {
       account: account.toSafeObject
@@ -173,11 +177,15 @@ export const registerOrganizationAccount = async (payload) => {
       session,
     );
 
-    await sendVerificationEmail({
-      email: payload.email,
-      fullName: payload.fullName,
-      token: rawToken,
-    });
+    try {
+      await sendVerificationEmail({
+        email: payload.email,
+        fullName: payload.fullName,
+        token: rawToken,
+      });
+    } catch (err) {
+      console.error("Signup succeeded but verification email failed to send:", err);
+    }
 
     return {
       account: account.toSafeObject
