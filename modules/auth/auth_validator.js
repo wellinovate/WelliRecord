@@ -14,7 +14,14 @@ const personalRegisterSchema = z.object({
     .email("Valid email is required")
     .transform((val) => val.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  phone: z.string().trim().min(7, "Phone number must be at least 7 digits"),
+  phone: z
+    .string()
+    .trim()
+    .transform((val) => val.replace(/[\s-]/g, ""))
+    .refine(
+      (val) => /^(0[789][01]\d{8}|\+?234[789][01]\d{8})$/.test(val),
+      "Enter a valid Nigerian phone number (e.g. 08012345678)",
+    ),
   gender: z.string().trim().min(2, "Gender is required"),
   address: optionalString,
   role: z.string().optional(),
@@ -44,7 +51,14 @@ const organizationRegisterSchema = z.object({
     .email("Valid email is required")
     .transform((val) => val.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  phone: z.string().trim().min(7, "Phone number must be at least 7 digits"),
+  phone: z
+    .string()
+    .trim()
+    .transform((val) => val.replace(/[\s-]/g, ""))
+    .refine(
+      (val) => /^(0[789][01]\d{8}|\+?234[789][01]\d{8})$/.test(val),
+      "Enter a valid Nigerian phone number (e.g. 08012345678)",
+    ),
   country: z.string().trim().min(2, "Country is required"),
   state: z.string().trim().min(2, "State is required"),
   city: z.string().trim().min(2, "City is required"),

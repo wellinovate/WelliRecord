@@ -51,6 +51,8 @@ const accountSchema = new Schema(
       type: String,
       trim: true,
       default: null,
+      unique: true,
+      sparse: true,
     },
 
     img: {
