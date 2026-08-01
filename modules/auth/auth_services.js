@@ -15,6 +15,7 @@ import { Account } from "../accounts/account_model.js";
 import {
   createAccount,
   findAccountByEmail,
+  findAccountByPhone,
 } from "../accounts/account_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { createOrganizationProfile } from "../organizations/organizations_services.js";
@@ -48,6 +49,17 @@ export const registerUserAccount = async (payload) => {
 
     if (existing) {
       throw new AppError("Email already exists", 409, "EMAIL_ALREADY_EXISTS");
+    }
+
+    if (payload.phone) {
+      const existingPhone = await findAccountByPhone(payload.phone, session);
+      if (existingPhone) {
+        throw new AppError(
+          "This phone number is already registered to another account",
+          409,
+          "PHONE_ALREADY_EXISTS",
+        );
+      }
     }
 
     const rawToken = generateEmailVerificationToken();
@@ -109,6 +121,17 @@ export const registerOrganizationAccount = async (payload) => {
 
     if (existing) {
       throw new AppError("Email already exists", 409, "EMAIL_ALREADY_EXISTS");
+    }
+
+    if (payload.phone) {
+      const existingPhone = await findAccountByPhone(payload.phone, session);
+      if (existingPhone) {
+        throw new AppError(
+          "This phone number is already registered to another account",
+          409,
+          "PHONE_ALREADY_EXISTS",
+        );
+      }
     }
 
     const rawToken = generateEmailVerificationToken();

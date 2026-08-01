@@ -1,8 +1,16 @@
+
 import { Account } from "./account_model.js";
 
 export const findAccountByEmail = async (email, session = null) => {
   const normalizedEmail = email.trim().toLowerCase();
   const query = Account.findOne({ email: normalizedEmail });
+  if (session) query.session(session);
+  return query;
+};
+
+export const findAccountByPhone = async (phone, session = null) => {
+  const normalizedPhone = phone.trim().replace(/[\s-]/g, "");
+  const query = Account.findOne({ phone: normalizedPhone });
   if (session) query.session(session);
   return query;
 };
