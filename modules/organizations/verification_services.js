@@ -87,3 +87,17 @@ export const getVerificationStatusService = async ({ accountId }) => {
 
   return profile;
 };
+
+export const getMyOrganizationService = async ({ accountId }) => {
+  const profile = await OrganizationProfile.findOne({ accountId }).lean();
+
+  if (!profile) {
+    throw new AppError(
+      "Organization profile not found",
+      404,
+      "ORGANIZATION_PROFILE_NOT_FOUND",
+    );
+  }
+
+  return profile;
+};
