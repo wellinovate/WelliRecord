@@ -8,8 +8,26 @@ const objectIdSchema = z
     message: "Invalid ObjectId",
   });
 
+// Patients never see a raw ObjectId anywhere in the product — the only
+// identifier shown to them is the WR-XXXX-XXXX format (wrId / wrOrgId).
+// This form asks for "the provider or organization's ID," so it has to
+// accept the format that's actually printed on their card, not just the
+// internal database key. The service layer resolves whichever one was
+// sent — see resolveGranteeId in access_grant_service.js.
+const granteeIdSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => mongoose.Types.ObjectId.isValid(value) || /^WR-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(value),
+    { message: "Invalid ID — enter a WelliRecord ID (e.g. WR-1234-ABCD)" },
+  );
+
 const nullableObjectIdSchema = z
   .union([objectIdSchema, z.null()])
+  .optional();
+
+const nullableGranteeIdSchema = z
+  .union([granteeIdSchema, z.null()])
   .optional();
 
 const nullableStringSchema = z
@@ -30,9 +48,9 @@ export const createAccessGrantSchema = z
       .enum(["provider", "organization", "caregiver", "payer", "other"])
       .default("provider"),
 
-    granteeUserId: nullableObjectIdSchema,
+    granteeUserId: nullableGranteeIdSchema,
 
-    granteeOrganizationId: nullableObjectIdSchema,
+    granteeOrganizationId: nullableGranteeIdSchema,
 
     accessScope: z.enum([
       "single-record",
@@ -51,6 +69,7 @@ export const createAccessGrantSchema = z
         "lab-results",
         "procedures",
         "immunizations",
+        "vision",
       ])
       .nullable()
       .optional(),

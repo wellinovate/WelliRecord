@@ -86,6 +86,7 @@ const accessGrantSchema = new Schema(
         "lab-results",
         "procedures",
         "immunizations",
+        "vision",
       ],
       default: null,
       index: true,

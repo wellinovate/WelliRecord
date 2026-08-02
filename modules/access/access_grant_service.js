@@ -2,21 +2,21 @@ import mongoose from "mongoose";
 import { accessGrantModel } from "./access_grant_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 
+// Builds the right Mongo query for whichever ID format was submitted.
+// Patients only ever see the WR-XXXX-XXXX form (wrOrgId), so that has
+// to resolve just as reliably as a raw ObjectId typed by an internal
+// tool or copied from an API response.
+const buildIdLookup = (value) =>
+  mongoose.Types.ObjectId.isValid(value) ? { _id: value } : { wrOrgId: value };
+
 const validateGranteeExists = async ({
   granteeType,
   granteeUserId,
   granteeOrganizationId,
 }) => {
   if (granteeType === "provider") {
-    if (!mongoose.Types.ObjectId.isValid(granteeUserId)) {
-      const error = new Error("Invalid provider user ID.");
-      console.log("🚀 ~ validateGranteeExists ~ error:", error)
-      error.statusCode = 400;
-      throw error;
-    }
-
     const provider = await OrganizationProfile.findOne({
-      _id: granteeUserId,
+      ...buildIdLookup(granteeUserId),
       organizationType: "individaul_provider",
     });
 
@@ -31,15 +31,8 @@ const validateGranteeExists = async ({
   }
 
   if (granteeType === "organization") {
-    if (!mongoose.Types.ObjectId.isValid(granteeOrganizationId)) {
-      const error = new Error("Invalid organization ID.");
-      console.log("🚀 ~ validateGranteeExists ~ error:", error)
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const organization = await OrganizationProfile.findById(
-      granteeOrganizationId,
+    const organization = await OrganizationProfile.findOne(
+      buildIdLookup(granteeOrganizationId),
     );
 
     if (!organization) {
@@ -85,7 +78,7 @@ export const grantPatientAccess = async ({
   const now = new Date();
 
   try {
-    await validateGranteeExists({
+    const grantee = await validateGranteeExists({
       granteeType,
       granteeUserId,
       granteeOrganizationId,
@@ -112,10 +105,13 @@ export const grantPatientAccess = async ({
 
       granteeType,
 
-      granteeUserId: granteeType === "provider" ? granteeUserId : null,
+      // Always the resolved document's real _id — never the raw string
+      // the caller sent. That string might have been a wrOrgId, which
+      // is not a valid value to store on a ref field.
+      granteeUserId: granteeType === "provider" ? grantee._id : null,
 
       granteeOrganizationId:
-        granteeType === "organization" ? granteeOrganizationId : null,
+        granteeType === "organization" ? grantee._id : null,
 
       accessScope,
       category,
