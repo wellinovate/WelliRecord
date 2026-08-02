@@ -4,6 +4,7 @@ import { protect, requireRole } from "../auth/auth_middleware.js";
 import {
   createVisionVisitController,
   getVisionRecordController,
+  getAllPatientVisionController,
 } from "./vision_record_controller.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -19,6 +20,11 @@ router.post(
   upload.array("photos", 6),
   createVisionVisitController,
 );
+
+// Org-wide list for the standalone provider Vision page. Placed before
+// "/:patientId" — otherwise Express would match "patients" as a
+// patientId value and this route would never be reached.
+router.get("/patients", protect, requireRole("provider"), getAllPatientVisionController);
 
 // Read: any authenticated account that already has access to this
 // patient's record (the patient themselves, or a provider with a

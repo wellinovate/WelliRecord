@@ -23,6 +23,16 @@ const visionVisitSchema = new Schema(
     providerId: { type: Schema.Types.ObjectId, ref: "Account", required: true },
     providerName: { type: String, required: true, trim: true },
 
+    // Set at write time from the acting provider's organization (see
+    // vision_record_service.js). Lets the org-wide provider list query
+    // filter visits the same way getAllPatientMedicationsService does —
+    // null only for visits entered before this field existed.
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "OrganizationProfile",
+      default: null,
+    },
+
     acuity: {
       distance: {
         right: { type: String, default: null }, // e.g. "6/6", "20/40"
@@ -100,5 +110,6 @@ const visionRecordSchema = new Schema(
 // Most-recent-first is the read pattern for both the provider history
 // view and the patient profile section, so index supports that sort.
 visionRecordSchema.index({ patientId: 1, "visits.date": -1 });
+visionRecordSchema.index({ "visits.organizationId": 1, "visits.date": -1 });
 
 export const visionRecordModel = mongoose.model("VisionRecord", visionRecordSchema);

@@ -1,4 +1,8 @@
-import { createVisionVisitService, getVisionRecordService } from "./vision_record_service.js";
+import {
+  createVisionVisitService,
+  getVisionRecordService,
+  getAllPatientVisionService,
+} from "./vision_record_service.js";
 
 export const createVisionVisitController = async (req, res, next) => {
   try {
@@ -11,6 +15,7 @@ export const createVisionVisitController = async (req, res, next) => {
     const record = await createVisionVisitService({
       patientId,
       actingAccountId: req.user.id, // set by `protect` middleware
+      wrOrgId: req.user.wrOrgId,
       clinicName,
       acuity: typeof acuity === "string" ? JSON.parse(acuity) : acuity,
       colorVision,
@@ -22,6 +27,26 @@ export const createVisionVisitController = async (req, res, next) => {
     });
 
     return res.status(201).json({ success: true, data: record });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getAllPatientVisionController = async (req, res, next) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+
+    const result = await getAllPatientVisionService({
+      page,
+      limit,
+      wrOrgId: req.user.wrOrgId,
+    });
+
+    return res.status(200).json({ success: true, data: result });
   } catch (error) {
     if (error.statusCode) {
       return res.status(error.statusCode).json({ success: false, message: error.message });
