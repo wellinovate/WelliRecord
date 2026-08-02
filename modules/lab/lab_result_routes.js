@@ -1,5 +1,6 @@
 import express from "express";
 import { protect } from "../auth/auth_middleware.js";
+import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
   createLabResultController,
@@ -16,6 +17,7 @@ const router = express.Router();
 router.post(
   "/",
   protect,
+  restrictClinicalScope("lab-results"),
   validate(createLabResultSchema),
   createLabResultController,
 );
@@ -23,12 +25,14 @@ router.post(
 router.get(
   "/patient/:patientId",
   protect,
+  restrictClinicalScope("lab-results"),
   validate(getPatientLabResultsParamsSchema, "params"),
   getPatientLabResultsController,
 );
 router.get(
   "/patients",
   protect,
+  restrictClinicalScope("lab-results"),
   getAllPatientLabResultsController,
 );
 

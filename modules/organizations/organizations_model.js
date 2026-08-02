@@ -40,6 +40,14 @@ const organizationProfileSchema = new Schema(
       required: true,
       index: true,
     },
+    // Only meaningful when organizationType is "healthcare_provider".
+    // "general" (the default) has no restriction. A specialty value
+    // limits every provider account under this organization to a fixed
+    // set of record categories, enforced server-side by
+    // restrictClinicalScope (see modules/auth/clinical_scope_middleware.js)
+    // — this is a structural, per-facility restriction, separate from
+    // and in addition to the existing per-patient AccessGrant.category
+    // scoping, which is per-consent rather than per-facility.
     clinicalScope: {
       type: String,
       enum: ["general", "eye_care"],
