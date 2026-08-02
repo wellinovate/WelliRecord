@@ -23,6 +23,7 @@ import appointmentRoutes from "./modules/appointments/appointment_routes.js";
 import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
 import accessGrantRoutes from "./modules/access/access_grant_routes.js";
 import bridgeRoutes from "./modules/access/bridge_routes.js";
+import visionRecordRoutes from "./modules/vision/vision_record_routes.js";
 // import { connectRedis } from "./shared/config/redis.js";
 import {
   globalRateLimiter,
@@ -116,6 +117,7 @@ app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/queue", visitQueueRoutes);
 app.use("/api/v1/access-grants", accessGrantRoutes);
 app.use("/api/v1/bridge", bridgeRoutes);
+app.use("/api/v1/records/vision", visionRecordRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("Wellirecord staging is running..."));
