@@ -50,7 +50,7 @@ export const sendLoginOtp = async ({ phoneNumber }) => {
       pin_length: 6,
       pin_placeholder: "< 123456 >",
       message_text:
-        "Your WelliRecord login code is < 123456 >. It expires in 5 minutes.",
+        "Your WelliRecord Verification PIN is < 123456 >. It expires in 5 minutes. For security, never share this code.",
       pin_type: "NUMERIC",
     });
 
