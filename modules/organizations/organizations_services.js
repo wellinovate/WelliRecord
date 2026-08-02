@@ -15,6 +15,10 @@ export const createOrganizationProfile = async (payload, session) => {
         wrOrgId: payload.wrOrgId,
         organizationName: payload.organizationName,
         organizationType: payload.organizationType,
+        // Falls through to the schema's own "general" default when
+        // undefined — payload.clinicalScope is undefined for every
+        // organizationType other than healthcare_provider.
+        ...(payload.clinicalScope && { clinicalScope: payload.clinicalScope }),
         officeAddress: payload.officeAddress || null,
         registrationNumber: payload.registrationNumber || null,
         licenseNumber: payload.licenseNumber || null,

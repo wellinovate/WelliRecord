@@ -70,6 +70,11 @@ const organizationRegisterSchema = z.object({
     .string()
     .trim()
     .min(2, "Contact person role is required"),
+  // Only meaningful when organizationType is "healthcare_provider" —
+  // see OrganizationProfile.clinicalScope. Optional here because every
+  // other organizationType has no use for it; createOrganizationProfile
+  // defaults it to "general" if omitted.
+  clinicalScope: z.enum(["general", "eye_care"]).optional(),
   authProvider: z.literal("local").optional(),
 });
 
