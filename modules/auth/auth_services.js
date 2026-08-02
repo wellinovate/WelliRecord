@@ -168,6 +168,10 @@ export const registerOrganizationAccount = async (payload) => {
         wrOrgId: wrId,
         organizationName: payload.organizationName,
         organizationType: payload.organizationType,
+        // Defaults to "general" via the schema itself if omitted —
+        // every non-healthcare_provider org type sends this as
+        // undefined, which is fine, the model default handles it.
+        clinicalScope: payload.clinicalScope,
         officeAddress: payload.officeAddress,
         registrationNumber: payload.registrationNumber,
         licenseNumber: payload.licenseNumber,
