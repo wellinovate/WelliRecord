@@ -18,3 +18,11 @@ test
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+# Temp files & nested clones
+.DS_Store
+*.py
+*.mjs
+wellirecords/
+WelliRecord/
+
