@@ -81,3 +81,6 @@ export const requireRole = (...roles) => (req, res, next) => {
 
   next();
 };
+
+export { restrictClinicalScope } from "./clinical_scope_middleware.js";
+

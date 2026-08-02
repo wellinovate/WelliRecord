@@ -40,6 +40,12 @@ const organizationProfileSchema = new Schema(
       required: true,
       index: true,
     },
+    clinicalScope: {
+      type: String,
+      enum: ["general", "eye_care"],
+      default: "general",
+      index: true,
+    },
     officeAddress: {
       type: String,
       trim: true,
