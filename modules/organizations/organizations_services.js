@@ -428,6 +428,11 @@ export const searchProvidersService = async ({
       phone: item.phone || null,
       specialty: item.contactPersonRole || null,
       telemedicineAvailable: item.organizationType === "telehealth",
+      // The only identifier patients are ever shown for granting
+      // consent access (see access_grant_validation.js) — was being
+      // fetched from the DB above (wrOrgId: 1 in the $project stage)
+      // and then silently dropped here before the response went out.
+      wrOrgId: item.wrOrgId || null,
       organization: {
         _id: item._id,
         name: item.organizationName,
