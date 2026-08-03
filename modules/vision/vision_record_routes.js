@@ -10,13 +10,27 @@ import {
 const upload = multer({ storage: multer.memoryStorage() });
 const router = express.Router();
 
-// Write: provider only. requireRole runs in addition to the check
-// inside vision_record_service.js — belt and suspenders, since this is
-// a clinical-accuracy rule (spec section 2), not just an access rule.
+// Write: provider-side accounts only. requireRole runs in addition to
+// the check inside vision_record_service.js — belt and suspenders,
+// since this is a clinical-accuracy rule (spec section 2), not just an
+// access rule. Lists every non-patient role from Account.role's enum
+// rather than just "provider" — a doctor, nurse, admin, etc. account
+// is still provider-side and was otherwise getting a 403 here despite
+// having access to every other provider route in the app.
+const PROVIDER_SIDE_ROLES = [
+  "provider",
+  "doctor",
+  "nurse",
+  "caregiver",
+  "staff",
+  "admin",
+  "provider_admin",
+];
+
 router.post(
   "/:patientId/visits",
   protect,
-  requireRole("provider"),
+  requireRole(...PROVIDER_SIDE_ROLES),
   upload.array("photos", 6),
   createVisionVisitController,
 );
@@ -24,7 +38,7 @@ router.post(
 // Org-wide list for the standalone provider Vision page. Placed before
 // "/:patientId" — otherwise Express would match "patients" as a
 // patientId value and this route would never be reached.
-router.get("/patients", protect, requireRole("provider"), getAllPatientVisionController);
+router.get("/patients", protect, requireRole(...PROVIDER_SIDE_ROLES), getAllPatientVisionController);
 
 // Read: any authenticated account that already has access to this
 // patient's record (the patient themselves, or a provider with a
