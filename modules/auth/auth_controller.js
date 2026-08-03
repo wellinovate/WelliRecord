@@ -303,9 +303,9 @@ export const verifyEmailController = async (req, res, next) => {
 
 export const resendLoginOtpController = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email, challengeToken } = req.body;
 
-    const result = await resendLoginOtpService({ email });
+    const result = await resendLoginOtpService({ email, challengeToken });
 
     return res.status(200).json({
       success: true,
