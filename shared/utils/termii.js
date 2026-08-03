@@ -46,11 +46,11 @@ export const sendLoginOtp = async ({ phoneNumber }) => {
       from: TERMII_SENDER_ID,
       channel: TERMII_OTP_CHANNEL,
       pin_attempts: 3,
-      pin_time_to_live: 2,
+      pin_time_to_live: 5,
       pin_length: 6,
       pin_placeholder: "< 123456 >",
       message_text:
-        "Your WelliRecord Verification PIN is < 123456 >. It expires in 2 minutes. For security, never share this code.",
+        "Your WelliRecord Verification PIN is < 123456 >. It expires in 5 minutes. For security, never share this code.",
       pin_type: "NUMERIC",
     });
 

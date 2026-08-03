@@ -673,9 +673,23 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
 
 
 
-export const resendLoginOtpService = async ({ email }) => {
-  // 1. Find account
-  const account = await Account.findOne({ email: email.toLowerCase().trim() });
+export const resendLoginOtpService = async ({ email, challengeToken }) => {
+  let account = null;
+
+  // 1a. Try resolving account from challengeToken
+  if (challengeToken && typeof challengeToken === "string") {
+    const challengeTokenHash = hashLoginChallengeToken(challengeToken);
+    const existingChallenge = await LoginOtpChallenge.findOne({ challengeTokenHash }).sort({ createdAt: -1 });
+    if (existingChallenge) {
+      account = await Account.findById(existingChallenge.accountId);
+    }
+  }
+
+  // 1b. Fallback to resolving account by email
+  if (!account && email && typeof email === "string" && email.includes("@")) {
+    account = await Account.findOne({ email: email.toLowerCase().trim() });
+  }
+
   if (!account) {
     throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
   }
@@ -684,12 +698,12 @@ export const resendLoginOtpService = async ({ email }) => {
     throw new AppError("No phone attached to account", 400, "PHONE_NOT_FOUND");
   }
 
-  // 2. Check cooldown (optional: 60s or 2min)
+  // 2. Check cooldown (30 seconds between resends)
   const lastOtp = await LoginOtpChallenge.findOne({
     accountId: account._id,
   }).sort({ createdAt: -1 });
   if (lastOtp) {
-    const cooldownMs = 60 * 1000; // 1 minute
+    const cooldownMs = 30 * 1000; // 30s
     const now = Date.now();
     if (lastOtp.createdAt.getTime() + cooldownMs > now) {
       throw new AppError(
@@ -705,12 +719,13 @@ export const resendLoginOtpService = async ({ email }) => {
   try {
     otp = await sendLoginOtp({ phoneNumber: account.phone });
   } catch (err) {
-    throw new AppError("Unable to send OTP now", 502, "OTP_SEND_FAILED");
+    console.error("Resend OTP Termii error:", err);
+    throw new AppError("Unable to send OTP now. Please try again.", 502, "OTP_SEND_FAILED");
   }
 
   // 4. Generate challenge token
-  const challengeToken = generateLoginChallengeToken();
-  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
+  const newChallengeToken = generateLoginChallengeToken();
+  const challengeTokenHash = hashLoginChallengeToken(newChallengeToken);
 
   // 5. Save OTP challenge
   await LoginOtpChallenge.create({
@@ -723,8 +738,8 @@ export const resendLoginOtpService = async ({ email }) => {
 
   return {
     message: "OTP resent successfully",
-    challengeToken,
-    maskedPhone: account.phone.replace(/\d(?=\d{4})/g, "*"),
+    challengeToken: newChallengeToken,
+    maskedPhone: maskPhone(account.phone),
   };
 };
 
