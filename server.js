@@ -24,6 +24,9 @@ import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
 import accessGrantRoutes from "./modules/access/access_grant_routes.js";
 import bridgeRoutes from "./modules/access/bridge_routes.js";
 import visionRecordRoutes from "./modules/vision/vision_record_routes.js";
+import http from "http";
+import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
+import { initSocket } from "./shared/realtime/socket.js";
 // import { connectRedis } from "./shared/config/redis.js";
 import {
   globalRateLimiter,
@@ -34,6 +37,8 @@ import {
 dotenv.config();
 
 const app = express();
+const httpServer = http.createServer(app);
+initSocket(httpServer);
 // app.use(bodyParser.json());
 
 connectDB();
@@ -107,6 +112,7 @@ app.use("/api/v1/admin", adminUsers);
 app.use("/api/v1/allergies", allergyRoutes);
 app.use("/api/v1/diagnoses", diagnosisRoutes);
 app.use("/api/v1/lab-results", labResultRoutes);
+app.use("/api/v1/lab-orders", labOrderRoutes);
 app.use("/api/v1/procedures", procedureRoutes);
 app.use("/api/v1/immunizations", immunizationRoutes);
 app.use("/api/v1/vitals", vitalRoutes);
@@ -156,6 +162,6 @@ app.use((err, req, res, next) => {
 //   console.log(`✅ WelliID Issuer Service listening on port ${PORT}`);
 // });
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, "0.0.0.0", () => {
+httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ WelliID Issuer Service listening on port ${PORT}`);
 });
