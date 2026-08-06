@@ -135,6 +135,7 @@ app.get("/health", (req, res) => {
     status: "ok",
     service: "wellirecord-api",
     // environment: process.env.NODE_ENV,
+    commit: process.env.RENDER_GIT_COMMIT || null,
     timestamp: new Date().toISOString(),
   });
 });
