@@ -89,6 +89,8 @@ export const createPharmacyOrderService = async ({ payload, authUser }) => {
     await session.commitTransaction();
     session.endSession();
 
+    await docs[0].populate("patientId", "firstName fullName lastName email");
+
     const order = serializeOrder(docs[0]);
     broadcast("insert", order);
     return order;
