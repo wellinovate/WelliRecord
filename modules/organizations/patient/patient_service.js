@@ -292,8 +292,10 @@ export const searchPatientForOrganizationService = async ({
   }
 
   if (identifierType === "phone") {
+    const digitsOnly = String(value).replace(/\D/g, "");
+    const last9 = digitsOnly.slice(-9);
     patient = await UserProfile.findOne({
-      phone: normalizePhone(value),
+      phone: new RegExp(`${last9}$`),
     });
   }
 
