@@ -4,12 +4,10 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { getIO } from "../../shared/realtime/socket.js";
 
-// Same known limitation as lab_order_service.js: broadcasts go to every
-// connected client, not scoped per-organization yet.
 const broadcast = (operationType, order) => {
   const io = getIO();
   if (!io) return;
-  io.emit("pharmacy_order_change", {
+  io.to(`org:${order.organizationId}`).emit("pharmacy_order_change", {
     operationType,
     documentId: order.id,
     document: order,

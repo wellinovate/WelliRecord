@@ -4,14 +4,10 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { getIO } from "../../shared/realtime/socket.js";
 
-// NOTE: broadcasts go to every connected client right now, not scoped
-// per-organization. Fine for a single-tenant pilot; before onboarding
-// multiple organizations, this should join sockets to an org-specific
-// room (e.g. `org:<organizationId>`) and emit only to that room.
 const broadcast = (operationType, order) => {
   const io = getIO();
   if (!io) return;
-  io.emit("lab_order_change", {
+  io.to(`org:${order.organizationId}`).emit("lab_order_change", {
     operationType,
     documentId: order.id,
     document: order,
