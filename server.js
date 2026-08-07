@@ -27,6 +27,7 @@ import visionRecordRoutes from "./modules/vision/vision_record_routes.js";
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
+import localCustomerRoutes from "./modules/local-customers/local_customer_routes.js";
 import { initSocket } from "./shared/realtime/socket.js";
 // import { connectRedis } from "./shared/config/redis.js";
 import {
@@ -115,6 +116,7 @@ app.use("/api/v1/diagnoses", diagnosisRoutes);
 app.use("/api/v1/lab-results", labResultRoutes);
 app.use("/api/v1/lab-orders", labOrderRoutes);
 app.use("/api/v1/pharmacy-orders", pharmacyOrderRoutes);
+app.use("/api/v1/local-customers", localCustomerRoutes);
 app.use("/api/v1/procedures", procedureRoutes);
 app.use("/api/v1/immunizations", immunizationRoutes);
 app.use("/api/v1/vitals", vitalRoutes);
