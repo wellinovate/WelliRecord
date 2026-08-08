@@ -104,6 +104,19 @@ const accountSchema = new Schema(
       index: true,
     },
 
+    // Set only on synthetic accounts created for a dependant/child
+    // profile (see modules/dependants). Points at the parent's own
+    // Account. null for every regular account. This account can never
+    // log in on its own — see isActive/status below — managedBy exists
+    // so dependant accounts can be filtered out of anything that lists
+    // or notifies real login-capable accounts.
+    managedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "Account",
+      default: null,
+      index: true,
+    },
+
     lastLoginAt: {
       type: Date,
       default: null,
