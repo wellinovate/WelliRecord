@@ -24,6 +24,7 @@ import visitQueueRoutes from "./modules/visitQueue/visitQueue_routes.js";
 import accessGrantRoutes from "./modules/access/access_grant_routes.js";
 import bridgeRoutes from "./modules/access/bridge_routes.js";
 import visionRecordRoutes from "./modules/vision/vision_record_routes.js";
+import dependantRoutes from "./modules/dependants/dependants_routes.js";
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
@@ -128,6 +129,7 @@ app.use("/api/v1/queue", visitQueueRoutes);
 app.use("/api/v1/access-grants", accessGrantRoutes);
 app.use("/api/v1/bridge", bridgeRoutes);
 app.use("/api/v1/records/vision", visionRecordRoutes);
+app.use("/api/v1/dependants", dependantRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("Wellirecord staging is running..."));
