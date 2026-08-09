@@ -4,6 +4,45 @@ dotenv.config();
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+export const sendAppointmentConfirmationEmail = async ({
+  email,
+  patientName,
+  organizationName,
+  providerName,
+  scheduledFor,
+}) => {
+  const dateStr = new Date(scheduledFor).toLocaleString("en-NG", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "Africa/Lagos",
+  });
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: `Appointment confirmed — ${organizationName || "your facility"}`,
+      html: `
+        <div style="font-family: Arial;">
+          <h2>Appointment confirmed</h2>
+          <p>Hi ${patientName || "there"},</p>
+          <p>Your appointment at <strong>${organizationName || "your facility"}</strong>${providerName ? ` with ${providerName}` : ""} is confirmed for:</p>
+          <p style="font-size: 16px; font-weight: bold;">${dateStr}</p>
+          <p>You'll get a reminder about an hour before your appointment.</p>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the appointment confirmation email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+    return response;
+  } catch (error) {
+    console.error("Appointment confirmation email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
 export const sendTeamInviteEmail = async ({
   email,
   fullName,

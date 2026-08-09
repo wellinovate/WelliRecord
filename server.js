@@ -30,6 +30,7 @@ import apiKeyRoutes from "./modules/apikeys/apikey_routes.js";
 import teamRoutes from "./modules/team/team_routes.js";
 import notificationRoutes from "./modules/notifications/notification_routes.js";
 import { seedDefaultTemplates } from "./modules/notifications/notification_services.js";
+import { startAppointmentReminderScheduler } from "./modules/appointments/appointment_notifications.js";
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
@@ -183,4 +184,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   seedDefaultTemplates().catch((err) =>
     console.error("Could not seed default notification templates:", err),
   );
+  startAppointmentReminderScheduler();
 });

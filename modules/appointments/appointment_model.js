@@ -52,6 +52,12 @@ const appointmentSchema = new Schema(
       default: null,
       index: true,
     },
+
+    reminderSentAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   { timestamps: true },
 );

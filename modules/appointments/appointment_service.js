@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Appointment } from "./appointment_model.js";
 import { VisitQueue } from "../visitQueue/visitQueue_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { notifyAppointmentBooked } from "./appointment_notifications.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -75,6 +76,10 @@ export const createAppointmentService = async ({
     reasonForVisit,
     createdBy: createdBy || null,
   });
+
+  notifyAppointmentBooked(appointment._id).catch((err) =>
+    console.error("notifyAppointmentBooked failed:", err),
+  );
 
   return appointment;
 };
