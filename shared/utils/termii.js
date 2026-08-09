@@ -19,6 +19,36 @@ if (TERMII_OTP_CHANNEL && !allowedOtpChannels.includes(TERMII_OTP_CHANNEL)) {
   );
 }
 
+export const sendSms = async ({ phoneNumber, message }) => {
+  if (!TERMII_API_KEY) {
+    throw new AppError(
+      "SMS service is not configured",
+      500,
+      "SMS_NOT_CONFIGURED",
+    );
+  }
+  if (!phoneNumber || !message) {
+    throw new AppError(
+      "Phone number and message are required",
+      400,
+      "SMS_PARAMS_REQUIRED",
+    );
+  }
+
+  const phone = normalizeNigerianPhone(phoneNumber);
+
+  const { data } = await axios.post(`${TERMII_BASE_URL}/api/sms/send`, {
+    api_key: TERMII_API_KEY,
+    to: phone,
+    from: TERMII_SENDER_ID,
+    sms: message,
+    type: "plain",
+    channel: "generic",
+  });
+
+  return data;
+};
+
 export const sendLoginOtp = async ({ phoneNumber }) => {
   if (!TERMII_API_KEY) {
     throw new AppError(

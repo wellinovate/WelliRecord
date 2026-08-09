@@ -7,6 +7,7 @@ import { TeamInvite } from "./team_invite_model.js";
 import { withTransaction } from "../../shared/utils/withTransaction.js";
 import { sendTeamInviteEmail } from "../../shared/utils/resend.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { createNotification } from "../notifications/notification_services.js";
 
 // Account.role and OrganizationMembership.membershipRole are two
 // different enums that only partially overlap. Account.role only
@@ -190,6 +191,21 @@ export const acceptInviteService = async ({ token, password }) => {
     invite.status = "accepted";
     await invite.save({ session });
 
+    return { success: true, organizationId: invite.organizationId, fullName: invite.fullName };
+  }).then(async (result) => {
+    // Fires after the transaction commits — notification creation
+    // isn't part of the atomic invite-acceptance guarantee, and
+    // shouldn't roll back a successful account creation if it fails.
+    try {
+      await createNotification({
+        recipientAccountId: result.organizationId,
+        type: "team_invite_accepted",
+        title: "Invite accepted",
+        body: `${result.fullName} has accepted your team invitation and can now log in.`,
+      });
+    } catch (err) {
+      console.error("Could not create invite-accepted notification:", err);
+    }
     return { success: true };
   });
 };

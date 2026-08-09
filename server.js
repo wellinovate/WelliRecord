@@ -28,6 +28,8 @@ import dependantRoutes from "./modules/dependants/dependants_routes.js";
 import waitlistRoutes from "./modules/waitlist/waitlist_routes.js";
 import apiKeyRoutes from "./modules/apikeys/apikey_routes.js";
 import teamRoutes from "./modules/team/team_routes.js";
+import notificationRoutes from "./modules/notifications/notification_routes.js";
+import { seedDefaultTemplates } from "./modules/notifications/notification_services.js";
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
@@ -136,6 +138,7 @@ app.use("/api/v1/dependants", dependantRoutes);
 app.use("/api/v1/waitlist", waitlistRoutes);
 app.use("/api/v1/api-keys", apiKeyRoutes);
 app.use("/api/v1/team", teamRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("Wellirecord staging is running..."));
@@ -177,4 +180,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ WelliID Issuer Service listening on port ${PORT}`);
+  seedDefaultTemplates().catch((err) =>
+    console.error("Could not seed default notification templates:", err),
+  );
 });
