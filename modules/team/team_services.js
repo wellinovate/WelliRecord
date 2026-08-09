@@ -5,6 +5,25 @@ import { UserProfile } from "../users/user_profile_model.js";
 import { Account } from "../accounts/account_model.js";
 import { TeamInvite } from "./team_invite_model.js";
 import { withTransaction } from "../../shared/utils/withTransaction.js";
+import { sendTeamInviteEmail } from "../../shared/utils/resend.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
+
+// Account.role and OrganizationMembership.membershipRole are two
+// different enums that only partially overlap. Account.role only
+// allows patient/provider/doctor/nurse/caregiver/staff/admin/
+// provider_admin — passing a membershipRole like "lab_tech" or
+// "pharmacist" straight through would fail Account validation before
+// the membership is ever created. The specific job function lives on
+// membershipRole; Account.role only needs a coarse system-level value.
+const ACCOUNT_ROLE_MAP = {
+  provider_admin: "provider_admin",
+  doctor: "doctor",
+  nurse: "nurse",
+};
+
+function toAccountRole(membershipRole) {
+  return ACCOUNT_ROLE_MAP[membershipRole] || "staff";
+}
 
 export const listTeamMembersService = async ({ organizationId }) => {
   const memberships = await OrganizationMembership.find({ organizationId }).populate("userId");
@@ -51,6 +70,18 @@ export const inviteTeamMemberService = async ({ organizationId, payload }) => {
     fullName,
     membershipRole,
     expiresAt,
+  });
+
+  const orgProfile = await OrganizationProfile.findOne({
+    accountId: organizationId,
+  }).lean();
+
+  await sendTeamInviteEmail({
+    email,
+    fullName,
+    organizationName: orgProfile?.organizationName,
+    membershipRole,
+    token,
   });
 
   return {
@@ -118,7 +149,7 @@ export const acceptInviteService = async ({ token, password }) => {
         [
           {
             accountType: "user",
-            role: invite.membershipRole,
+            role: toAccountRole(invite.membershipRole),
             email: invite.email,
             password: password,
             isActive: true,

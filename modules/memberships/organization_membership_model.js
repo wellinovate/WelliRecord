@@ -24,6 +24,7 @@ const organizationMembershipSchema = new Schema(
       enum: [
         "provider_admin",
         "doctor",
+        "clinician",
         "nurse",
         "lab_tech",
         "pharmacist",
