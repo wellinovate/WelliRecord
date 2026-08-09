@@ -44,7 +44,7 @@ export const createDependantService = async ({ payload, authUser }) => {
           isActive: false,
           status: "disabled",
           isVerified: false,
-          managedBy: authUser.accountId,
+          managedBy: authUser.sub,
         },
       ],
       { session },
@@ -77,8 +77,13 @@ export const createDependantService = async ({ payload, authUser }) => {
 };
 
 export const listDependantsService = async ({ authUser }) => {
+  // Defense in depth: an undefined managedBy filter would silently
+  // match every Account in the system (Mongoose drops undefined keys
+  // from queries) — exactly the bug this guard prevents from recurring.
+  if (!authUser?.sub) return [];
+
   const accounts = await Account.find({
-    managedBy: authUser.accountId,
+    managedBy: authUser.sub,
   }).select("_id");
 
   const accountIds = accounts.map((a) => a._id);
@@ -103,7 +108,7 @@ export const listDependantsService = async ({ authUser }) => {
 
 export const getDependantService = async ({ dependantId, authUser }) => {
   const account = await Account.findById(dependantId);
-  await assertOwnership(account, authUser.accountId);
+  await assertOwnership(account, authUser.sub);
 
   const profile = await UserProfile.findOne({ accountId: dependantId });
   if (!profile) {
@@ -129,7 +134,7 @@ export const updateDependantService = async ({
   authUser,
 }) => {
   const account = await Account.findById(dependantId);
-  await assertOwnership(account, authUser.accountId);
+  await assertOwnership(account, authUser.sub);
 
   const profile = await UserProfile.findOne({ accountId: dependantId });
   if (!profile) {
