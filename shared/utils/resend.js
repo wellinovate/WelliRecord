@@ -43,6 +43,35 @@ export const sendAppointmentConfirmationEmail = async ({
   }
 };
 
+export const sendLabResultReadyEmail = async ({ email, patientName, isCritical = false }) => {
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: isCritical
+        ? "Urgent: a new lab result needs your attention"
+        : "Your lab result is ready to view",
+      html: `
+        <div style="font-family: Arial;">
+          <h2>${isCritical ? "Urgent lab result available" : "New lab result available"}</h2>
+          <p>Hi ${patientName || "there"},</p>
+          <p>A laboratory result has been added to your WelliRecord.</p>
+          <p><a href="https://wellirecord.com/vault">Log in to view it securely</a></p>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the lab result email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+    return response;
+  } catch (error) {
+    console.error("Lab result ready email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
 export const sendTeamInviteEmail = async ({
   email,
   fullName,

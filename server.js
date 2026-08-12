@@ -35,6 +35,7 @@ import { startAppointmentReminderScheduler } from "./modules/appointments/appoin
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import labTestCatalogRoutes from "./modules/lab-tests-catalog/lab_test_catalog_routes.js";
+import labDeliveryRoutes from "./modules/lab-delivery/lab_delivery_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
 import localCustomerRoutes from "./modules/local-customers/local_customer_routes.js";
 import { initSocket } from "./shared/realtime/socket.js";
@@ -125,6 +126,7 @@ app.use("/api/v1/diagnoses", diagnosisRoutes);
 app.use("/api/v1/lab-results", labResultRoutes);
 app.use("/api/v1/lab-orders", labOrderRoutes);
 app.use("/api/v1/lab-tests-catalog", labTestCatalogRoutes);
+app.use("/api/v1/lab-delivery", labDeliveryRoutes);
 app.use("/api/v1/pharmacy-orders", pharmacyOrderRoutes);
 app.use("/api/v1/local-customers", localCustomerRoutes);
 app.use("/api/v1/procedures", procedureRoutes);

@@ -75,7 +75,7 @@ const labResultEntrySchema = new Schema(
 
     interpretation: {
       type: String,
-      enum: ["low", "normal", "high", "positive", "negative", "abnormal", "unknown"],
+      enum: ["low", "normal", "high", "positive", "negative", "abnormal", "critical", "unknown"],
       default: "unknown",
       index: true,
     },
