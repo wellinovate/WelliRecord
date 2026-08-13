@@ -270,7 +270,7 @@ export const getInviteByTokenService = async ({ token }) => {
   };
 };
 
-export const acceptInviteService = async ({ token, password }) => {
+export const acceptInviteService = async ({ token, password, phone }) => {
   const invite = await TeamInvite.findOne({ token, status: "pending" });
   if (!invite || invite.expiresAt < new Date()) {
     throw new AppError("Invalid or expired invite link", 404, "INVITE_NOT_FOUND");
@@ -286,6 +286,7 @@ export const acceptInviteService = async ({ token, password }) => {
             role: toAccountRole(invite.membershipRole),
             email: invite.email,
             password: password,
+            phone,
             isActive: true,
             status: "active",
             isVerified: true,
@@ -293,6 +294,12 @@ export const acceptInviteService = async ({ token, password }) => {
         ],
         { session },
       );
+    } else if (!account.phone && phone) {
+      // Existing account (e.g. they'd started signing up elsewhere but
+      // never finished) that's still missing a phone — same login
+      // blocker applies, so fill it in here too.
+      account.phone = phone;
+      await account.save({ session });
     }
 
     let profile = await UserProfile.findOne({ accountId: account._id });

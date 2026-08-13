@@ -152,8 +152,8 @@ export const getInviteByTokenController = async (req, res, next) => {
 export const acceptInviteController = async (req, res, next) => {
   try {
     const { token } = req.params;
-    const { password } = req.validated;
-    const result = await acceptInviteService({ token, password });
+    const { password, phone } = req.validated;
+    const result = await acceptInviteService({ token, password, phone });
     return res.status(200).json({
       success: true,
       message: "Invitation accepted successfully",
