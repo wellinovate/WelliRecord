@@ -19,3 +19,8 @@ export const inviteMemberSchema = z.object({
 export const acceptInviteSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
+
+export const updatePermissionsSchema = z.object({
+  granted: z.array(z.string()).default([]),
+  revoked: z.array(z.string()).default([]),
+});

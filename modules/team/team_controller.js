@@ -6,7 +6,43 @@ import {
   getInviteByTokenService,
   acceptInviteService,
   getRoleCatalogService,
+  getPermissionRegistryService,
+  updateMemberPermissionsService,
 } from "./team_services.js";
+
+export const getPermissionRegistryController = async (req, res, next) => {
+  try {
+    const result = getPermissionRegistryService();
+    return res.status(200).json({
+      success: true,
+      message: "Permission registry retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateMemberPermissionsController = async (req, res, next) => {
+  try {
+    const organizationId = req.user.sub;
+    const { membershipId } = req.params;
+    const { granted, revoked } = req.validated;
+    const result = await updateMemberPermissionsService({
+      organizationId,
+      membershipId,
+      granted,
+      revoked,
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Access updated",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getRoleCatalogController = async (req, res, next) => {
   try {

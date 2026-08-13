@@ -10,6 +10,7 @@ import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { createNotification } from "../notifications/notification_services.js";
 
 import { getRoleCatalog, isRoleAllowed } from "./role_catalog.js";
+import { getEffectivePermissions, getRoleDefaultPermissions, PERMISSIONS, PERMISSION_CATEGORIES, PERMISSION_KEYS } from "./permission_registry.js";
 
 // Account.role and OrganizationMembership.membershipRole are two
 // different enums that only partially overlap. Account.role only
@@ -46,6 +47,26 @@ export const getRoleCatalogService = async ({ organizationId }) => {
   });
 };
 
+// Exposed to the frontend via GET /team/permissions so the "Access"
+// panel on each member row can render checkboxes with real labels,
+// grouped the same way for every facility, and grey out the ones that
+// come from the role default versus ones the admin explicitly granted.
+export const getPermissionRegistryService = () => {
+  const roles = [
+    "provider_admin", "doctor", "clinician", "nurse", "lab_tech",
+    "pharmacist", "frontdesk", "insurer_agent", "support_staff",
+  ];
+  const roleDefaults = Object.fromEntries(
+    roles.map((role) => [role, getRoleDefaultPermissions(role)]),
+  );
+
+  return {
+    categories: PERMISSION_CATEGORIES,
+    permissions: PERMISSIONS,
+    roleDefaults,
+  };
+};
+
 export const listTeamMembersService = async ({ organizationId }) => {
   const memberships = await OrganizationMembership.find({ organizationId }).populate("userId");
 
@@ -57,7 +78,11 @@ export const listTeamMembersService = async ({ organizationId }) => {
       name: profile.fullName || "Team Member",
       email: profile.email || "",
       role: m.membershipRole,
-      permissions: [],
+      permissions: getEffectivePermissions(m.membershipRole, m.permissionOverrides),
+      permissionOverrides: {
+        granted: m.permissionOverrides?.granted || [],
+        revoked: m.permissionOverrides?.revoked || [],
+      },
       status: m.isActive ? "active" : "suspended",
       lastActive: profile.updatedAt || m.updatedAt || null,
     };
@@ -71,12 +96,55 @@ export const listTeamMembersService = async ({ organizationId }) => {
     name: inv.fullName,
     email: inv.email,
     role: inv.membershipRole,
-    permissions: [],
+    permissions: getRoleDefaultPermissions(inv.membershipRole),
+    permissionOverrides: { granted: [], revoked: [] },
     status: "invited",
     lastActive: null,
   }));
 
   return [...memberList, ...inviteList];
+};
+
+// An admin can only adjust a member's overrides, never a provider_admin's
+// — that role always has full access regardless of overrides, see
+// permission_registry.js, so there's nothing to restrict there and
+// nothing to accidentally lock an admin out of.
+export const updateMemberPermissionsService = async ({
+  organizationId,
+  membershipId,
+  granted = [],
+  revoked = [],
+}) => {
+  const membership = await OrganizationMembership.findOne({
+    _id: membershipId,
+    organizationId,
+  });
+  if (!membership) {
+    throw new AppError("Team member not found", 404, "MEMBER_NOT_FOUND");
+  }
+  if (membership.membershipRole === "provider_admin") {
+    throw new AppError(
+      "An administrator's access can't be restricted",
+      422,
+      "CANNOT_OVERRIDE_ADMIN",
+    );
+  }
+
+  const validGranted = granted.filter((k) => PERMISSION_KEYS.includes(k));
+  const validRevoked = revoked.filter((k) => PERMISSION_KEYS.includes(k));
+  // A key can't be both granted and revoked at once — revoked wins,
+  // since "take this away" should never lose to a stale grant.
+  membership.permissionOverrides = {
+    granted: validGranted.filter((k) => !validRevoked.includes(k)),
+    revoked: validRevoked,
+  };
+  await membership.save();
+
+  return {
+    membershipId: membership._id,
+    permissions: getEffectivePermissions(membership.membershipRole, membership.permissionOverrides),
+    permissionOverrides: membership.permissionOverrides,
+  };
 };
 
 export const inviteTeamMemberService = async ({ organizationId, payload }) => {

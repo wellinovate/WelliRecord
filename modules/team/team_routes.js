@@ -9,12 +9,15 @@ import {
   getInviteByTokenController,
   acceptInviteController,
   getRoleCatalogController,
+  getPermissionRegistryController,
+  updateMemberPermissionsController,
 } from "./team_controller.js";
-import { inviteMemberSchema, acceptInviteSchema } from "./team_validation.js";
+import { inviteMemberSchema, acceptInviteSchema, updatePermissionsSchema } from "./team_validation.js";
 
 const router = express.Router();
 
 router.get("/role-catalog", protect, getRoleCatalogController);
+router.get("/permissions", protect, getPermissionRegistryController);
 
 // Public routes for accepting invitation
 router.get("/invite/:token", getInviteByTokenController);
@@ -25,5 +28,11 @@ router.get("/members", protect, listTeamMembersController);
 router.post("/invite", protect, validate(inviteMemberSchema), inviteTeamMemberController);
 router.patch("/members/:membershipId/suspend", protect, suspendTeamMemberController);
 router.patch("/members/:membershipId/reactivate", protect, reactivateTeamMemberController);
+router.patch(
+  "/members/:membershipId/permissions",
+  protect,
+  validate(updatePermissionsSchema),
+  updateMemberPermissionsController,
+);
 
 export default router;

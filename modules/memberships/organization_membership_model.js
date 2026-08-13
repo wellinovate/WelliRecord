@@ -60,6 +60,16 @@ const organizationMembershipSchema = new Schema(
       index: true,
     },
 
+    // Per-member permission overrides, layered on top of the role's
+    // default permission set (see modules/team/permission_registry.js).
+    // Effective permission = (role default ∪ granted) − revoked. Empty
+    // arrays mean "just the role default, nothing overridden" — the
+    // common case.
+    permissionOverrides: {
+      granted: { type: [String], default: [] },
+      revoked: { type: [String], default: [] },
+    },
+
     isActive: {
       type: Boolean,
       default: true,
