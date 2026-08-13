@@ -46,6 +46,26 @@ export const sendSms = async ({ phoneNumber, message }) => {
     channel: "generic",
   });
 
+  // Termii can return HTTP 200 with a body indicating failure (e.g. no
+  // balance, invalid sender ID, undelivered route) — axios only throws on
+  // non-2xx, so that failure has to be checked explicitly or it silently
+  // looks like success.
+  const looksFailed =
+    data?.balance === 0 ||
+    (typeof data?.code === "string" && data.code.toLowerCase() !== "ok") ||
+    (typeof data?.message === "string" &&
+      /balance|insufficient|invalid|fail|error|reject/i.test(data.message) &&
+      !data?.message_id);
+
+  if (looksFailed) {
+    console.error("Termii send SMS returned a failure body:", data);
+    throw new AppError(
+      data?.message || "SMS was not accepted for delivery",
+      502,
+      "SMS_SEND_FAILED",
+    );
+  }
+
   return data;
 };
 
