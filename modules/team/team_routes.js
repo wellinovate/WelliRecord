@@ -8,10 +8,13 @@ import {
   reactivateTeamMemberController,
   getInviteByTokenController,
   acceptInviteController,
+  getRoleCatalogController,
 } from "./team_controller.js";
 import { inviteMemberSchema, acceptInviteSchema } from "./team_validation.js";
 
 const router = express.Router();
+
+router.get("/role-catalog", protect, getRoleCatalogController);
 
 // Public routes for accepting invitation
 router.get("/invite/:token", getInviteByTokenController);

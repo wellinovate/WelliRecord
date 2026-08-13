@@ -5,7 +5,23 @@ import {
   reactivateTeamMemberService,
   getInviteByTokenService,
   acceptInviteService,
+  getRoleCatalogService,
 } from "./team_services.js";
+
+export const getRoleCatalogController = async (req, res, next) => {
+  try {
+    const organizationId = req.user.sub;
+    const result = await getRoleCatalogService({ organizationId });
+
+    return res.status(200).json({
+      success: true,
+      message: "Role catalog retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const listTeamMembersController = async (req, res, next) => {
   try {

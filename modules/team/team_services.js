@@ -9,6 +9,8 @@ import { sendTeamInviteEmail } from "../../shared/utils/resend.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { createNotification } from "../notifications/notification_services.js";
 
+import { getRoleCatalog, isRoleAllowed } from "./role_catalog.js";
+
 // Account.role and OrganizationMembership.membershipRole are two
 // different enums that only partially overlap. Account.role only
 // allows patient/provider/doctor/nurse/caregiver/staff/admin/
@@ -25,6 +27,24 @@ const ACCOUNT_ROLE_MAP = {
 function toAccountRole(membershipRole) {
   return ACCOUNT_ROLE_MAP[membershipRole] || "staff";
 }
+
+// Exposed to the frontend via GET /team/role-catalog so the invite
+// dropdown only offers roles that make sense for this facility's type
+// — a diagnostic lab doesn't see "Nurse", an eye-care-scoped hospital
+// sees "Optician / Ophthalmologist" instead of a plain "Doctor" label.
+// See role_catalog.js for the mapping.
+export const getRoleCatalogService = async ({ organizationId }) => {
+  const orgProfile = await OrganizationProfile.findOne({
+    accountId: organizationId,
+  })
+    .select("organizationType clinicalScope")
+    .lean();
+
+  return getRoleCatalog({
+    organizationType: orgProfile?.organizationType,
+    clinicalScope: orgProfile?.clinicalScope,
+  });
+};
 
 export const listTeamMembersService = async ({ organizationId }) => {
   const memberships = await OrganizationMembership.find({ organizationId }).populate("userId");
@@ -61,6 +81,31 @@ export const listTeamMembersService = async ({ organizationId }) => {
 
 export const inviteTeamMemberService = async ({ organizationId, payload }) => {
   const { email, fullName, membershipRole } = payload;
+
+  // Defense in depth: the frontend hides roles that don't fit this
+  // facility's type, but a direct API call could still send one. This
+  // is the actual enforcement — same pattern as restrictClinicalScope,
+  // where the UI hiding a tab is a courtesy, not the boundary.
+  const orgProfile = await OrganizationProfile.findOne({
+    accountId: organizationId,
+  })
+    .select("organizationType clinicalScope organizationName")
+    .lean();
+
+  if (
+    !isRoleAllowed({
+      organizationType: orgProfile?.organizationType,
+      clinicalScope: orgProfile?.clinicalScope,
+      membershipRole,
+    })
+  ) {
+    throw new AppError(
+      "This role isn't available for your facility type",
+      422,
+      "ROLE_NOT_IN_CATALOG",
+    );
+  }
+
   const token = crypto.randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -72,10 +117,6 @@ export const inviteTeamMemberService = async ({ organizationId, payload }) => {
     membershipRole,
     expiresAt,
   });
-
-  const orgProfile = await OrganizationProfile.findOne({
-    accountId: organizationId,
-  }).lean();
 
   await sendTeamInviteEmail({
     email,
