@@ -8,7 +8,58 @@ import {
   uploadVerificationDocumentService,
   getVerificationStatusService,
   getMyOrganizationService,
+  uploadOrganizationLogoService,
+  removeOrganizationLogoService,
 } from "./verification_services.js";
+
+export const uploadOrganizationLogoController = async (req, res, next) => {
+  try {
+    const accountId = req.user?.sub;
+
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization context missing",
+      });
+    }
+
+    const profile = await uploadOrganizationLogoService({
+      accountId,
+      file: req.file,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logo updated",
+      data: { logo: profile.logo },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeOrganizationLogoController = async (req, res, next) => {
+  try {
+    const accountId = req.user?.sub;
+
+    if (!accountId) {
+      return res.status(400).json({
+        success: false,
+        message: "Organization context missing",
+      });
+    }
+
+    await removeOrganizationLogoService({ accountId });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logo removed",
+      data: { logo: null },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const uploadVerificationDocumentController = async (req, res, next) => {
   try {

@@ -88,6 +88,93 @@ export const getVerificationStatusService = async ({ accountId }) => {
   return profile;
 };
 
+const ALLOWED_LOGO_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/svg+xml"];
+const MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+/**
+ * Upload a facility's own logo for branding — shown in place of the
+ * generic org-type icon in the provider sidebar and, later, on
+ * patient-facing WelliBridge surfaces. Mirrors
+ * uploadVerificationDocumentService's Cloudinary pattern above, in a
+ * separate folder so a logo swap can never touch verification
+ * documents.
+ */
+export const uploadOrganizationLogoService = async ({ accountId, file }) => {
+  if (!file) {
+    throw new AppError("No image was uploaded", 400, "NO_FILE_UPLOADED");
+  }
+
+  if (!ALLOWED_LOGO_MIME_TYPES.includes(file.mimetype)) {
+    throw new AppError(
+      "Only JPG, PNG, WEBP, and SVG images are accepted",
+      400,
+      "INVALID_FILE_TYPE",
+    );
+  }
+
+  if (file.size > MAX_LOGO_SIZE_BYTES) {
+    throw new AppError("Image must be under 5MB", 400, "FILE_TOO_LARGE");
+  }
+
+  const profile = await OrganizationProfile.findOne({ accountId });
+
+  if (!profile) {
+    throw new AppError(
+      "Organization profile not found",
+      404,
+      "ORGANIZATION_PROFILE_NOT_FOUND",
+    );
+  }
+
+  const uploadResult = await new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "wellirecord/org-logos",
+        resource_type: "image",
+        public_id: `${accountId}_${Date.now()}`,
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      },
+    );
+    uploadStream.end(file.buffer);
+  }).catch(() => {
+    throw new AppError(
+      "Failed to upload logo. Please try again.",
+      502,
+      "LOGO_UPLOAD_FAILED",
+    );
+  });
+
+  profile.logo = uploadResult.secure_url;
+  await profile.save();
+
+  return profile;
+};
+
+/**
+ * Clears the facility's logo — the sidebar and any branded surfaces
+ * fall back to the default WelliRecord mark / org-type icon. Doesn't
+ * delete the asset from Cloudinary; only detaches it from the profile.
+ */
+export const removeOrganizationLogoService = async ({ accountId }) => {
+  const profile = await OrganizationProfile.findOne({ accountId });
+
+  if (!profile) {
+    throw new AppError(
+      "Organization profile not found",
+      404,
+      "ORGANIZATION_PROFILE_NOT_FOUND",
+    );
+  }
+
+  profile.logo = null;
+  await profile.save();
+
+  return profile;
+};
+
 export const getMyOrganizationService = async ({ accountId }) => {
   const profile = await OrganizationProfile.findOne({ accountId }).lean();
 

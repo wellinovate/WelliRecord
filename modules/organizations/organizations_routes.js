@@ -8,6 +8,8 @@ import {
   getVerificationStatusController,
   getMyOrganizationController,
   searchNearbyOrganizationsController,
+  uploadOrganizationLogoController,
+  removeOrganizationLogoController,
 } from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
 import { protect } from "../auth/auth_middleware.js";
@@ -28,6 +30,14 @@ router.post(
 );
 router.get("/verify-org/status", protect, getVerificationStatusController);
 router.get("/me", protect, getMyOrganizationController);
+
+router.post(
+  "/logo",
+  protect,
+  upload.single("logo"),
+  uploadOrganizationLogoController,
+);
+router.delete("/logo", protect, removeOrganizationLogoController);
 
 router.post("/register-patient", protect, registerPatientController);
 router.get("/patients", protect, getPatientsController);
