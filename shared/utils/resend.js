@@ -49,14 +49,72 @@ export const sendLabResultReadyEmail = async ({ email, patientName, isCritical =
       from: "WelliRecord <noreply@send.wellirecord.com>",
       to: email,
       subject: isCritical
-        ? "Urgent: a new lab result needs your attention"
-        : "Your lab result is ready to view",
+        ? "🚨 Urgent: Your Lab Result Is Ready to View - WelliRecord™"
+        : "Your Lab Result Is Ready to View - WelliRecord™",
       html: `
-        <div style="font-family: Arial;">
-          <h2>${isCritical ? "Urgent lab result available" : "New lab result available"}</h2>
-          <p>Hi ${patientName || "there"},</p>
-          <p>A laboratory result has been added to your WelliRecord.</p>
-          <p><a href="https://wellirecord.com/vault">Log in to view it securely</a></p>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; color: #1e293b;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            
+            <!-- Brand Header -->
+            <div style="background-color: #0b2447; padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">WelliRecord<span style="color: #38bdf8;">™</span></h1>
+              <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0; font-weight: 500;">One patient. One trusted record. Accessible when it matters.</p>
+            </div>
+
+            <!-- Main Content -->
+            <div style="padding: 36px 32px;">
+              <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">
+                ${isCritical ? "🚨 Urgent: Your Lab Result Is Ready to View" : "Your Lab Result Is Ready to View"}
+              </h2>
+
+              <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 16px;">
+                Hi <strong>${patientName || "there"}</strong>,
+              </p>
+
+              <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px;">
+                A new laboratory result has been securely added to your <strong>WelliRecord™</strong>.
+              </p>
+
+              <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px;">
+                You can now sign in to your account to view your result and keep it safely with your health records.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="https://wellirecord.com/vault" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);">
+                  Log in to View Your Result Securely
+                </a>
+              </div>
+
+              <!-- Security Tip Box -->
+              <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 6px 0; color: #0369a1; font-size: 14px; font-weight: 700;">🔐 Security Tip</h4>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #0c4a6e;">
+                  Your health information is private. <strong>Never share your WelliRecord password, verification code, or login link with anyone.</strong> Always access your result through the official WelliRecord platform.
+                </p>
+              </div>
+
+              <!-- Medical Tip Box -->
+              <div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <h4 style="margin: 0 0 6px 0; color: #854d0e; font-size: 14px; font-weight: 700;">🩺 Medical Tip</h4>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #713f12;">
+                  A laboratory result should be interpreted in the context of your symptoms, medical history, and other clinical findings. <strong>If your result is abnormal, unexpected, or marked as requiring follow-up, speak with your healthcare provider before making medical decisions.</strong>
+                </p>
+              </div>
+
+              <p style="font-size: 13px; line-height: 1.5; color: #64748b;">
+                Your result remains available in your WelliRecord, helping you maintain a continuous and accessible history of your healthcare information.
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f1f5f9; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 13px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">WelliRecord™</p>
+              <p style="font-size: 12px; font-style: italic; color: #64748b; margin: 0 0 12px 0;">One patient. One trusted record. Accessible when it matters.</p>
+              <p style="font-size: 11px; color: #94a3b8; margin: 0;">© WelliRecord™ | Secure digital health records</p>
+            </div>
+
+          </div>
         </div>
       `,
     });
