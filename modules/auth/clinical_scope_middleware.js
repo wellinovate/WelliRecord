@@ -1,4 +1,3 @@
-import { UserProfile } from "../users/user_profile_model.js";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 
@@ -43,40 +42,48 @@ export const restrictClinicalScope = (category) => async (req, res, next) => {
       return next();
     }
 
-    const accountId = req.user.accountId || req.user.id;
-    const profile = await UserProfile.findOne({ accountId }).select("_id");
-    if (!profile) {
-      // No profile resolved — fail open to the existing role/access
-      // checks rather than blocking here; this middleware only adds a
-      // restriction, it should never be the sole gate that grants access.
+    // BUGFIX: the JWT payload signed at login (shared/utils/helper.js,
+    // signAccessToken) only ever sets `sub` (Account._id) and
+    // `profileId` (UserProfile._id) — it never sets `accountId` or
+    // `id`. This line always evaluated to undefined, so
+    // UserProfile.findOne below always returned null and this
+    // middleware silently fell through to next() for every request —
+    // the eye-care category restriction below was never actually
+    // enforced. Fixed to read the field the token actually has.
+    if (req.user.profileId) {
+      const membership = await OrganizationMembership.findOne({
+        userId: req.user.profileId,
+        isActive: true,
+      }).select("organizationId");
+
+      if (!membership) {
+        return next();
+      }
+
+      const org = await OrganizationProfile
+        .findOne({ accountId: membership.organizationId })
+        .select("clinicalScope");
+
+      if (!org || org.clinicalScope === "general") {
+        return next();
+      }
+
+      if (org.clinicalScope === "eye_care" && !EYE_CARE_ALLOWED_CATEGORIES.has(category)) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "This facility is registered as an eye care provider and does not have access to this record category.",
+        });
+      }
+
       return next();
     }
 
-    const membership = await OrganizationMembership.findOne({
-      userId: profile._id,
-      isActive: true,
-    }).select("organizationId");
-
-    if (!membership) {
-      return next();
-    }
-
-    const org = await OrganizationProfile
-      .findOne({ accountId: membership.organizationId })
-      .select("clinicalScope");
-
-    if (!org || org.clinicalScope === "general") {
-      return next();
-    }
-
-    if (org.clinicalScope === "eye_care" && !EYE_CARE_ALLOWED_CATEGORIES.has(category)) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "This facility is registered as an eye care provider and does not have access to this record category.",
-      });
-    }
-
+    // No profileId on the token (e.g. the organization's own owner
+    // account, which authenticates with accountType "organization" and
+    // has no UserProfile) — fail open to the existing role/access
+    // checks rather than blocking here; this middleware only adds a
+    // restriction, it should never be the sole gate that grants access.
     return next();
   } catch (error) {
     next(error);

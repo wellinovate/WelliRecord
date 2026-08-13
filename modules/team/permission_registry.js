@@ -47,6 +47,7 @@ export const PERMISSIONS = {
   write_lab_results: { label: "Enter lab results", category: "lab" },
 
   view_prescriptions: { label: "View prescriptions", category: "pharmacy" },
+  create_prescriptions: { label: "Create prescriptions", category: "pharmacy" },
   dispense_medications: { label: "Dispense medications", category: "pharmacy" },
 
   view_vision_records: { label: "View vision records", category: "vision" },
@@ -71,7 +72,7 @@ const ROLE_DEFAULTS = {
     "view_patients", "register_patients",
     "view_clinical_records", "write_clinical_records",
     "view_lab_orders", "create_lab_orders",
-    "view_prescriptions",
+    "view_prescriptions", "create_prescriptions",
     "view_vision_records", "write_vision_records",
     "manage_appointments",
     "view_reports",
@@ -80,7 +81,7 @@ const ROLE_DEFAULTS = {
     "view_patients", "register_patients",
     "view_clinical_records", "write_clinical_records",
     "view_lab_orders", "create_lab_orders",
-    "view_prescriptions",
+    "view_prescriptions", "create_prescriptions",
     "view_vision_records", "write_vision_records",
     "manage_appointments",
     "view_reports",

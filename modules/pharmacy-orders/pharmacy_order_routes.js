@@ -1,6 +1,7 @@
 import express from "express";
 import { protect } from "../auth/auth_middleware.js";
 import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
+import { requirePermission } from "../team/require_permission_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
   createPharmacyOrderController,
@@ -20,6 +21,7 @@ router.get(
   "/",
   protect,
   restrictClinicalScope("pharmacy-orders"),
+  requirePermission("view_prescriptions"),
   getAllPharmacyOrdersController,
 );
 
@@ -27,6 +29,7 @@ router.post(
   "/",
   protect,
   restrictClinicalScope("pharmacy-orders"),
+  requirePermission("create_prescriptions"),
   validate(createPharmacyOrderSchema),
   createPharmacyOrderController,
 );
@@ -35,6 +38,7 @@ router.patch(
   "/:id/status",
   protect,
   restrictClinicalScope("pharmacy-orders"),
+  requirePermission("view_prescriptions"),
   validate(updatePharmacyOrderStatusSchema),
   updatePharmacyOrderStatusController,
 );
@@ -43,6 +47,7 @@ router.patch(
   "/:id/dispense",
   protect,
   restrictClinicalScope("pharmacy-orders"),
+  requirePermission("dispense_medications"),
   validate(dispensePharmacyOrderSchema),
   dispensePharmacyOrderController,
 );
