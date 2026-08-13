@@ -8,7 +8,22 @@ import {
   getRoleCatalogService,
   getPermissionRegistryService,
   updateMemberPermissionsService,
+  getMyMembershipService,
 } from "./team_services.js";
+
+export const getMyMembershipController = async (req, res, next) => {
+  try {
+    const profileId = req.user.profileId;
+    const result = await getMyMembershipService({ profileId });
+    return res.status(200).json({
+      success: true,
+      message: "Membership details retrieved successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getPermissionRegistryController = async (req, res, next) => {
   try {

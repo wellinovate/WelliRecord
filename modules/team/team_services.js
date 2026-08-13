@@ -67,6 +67,30 @@ export const getPermissionRegistryService = () => {
   };
 };
 
+export const getMyMembershipService = async ({ profileId }) => {
+  if (!profileId) return null;
+
+  const membership = await OrganizationMembership.findOne({
+    userId: profileId,
+    isActive: true,
+  }).lean();
+
+  if (!membership) return null;
+
+  const permissions = getEffectivePermissions(
+    membership.membershipRole,
+    membership.permissionOverrides,
+  );
+
+  return {
+    membershipId: membership._id.toString(),
+    organizationId: membership.organizationId.toString(),
+    role: membership.membershipRole,
+    permissions,
+    permissionOverrides: membership.permissionOverrides || { granted: [], revoked: [] },
+  };
+};
+
 export const listTeamMembersService = async ({ organizationId }) => {
   const memberships = await OrganizationMembership.find({ organizationId }).populate("userId");
 
