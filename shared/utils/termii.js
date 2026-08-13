@@ -43,7 +43,7 @@ export const sendSms = async ({ phoneNumber, message }) => {
     from: TERMII_SENDER_ID,
     sms: message,
     type: "plain",
-    channel: "generic",
+    channel: TERMII_OTP_CHANNEL,
   });
 
   // Termii can return HTTP 200 with a body indicating failure (e.g. no
