@@ -248,6 +248,7 @@ export const searchNearbyOrganizationsController = async (req, res, next) => {
 export const getMyOrganizationController = async (req, res, next) => {
   try {
     const accountId = req.user?.sub;
+    const profileId = req.user?.profileId;
 
     if (!accountId) {
       return res.status(400).json({
@@ -256,7 +257,7 @@ export const getMyOrganizationController = async (req, res, next) => {
       });
     }
 
-    const organization = await getMyOrganizationService({ accountId });
+    const organization = await getMyOrganizationService({ accountId, profileId });
 
     return res.status(200).json({
       success: true,

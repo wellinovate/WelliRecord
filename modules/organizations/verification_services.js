@@ -1,4 +1,5 @@
 import { OrganizationProfile } from "./organizations_model.js";
+import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import cloudinary from "../../shared/config/cloudinary.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
@@ -175,8 +176,25 @@ export const removeOrganizationLogoService = async ({ accountId }) => {
   return profile;
 };
 
-export const getMyOrganizationService = async ({ accountId }) => {
-  const profile = await OrganizationProfile.findOne({ accountId }).lean();
+export const getMyOrganizationService = async ({ accountId, profileId }) => {
+  let profile = await OrganizationProfile.findOne({ accountId }).lean();
+
+  // Org owners find their profile directly above. Staff (doctor, nurse,
+  // etc.) never own an OrganizationProfile — they belong to one via an
+  // OrganizationMembership row instead, keyed by their UserProfile id
+  // (profileId, from the JWT), not their account id.
+  if (!profile && profileId) {
+    const membership = await OrganizationMembership.findOne({
+      userId: profileId,
+      isActive: true,
+    }).lean();
+
+    if (membership) {
+      profile = await OrganizationProfile.findOne({
+        accountId: membership.organizationId,
+      }).lean();
+    }
+  }
 
   if (!profile) {
     throw new AppError(
