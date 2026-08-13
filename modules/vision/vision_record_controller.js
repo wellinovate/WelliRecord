@@ -14,7 +14,11 @@ export const createVisionVisitController = async (req, res, next) => {
     // routes in this backend.
     const record = await createVisionVisitService({
       patientId,
-      actingAccountId: req.user.id, // set by `protect` middleware
+      // BUGFIX: was req.user.id, which the JWT payload never sets —
+      // same root cause as the identity_controller.js and
+      // clinical_scope_middleware.js fixes. Account.findById below
+      // needs the account id, which is `sub` on this token.
+      actingAccountId: req.user.sub,
       wrOrgId: req.user.wrOrgId,
       clinicName,
       acuity: typeof acuity === "string" ? JSON.parse(acuity) : acuity,

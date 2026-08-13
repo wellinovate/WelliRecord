@@ -38,9 +38,17 @@ export const createVisionVisitService = async ({
   treatment,
   photoFiles = [],
 }) => {
-  const provider = await Account.findById(actingAccountId);
-
-  if (!provider || provider.role !== "provider") {
+  // BUGFIX: Account.role is never actually set to the literal string
+  // "provider" anywhere in this codebase — staff accounts get
+  // "doctor"/"nurse"/"staff"/"provider_admin" (see team_services.js
+  // toAccountRole), and the organization owner account's role is null
+  // (accountType "organization", role only required for accountType
+  // "user"). The old check rejected every caller, including a
+  // correctly-resolved provider account, once the actingAccountId
+  // field-name bug above was fixed — the two bugs were masking each
+  // other. What this check actually means, per the comment above, is
+  // "not a patient account".
+  if (!provider || provider.role === "patient") {
     const error = new Error("Only a provider account can add a vision record entry");
     error.statusCode = 403;
     throw error;

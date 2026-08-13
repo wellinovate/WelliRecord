@@ -13,6 +13,7 @@ import {
 import { validateObjectIdParam } from "../../shared/libs/common_validators.js";
 import { protect } from "../auth/auth_middleware.js";
 import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
+import { requirePermission } from "../team/require_permission_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 
 const router = express.Router();
@@ -41,6 +42,7 @@ router.post(
   "/",
   protect,
   restrictClinicalScope("vitals"),
+  requirePermission("write_clinical_records"),
   // requireOrganizationAccount,
   validate(createVitalSchema),
   createVitalController,
@@ -50,6 +52,7 @@ router.get(
   "/patient/:patientId",
   protect,
   restrictClinicalScope("vitals"),
+  requirePermission("view_clinical_records"),
   validate(getPatientVitalsParamsSchema, "params"),
   getPatientVitalsController,
 );

@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { protect, requireRole } from "../auth/auth_middleware.js";
+import { requirePermission } from "../team/require_permission_middleware.js";
 import {
   createVisionVisitController,
   getVisionRecordController,
@@ -31,6 +32,7 @@ router.post(
   "/:patientId/visits",
   protect,
   requireRole(...PROVIDER_SIDE_ROLES),
+  requirePermission("write_vision_records"),
   upload.array("photos", 6),
   createVisionVisitController,
 );
@@ -38,13 +40,22 @@ router.post(
 // Org-wide list for the standalone provider Vision page. Placed before
 // "/:patientId" — otherwise Express would match "patients" as a
 // patientId value and this route would never be reached.
-router.get("/patients", protect, requireRole(...PROVIDER_SIDE_ROLES), getAllPatientVisionController);
+router.get(
+  "/patients",
+  protect,
+  requireRole(...PROVIDER_SIDE_ROLES),
+  requirePermission("view_vision_records"),
+  getAllPatientVisionController,
+);
 
 // Read: any authenticated account that already has access to this
 // patient's record (the patient themselves, or a provider with a
 // standing access grant) can read. This route intentionally does not
 // duplicate WelliRecord's access-grant logic — it defers to the same
 // `protect` + record-access check every other record-read route uses.
-router.get("/:patientId", protect, getVisionRecordController);
+// requirePermission runs too — it's a no-op for the patient themselves
+// (patients are exempted inside the middleware) and only narrows the
+// provider-side case.
+router.get("/:patientId", protect, requirePermission("view_vision_records"), getVisionRecordController);
 
 export default router;
