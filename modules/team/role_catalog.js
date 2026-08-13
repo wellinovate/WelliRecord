@@ -47,7 +47,7 @@ const CATALOGS = {
   lab: {
     roles: ["provider_admin", "lab_tech", "frontdesk", "support_staff"],
     labelOverrides: {
-      lab_tech: "Lab Scientist / Technician",
+      lab_tech: "Lab Technician / Lab Scientist",
     },
   },
   pharmacy: {
