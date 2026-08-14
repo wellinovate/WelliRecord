@@ -2,6 +2,7 @@ import {
   createLabResultService,
   getAllPatientLabResultsService,
   getPatientLabResultsService,
+  correctLabResultService,
 } from "./lab_result_service.js";
 import { getPatientLabResultsQuerySchema } from "./lab_result_validation.js";
 
@@ -82,6 +83,32 @@ export const getMyLabResultsController = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Patient lab results fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const correctLabResultController = async (req, res, next) => {
+  try {
+    // validate() overwrites req.validated on each call, so with params
+    // and body both validated on this route, id has to come from
+    // req.params (already checked as a valid ObjectId by the params
+    // validator before this controller runs) rather than req.validated.
+    const { id } = req.params;
+    const { recordStatus, reason } = req.validated;
+
+    const result = await correctLabResultService({
+      labResultId: id,
+      recordStatus,
+      reason,
+      authUser: req.user,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Lab result marked ${recordStatus}`,
       data: result,
     });
   } catch (error) {

@@ -7,10 +7,13 @@ import {
   createLabResultController,
   getAllPatientLabResultsController,
   getPatientLabResultsController,
+  correctLabResultController,
 } from "./lab_result_controller.js";
 import {
   createLabResultSchema,
   getPatientLabResultsParamsSchema,
+  labResultIdParamsSchema,
+  correctLabResultSchema,
 } from "./lab_result_validation.js";
 
 const router = express.Router();
@@ -38,6 +41,16 @@ router.get(
   restrictClinicalScope("lab-results"),
   requirePermission("view_lab_orders"),
   getAllPatientLabResultsController,
+);
+
+router.patch(
+  "/:id/status",
+  protect,
+  restrictClinicalScope("lab-results"),
+  requirePermission("write_lab_results"),
+  validate(labResultIdParamsSchema, "params"),
+  validate(correctLabResultSchema),
+  correctLabResultController,
 );
 
 export default router;

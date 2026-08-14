@@ -241,3 +241,48 @@ export const getAllPatientLabResultsService = async ({
     },
   };
 };
+
+// Marks a lab result as archived or entered-in-error. This is the only
+// place recordStatus can move off "active" through the API — it was
+// previously only reachable by editing the database directly, which is
+// how a mistaken duplicate result (same draw, wrong unit, typo'd test
+// name) stayed visible to a patient as "Verified" for as long as it did.
+export const correctLabResultService = async ({
+  labResultId,
+  recordStatus,
+  reason,
+  authUser,
+}) => {
+  const result = await labResultModel.findById(labResultId);
+
+  if (!result) {
+    const error = new Error("Lab result not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (result.recordStatus !== "active") {
+    const error = new Error(
+      `Lab result is already ${result.recordStatus}, not active`,
+    );
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const correctedBy = authUser?.sub || null;
+  const correctionNote = `[${new Date().toISOString()}] Marked ${recordStatus} by ${correctedBy || "unknown user"}: ${reason}`;
+
+  result.recordStatus = recordStatus;
+  result.notes = result.notes
+    ? `${result.notes}\n${correctionNote}`
+    : correctionNote;
+
+  await result.save();
+
+  return {
+    id: result._id,
+    recordStatus: result.recordStatus,
+    notes: result.notes,
+    updatedAt: result.updatedAt,
+  };
+};

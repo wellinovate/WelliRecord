@@ -79,6 +79,19 @@ export const getPatientLabResultsParamsSchema = z.object({
   patientId: objectIdSchema,
 });
 
+export const labResultIdParamsSchema = z.object({
+  id: objectIdSchema,
+});
+
+// Only "archived" and "entered-in-error" are reachable through this
+// endpoint. Reactivating a record back to "active" is deliberately not
+// supported here — that would let a mistaken correction be silently
+// undone with no more scrutiny than the correction itself got.
+export const correctLabResultSchema = z.object({
+  recordStatus: z.enum(["archived", "entered-in-error"]),
+  reason: z.string().trim().min(3).max(500),
+});
+
 export const getPatientLabResultsQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1).optional(),
   limit: z.coerce.number().min(1).max(100).default(10).optional(),
