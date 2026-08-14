@@ -283,6 +283,35 @@ export async function getPatientAllergies(patientId, options) {
 
 // services/userProfile.service.ts
 
+// Fields returned as-is from the UserProfile document. Kept as one
+// list so a field added to the schema only needs to be added here to
+// become visible through this endpoint, instead of also needing a
+// matching line inside a hand-written return object that's easy to
+// forget (this is how `homeAddress` ended up collected at signup but
+// never returned here — see updateUserProfileService for the same
+// field on the write side).
+const READABLE_PROFILE_FIELDS = [
+  "wrId",
+  "fullName",
+  "firstName",
+  "middleName",
+  "lastName",
+  "email",
+  "phone",
+  "gender",
+  "dateOfBirth",
+  "homeAddress",
+  "avatar",
+  "emergencyContacts",
+  "notificationPreferences",
+  "bloodGroup",
+  "genotype",
+  "confirmedNone",
+  "isLicensed",
+  "createdAt",
+  "updatedAt",
+];
+
 export const getUserProfile = async (accountId) => {
   try {
     const account = await Account.findById(accountId).select("email isVerified");
@@ -290,14 +319,10 @@ export const getUserProfile = async (accountId) => {
     const profile = await UserProfile.findOne({
       accountId: accountId,
     });
-    // .lean();
-    console.log("🚀 ~ getUserProfile ~ profile:", profile);
 
     if (profile && !profile.wrId) {
       profile.wrId = generateWelliRecordId();
-      console.log("🚀 ~ getUserProfile ~ profile.wrId:", profile.wrId);
       await profile.save();
-      console.log(profile);
     }
 
     if (!profile) {
@@ -307,30 +332,18 @@ export const getUserProfile = async (accountId) => {
       };
     }
 
-    return {
+    const result = {
       id: profile._id,
-      wrId: profile.wrId,
-      fullName: profile.fullName,
-      firstName: profile.firstName,
-      middleName: profile.middleName,
-      lastName: profile.lastName,
-      email: profile.email,
-      phone: profile.phone,
-      gender: profile.gender,
-      dateOfBirth: profile.dateOfBirth,
-      avatar: profile.avatar,
-      emergencyContacts: profile.emergencyContacts,
-      notificationPreferences: profile.notificationPreferences,
-      bloodGroup: profile.bloodGroup,
-      genotype: profile.genotype,
-      confirmedNone: profile.confirmedNone,
-      isLicensed: profile.isLicensed,
       isVerified: Boolean(account?.isVerified),
-      createdAt: profile.createdAt,
-      updatedAt: profile.updatedAt,
     };
+
+    for (const field of READABLE_PROFILE_FIELDS) {
+      result[field] = profile[field];
+    }
+
+    return result;
   } catch (error) {
-    console.log("🚀 ~ getUserProfile ~ error:", error);
+    console.error("🚀 ~ getUserProfile ~ error:", error);
   }
 };
 
@@ -346,8 +359,19 @@ const sanitizeNullableString = (value) => {
   return value.trim();
 };
 
+// Free-text fields with no rule beyond "trim it, default to empty
+// string if cleared" — no write-once restriction, no enum, no nested
+// shape. Handled generically below so adding one of these later means
+// adding a name to this list, not a new hand-written `if (... in
+// payload)` block that the read side (READABLE_PROFILE_FIELDS above)
+// then also needs to remember to match.
+const SIMPLE_STRING_FIELDS = ["firstName", "middleName", "lastName"];
+
+// Same, but the field is allowed to be explicitly cleared to null
+// rather than falling back to "".
+const NULLABLE_STRING_FIELDS = ["avatar", "homeAddress"];
+
 export const updateUserProfileService = async ({ userId, payload }) => {
-  console.log("🚀 ~ updateUserProfileService ~ payload:", payload);
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid user id");
   }
@@ -388,9 +412,16 @@ export const updateUserProfileService = async ({ userId, payload }) => {
     updateData.gender = gender;
   }
 
-  // Editable fields only
-  if ("avatar" in payload) {
-    updateData.avatar = sanitizeNullableString(payload.avatar);
+  for (const field of SIMPLE_STRING_FIELDS) {
+    if (field in payload) {
+      updateData[field] = sanitizeString(payload[field]) || "";
+    }
+  }
+
+  for (const field of NULLABLE_STRING_FIELDS) {
+    if (field in payload) {
+      updateData[field] = sanitizeNullableString(payload[field]);
+    }
   }
 
   if ("dateOfBirth" in payload) {
@@ -403,18 +434,6 @@ export const updateUserProfileService = async ({ userId, payload }) => {
       }
       updateData.dateOfBirth = parsed;
     }
-  }
-
-  if ("firstName" in payload) {
-    updateData.firstName = sanitizeString(payload.firstName) || "";
-  }
-
-  if ("middleName" in payload) {
-    updateData.middleName = sanitizeString(payload.middleName) || "";
-  }
-
-  if ("lastName" in payload) {
-    updateData.lastName = sanitizeString(payload.lastName) || "";
   }
 
   if ("fullName" in payload) {
