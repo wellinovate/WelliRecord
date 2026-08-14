@@ -26,7 +26,7 @@ const pharmacySupplierSchema = new Schema(
   { timestamps: true },
 );
 
-pharmacySupplierSchema.index({ organizationId: 1, name: 1 }, { unique: true });
+pharmacySupplierSchema.index({ organizationId: 1, name: 1 });
 
 export const pharmacySupplierModel = mongoose.model(
   "PharmacySupplier",
