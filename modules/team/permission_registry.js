@@ -50,6 +50,10 @@ export const PERMISSIONS = {
   create_prescriptions: { label: "Create prescriptions", category: "pharmacy" },
   dispense_medications: { label: "Dispense medications", category: "pharmacy" },
 
+  view_pharmacy_inventory: { label: "View pharmacy inventory", category: "pharmacy" },
+  manage_pharmacy_inventory: { label: "Manage products, batches, and stock adjustments", category: "pharmacy" },
+  manage_pharmacy_purchasing: { label: "Create purchase orders and receive goods", category: "pharmacy" },
+
   view_vision_records: { label: "View vision records", category: "vision" },
   write_vision_records: { label: "Record vision exams", category: "vision" },
 
@@ -99,6 +103,7 @@ const ROLE_DEFAULTS = {
   pharmacist: [
     "view_patients",
     "view_prescriptions", "dispense_medications",
+    "view_pharmacy_inventory", "manage_pharmacy_inventory", "manage_pharmacy_purchasing",
   ],
   frontdesk: [
     "view_patients", "register_patients",
