@@ -78,8 +78,16 @@ export const registerPatientService = async ({
   }
 
   // 🔗 STEP 3: link patient to organization
+  // Dedupe key matches the unique index on PatientOrganization
+  // ({ patientId, organizationId }) and the same lookup used in
+  // linkPatientToOrganizationService. Previously this queried by
+  // { patientIdentity, organizationId } instead, which doesn't match
+  // what the index enforces — a patient linked first via
+  // /patient/link (patientId only, no patientIdentity) would not be
+  // found here, and the create() below would then hit a duplicate-key
+  // error from the index instead of updating lastSeenAt.
   let patientOrg = await PatientOrganization.findOne({
-    patientIdentity: patient._id,
+    patientId: patient._id,
     organizationId,
   });
   

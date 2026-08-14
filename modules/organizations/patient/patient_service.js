@@ -363,7 +363,6 @@ export const linkPatientToOrganizationService = async ({
   createdBy,
 }) => {
   const patient = await UserProfile.findById(patientIdentityId);
-  console.log("🚀 ~ linkPatientToOrganizationService ~ patient:", patient);
 
   if (!patient) {
     const error = new Error("Patient not found");
@@ -375,7 +374,6 @@ export const linkPatientToOrganizationService = async ({
     patientId: patient._id,
     organizationId,
   });
-  console.log("🚀 ~ linkPatientToOrganizationService ~ relation:", relation);
 
   if (relation) {
     return {
@@ -393,7 +391,6 @@ export const linkPatientToOrganizationService = async ({
     externalPatientId: generatePatientCode(),
     createdBy,
   });
-  console.log("🚀 ~ linkPatientToOrganizationService ~ relation:", relation);
 
   return {
     patientIdentityId: patient._id,
