@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import { accessGrantModel } from "./access_grant_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { Encounter } from "../encounter/encounter_model.js";
+import { ActivityLog } from "../analytics/activity_log_model.js";
 
 // Builds the right Mongo query for whichever ID format was submitted.
 // Patients only ever see the WR-XXXX-XXXX form (wrOrgId), so that has
@@ -406,4 +408,93 @@ export const buildClinicalAccessFilter = ({ grant, patientId, category }) => {
   }
 
   return filter;
+};
+
+// Access-context gate for a patient's core record (name, demographics,
+// relationship info — see resolveConsentAccess above for gating a
+// clinical-record *list* like vitals, which is a different shape of
+// problem). A doctor can open a patient's chart if:
+//   - they own the organization, or hold provider_admin (unrestricted
+//     by design — see permission_registry.js's getRoleDefaultPermissions)
+//   - they've had an encounter with this patient
+//   - the patient granted them (or their org) full-record consent
+//   - they invoke emergency access — always allowed, but only when a
+//     reason is given, and always logged distinctly from a normal view
+//
+// Deliberately doesn't implement "assigned patient", "referral",
+// "department", or "treatment relationship" — none of those have a
+// real data model anywhere in this codebase (no referrals module, no
+// patient-assignment concept, "department" is an unused field on
+// OrganizationMembership). Faking a check against data that doesn't
+// exist would just be a differently-shaped version of the problem
+// this function exists to close.
+export const resolvePatientRecordAccess = async ({
+  actor,
+  patientId,
+  emergencyAccess = false,
+  emergencyReason = null,
+}) => {
+  if (!actor?.isOrganizationActor) {
+    return { allowed: false, reason: null };
+  }
+
+  if (actor.isOrgOwner || actor.role === "provider_admin") {
+    return { allowed: true, reason: "admin" };
+  }
+
+  const hasEncounter = await Encounter.exists({
+    patientId,
+    providerId: actor.userId,
+  });
+
+  if (hasEncounter) {
+    return { allowed: true, reason: "encounter" };
+  }
+
+  const grant = await findActiveAccessGrant({
+    patientId,
+    userId: actor.userId,
+    organizationId: actor.organizationId,
+    category: null, // only a full-record grant unlocks the chart itself
+  });
+
+  if (grant) {
+    return { allowed: true, reason: "consent", grantId: grant._id };
+  }
+
+  if (emergencyAccess) {
+    if (!emergencyReason || !emergencyReason.trim()) {
+      const error = new Error("A reason is required to use emergency access.");
+      error.statusCode = 400;
+      throw error;
+    }
+    return { allowed: true, reason: "emergency", emergencyReason: emergencyReason.trim() };
+  }
+
+  return { allowed: false, reason: null };
+};
+
+// Who looked at what, and why — the audit-trail half of the
+// access-context spec. Best-effort: a logging failure should never be
+// the reason a legitimate view gets blocked, so this swallows its own
+// errors instead of propagating them into the request.
+export const logPatientRecordAccess = async ({ actor, patientId, decision }) => {
+  try {
+    const actionType =
+      decision.reason === "emergency" ? "emergency_access_used" : "record_viewed";
+    const message =
+      decision.reason === "emergency"
+        ? `Emergency access used: ${decision.emergencyReason}`
+        : `Patient record viewed (${decision.reason})`;
+
+    await ActivityLog.create({
+      organizationId: actor.organizationId,
+      providerId: actor.userId,
+      patientId,
+      actionType,
+      message,
+    });
+  } catch (error) {
+    console.error("Failed to write patient access log:", error.message);
+  }
 };

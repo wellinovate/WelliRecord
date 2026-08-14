@@ -43,6 +43,8 @@ const activityLogSchema = new Schema(
         "record_viewed",
         "consent_requested",
         "consent_granted",
+        "emergency_access_used",
+        "record_access_denied",
       ],
       required: true,
       index: true,

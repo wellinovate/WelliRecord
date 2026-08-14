@@ -5,11 +5,21 @@ import {
   linkPatientToOrganizationService,
   searchPatientForOrganizationService,
 } from "./patient_service.js";
+import { resolveActorContext } from "../../vitals/vital_service.js";
 
 export const getPatientsController = async (req, res, next) => {
   try {
     const { search, page, limit } = req.query;
-    const organizationId = req.user?.organizationId;
+
+    // BUGFIX: this read req.user?.organizationId directly, which the
+    // JWT only ever sets for the account that owns the organization
+    // (signAccessToken, shared/utils/helper.js) — every staff member
+    // (doctor, nurse, ...) got "Organization context missing" and
+    // could never list patients at all. Same underlying issue as
+    // resolveActorContext's classification bug; reusing that resolver
+    // here instead of a third copy of the same fix.
+    const actor = await resolveActorContext(req.user);
+    const organizationId = actor.organizationId;
 
     if (!organizationId) {
       return res.status(400).json({
@@ -38,7 +48,7 @@ export const getPatientsController = async (req, res, next) => {
 export const getPatientDetailController = async (req, res, next) => {
   try {
     const { patientId } = req.params;
-    console.log("🚀 ~ getPatientDetailController ~ patientId:", patientId);
+    const { emergencyAccess, emergencyReason } = req.query;
     const organizationId = req.user?.sub;
     const authUser = req.user;
 
@@ -53,6 +63,8 @@ export const getPatientDetailController = async (req, res, next) => {
       patientId,
       organizationId,
       authUser,
+      emergencyAccess: emergencyAccess === "true" || emergencyAccess === true,
+      emergencyReason: emergencyReason || null,
     });
 
     return res.status(200).json({

@@ -10,6 +10,7 @@ import { Encounter } from "../../encounter/encounter_model.js";
 import { UserProfile } from "../../users/user_profile_model.js";
 import { PatientOrganization } from "../patient_organization_model.js";
 import { resolvePatientAccessContext } from "../../vitals/vital_service.js";
+import { resolvePatientRecordAccess, logPatientRecordAccess } from "../../access/access_grant_service.js";
 
 export const getPatientsService = async ({
   organizationId,
@@ -131,6 +132,8 @@ export const getPatientDetailService = async ({
   patientId,
   organizationId,
   authUser,
+  emergencyAccess = false,
+  emergencyReason = null,
 }) => {
   if (!mongoose.Types.ObjectId.isValid(patientId)) {
     const error = new Error("Invalid patientId");
@@ -145,10 +148,32 @@ export const getPatientDetailService = async ({
       patientId,
       authUser,
     });
-      console.log("🚀 ~ getPatientDetailService ~ resolvedPatientId:", resolvedPatientId)
-      console.log("🚀 ~ getPatientDetailService ~ actor:", actor)
 
+  // Access-context gate — encounter, consent, admin, or emergency
+  // override. Runs before the organization-level relationship lookup
+  // below so a denied request never even reaches the patient's real
+  // data. See resolvePatientRecordAccess for what each of those means
+  // and what's deliberately not implemented yet (referral, department,
+  // assignment — no backing data model for any of those today).
+  const accessDecision = await resolvePatientRecordAccess({
+    actor,
+    patientId: resolvedPatientId,
+    emergencyAccess,
+    emergencyReason,
+  });
 
+  if (!accessDecision.allowed) {
+    const error = new Error(
+      "You don't have an encounter or consent on record for this patient. If this is urgent, use emergency access and provide a reason.",
+    );
+    error.statusCode = 403;
+    error.code = "PATIENT_ACCESS_DENIED";
+    throw error;
+  }
+
+  // Fire-and-forget — see logPatientRecordAccess for why this never
+  // blocks the response even if the write fails.
+  logPatientRecordAccess({ actor, patientId: resolvedPatientId, decision: accessDecision });
 
   const relationByPatientId = await PatientOrganization.findOne({
     patientId: resolvedPatientId,

@@ -3,6 +3,7 @@ import { vitalModel } from "./vitals_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import {
   buildClinicalAccessFilter,
   findActiveAccessGrant,
@@ -337,30 +338,72 @@ export const getPatientVitalsService = async ({
 //   };
 // };
 
-const resolveActorContext = async (authUser) => {
+// Roles that belong on the patient side even though the account itself
+// carries accountType "user" — same set used on the frontend
+// (RequireRole.tsx, ProviderLoginPage.tsx) to tell a patient apart
+// from staff, who share that same accountType.
+const PATIENT_SIDE_ROLES = new Set(["patient", "caregiver", "family_member"]);
+
+export const resolveActorContext = async (authUser) => {
   const userId = authUser?._id || authUser?.sub || null;
   const accountType =
     authUser?.accountType || authUser?.account?.accountType || null;
+  const role = authUser?.role || null;
 
-  const isOrganizationActor = accountType === "organization";
-  // accountType === "provider" ||
-
-  const isPatientActor = accountType === "user" || accountType === "patient";
+  // BUGFIX: this previously read `isOrganizationActor = accountType ===
+  // "organization"` — true only for the account that OWNS an
+  // organization. Every staff member (doctor, nurse, ...) is
+  // accountType "user", identical to a patient account, and was
+  // therefore misclassified as `isPatientActor: true`. Concretely:
+  // resolvePatientAccessContext's PATIENT ACTOR branch below compares
+  // the requested patientId against the *caller's own* UserProfile —
+  // which never matches when a doctor requests a real patient's
+  // record — so this threw 403 for every provider on every patient,
+  // unconditionally, regardless of any consent or encounter. Same bug
+  // class already fixed on the frontend in RequireRole.tsx and
+  // ProviderLoginPage.tsx; this is the backend instance of it, and
+  // it's shared by ~14 clinical modules (vitals, labs, medications,
+  // diagnoses, encounters, the patient detail endpoint, ...) that all
+  // import this same function, so this one fix applies everywhere at
+  // once rather than needing to be repeated per module.
+  const isPatientActor = accountType === "user" && PATIENT_SIDE_ROLES.has(role);
+  const isOrganizationActor = accountType === "organization" || (accountType === "user" && !isPatientActor);
+  const isOrgOwner = accountType === "organization";
 
   let organizationId = null;
   let wrOrgId = null;
   let organizationName = null;
 
   if (isOrganizationActor) {
-    const organization = await OrganizationProfile.findOne({
-      wrOrgId: authUser?.wrOrgId,
-    });
-    organizationId = organization._id;
-    organizationName = organization.organizationName;
-    wrOrgId = organization.wrOrgId;
-  }
+    // BUGFIX: this also looked up `OrganizationProfile.findOne({
+    // wrOrgId: authUser?.wrOrgId })` — the JWT (signAccessToken,
+    // shared/utils/helper.js) never sets a `wrOrgId` claim at all, so
+    // this always queried with `wrOrgId: undefined` and either threw
+    // (destructuring `organization._id` off a null result) or matched
+    // an arbitrary organization with no wrOrgId set. The org owner's
+    // own account id doubles as the organizationId convention used
+    // throughout (OrganizationMembership.organizationId refs Account,
+    // not OrganizationProfile) — see getMyOrganizationService for the
+    // same pattern already fixed there.
+    if (isOrgOwner) {
+      organizationId = userId;
+      const organization = await OrganizationProfile.findOne({ accountId: userId }).lean();
+      organizationName = organization?.organizationName || null;
+      wrOrgId = organization?.wrOrgId || null;
+    } else if (authUser?.profileId) {
+      const membership = await OrganizationMembership.findOne({
+        userId: authUser.profileId,
+        isActive: true,
+      }).select("organizationId").lean();
 
-  // const organizationId = (isOrganizationActor && authUser?.sub) || null;
+      if (membership) {
+        organizationId = membership.organizationId;
+        const organization = await OrganizationProfile.findOne({ accountId: membership.organizationId }).lean();
+        organizationName = organization?.organizationName || null;
+        wrOrgId = organization?.wrOrgId || null;
+      }
+    }
+  }
 
   return {
     userId,
@@ -368,6 +411,8 @@ const resolveActorContext = async (authUser) => {
     organizationName,
     wrOrgId,
     accountType,
+    role,
+    isOrgOwner,
     isOrganizationActor,
     isPatientActor,
   };
