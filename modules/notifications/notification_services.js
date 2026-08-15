@@ -120,20 +120,61 @@ const DEFAULT_TEMPLATES = [
     variables: ["patient_name", "provider_name", "org_name", "date", "time"],
   },
   {
+    // Separate row from the whatsapp one above, same name — this is
+    // the channel actually implemented today (see sendReminder,
+    // appointment_notifications.js). WhatsApp has no BSP wired up yet
+    // (see releaseLabDeliveryService), so that row stays as a
+    // placeholder for when it does.
+    name: "Appointment Reminder",
+    channel: "sms",
+    body: "Reminder: you have an appointment at {{org_name}} today at {{time}}. Reply if you need to reschedule.",
+    variables: ["org_name", "time"],
+  },
+  {
+    // Matches notifyAppointmentBooked's in-app notification.
+    name: "Appointment Confirmation",
+    channel: "in_app",
+    body: "Your appointment at {{org_name}}{{provider_suffix}} is booked for {{datetime}}.",
+    variables: ["org_name", "provider_suffix", "datetime"],
+  },
+  {
     name: "Lab Result Ready",
     channel: "sms",
-    body: "Your lab results from {{org_name}} are now available in your WelliRecord. Log in to view: {{link}}",
-    variables: ["org_name", "link"],
+    body: "Your lab results are now available in your WelliRecord. Log in to view: {{link}}",
+    variables: ["link"],
+  },
+  {
+    // Distinct from "Lab Result Ready" so a facility can toggle
+    // routine result notifications off while keeping critical alerts
+    // on (or vice versa) — they're different urgency, not just
+    // different wording of the same message.
+    name: "Critical Lab Alert",
+    channel: "sms",
+    body: "Urgent: a critical lab result has been released to your WelliRecord. Log in now: {{link}}",
+    variables: ["link"],
   },
 ];
 
 export const seedDefaultTemplates = async () => {
-  const count = await NotificationTemplate.countDocuments();
-  if (count === 0) {
-    await NotificationTemplate.insertMany(
-      DEFAULT_TEMPLATES.map((t) => ({ ...t, isActive: true })),
-    );
-  }
+  // Upserts by (name, channel) rather than bailing out once any
+  // template exists. A plain "insert only if collection is empty"
+  // check meant that adding a new template to DEFAULT_TEMPLATES here
+  // (as happened when Appointment Confirmation, the sms-channel
+  // Appointment Reminder, and Critical Lab Alert were added) would
+  // never actually create those rows on a database that already had
+  // the original 5 — resolveTemplatedMessage would find nothing and
+  // fail closed, silently breaking confirmations and reminders on
+  // every existing deployment. $setOnInsert leaves any row an admin
+  // has already edited (body, isActive) untouched.
+  await Promise.all(
+    DEFAULT_TEMPLATES.map((t) =>
+      NotificationTemplate.updateOne(
+        { name: t.name, channel: t.channel },
+        { $setOnInsert: { ...t, isActive: true } },
+        { upsert: true },
+      ),
+    ),
+  );
 };
 
 export const listTemplatesService = async ({ channel }) => {
@@ -150,6 +191,61 @@ export const toggleTemplateService = async ({ templateId, accountId }) => {
   template.lastModifiedBy = accountId;
   await template.save();
   return template;
+};
+
+// ── Template-driven message resolution ──
+//
+// Renders {{variable}} placeholders in a template's body/subject
+// against real values. Unresolved placeholders are left as-is rather
+// than silently blanked, so a missing variable is visible in the
+// rendered output instead of vanishing.
+const renderPlaceholders = (text, variables) =>
+  text.replace(/{{\s*(\w+)\s*}}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(variables, key)
+      ? String(variables[key] ?? "")
+      : match,
+  );
+
+// The single place every real send should go through to decide
+// whether, and with what content, to send — instead of each call site
+// carrying its own hardcoded string with no connection to the
+// admin-editable NotificationTemplate row of the same name/channel.
+// Deliberately distinguishes "explicitly deactivated" from "no
+// matching template row" — those are different situations:
+//   - deactivated: an admin made a deliberate choice. Honor it, don't
+//     send, that's the entire point of the toggle.
+//   - missing: a config/seeding gap, not a decision. Silently
+//     skipping is the wrong failure mode for anything time-sensitive
+//     or safety-relevant, so callers that can't tolerate silent loss
+//     (e.g. a critical lab alert) should pass safetyNetBody so a
+//     missing row degrades to a known-good message instead of nothing.
+//     Callers where silence is an acceptable failure (a routine
+//     reminder) should leave it unset and fail closed either way.
+export const resolveTemplatedMessage = async ({
+  name,
+  channel,
+  variables = {},
+  safetyNetBody = null,
+}) => {
+  const template = await NotificationTemplate.findOne({ name, channel });
+
+  if (template && !template.isActive) {
+    return { send: false, reason: "deactivated" };
+  }
+
+  if (!template) {
+    if (safetyNetBody) {
+      return { send: true, body: safetyNetBody, reason: "missing_template_fallback" };
+    }
+    return { send: false, reason: "missing_template" };
+  }
+
+  return {
+    send: true,
+    body: renderPlaceholders(template.body, variables),
+    subject: template.subject ? renderPlaceholders(template.subject, variables) : null,
+    reason: "template",
+  };
 };
 
 export const getDeliverySummaryService = async () => {

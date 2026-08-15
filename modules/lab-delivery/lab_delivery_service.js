@@ -6,7 +6,9 @@ import { createLabResultService } from "../lab/lab_result_service.js";
 import {
   createNotification,
   sendCriticalAlertSmsService,
+  resolveTemplatedMessage,
 } from "../notifications/notification_services.js";
+import { DeliveryLog } from "../notifications/delivery_log_model.js";
 import { sendSms, normalizeNigerianPhone } from "../../shared/utils/termii.js";
 import { sendLabResultReadyEmail } from "../../shared/utils/resend.js";
 
@@ -269,17 +271,56 @@ export const releaseLabDeliveryService = async ({ payload, authUser }) => {
   if (notificationChannels.sms && account?.phone) {
     try {
       if (isCritical) {
-        await sendCriticalAlertSmsService({
-          phoneNumber: account.phone,
-          message: `Urgent: a critical lab result has been released to your WelliRecord. Log in now: ${VAULT_LINK}`,
+        const resolved = await resolveTemplatedMessage({
+          name: "Critical Lab Alert",
+          channel: "sms",
+          variables: { link: VAULT_LINK },
+          // Patient safety-relevant — a missing (not deactivated)
+          // template row shouldn't mean this alert silently never
+          // sends, so this keeps a known-good message as a floor.
+          safetyNetBody: `Urgent: a critical lab result has been released to your WelliRecord. Log in now: ${VAULT_LINK}`,
         });
+
+        if (resolved.send) {
+          await sendCriticalAlertSmsService({
+            phoneNumber: account.phone,
+            message: resolved.body,
+          });
+          dispatch.sms = "sent";
+        } else {
+          await DeliveryLog.create({
+            channel: "sms",
+            status: "skipped",
+            recipient: account.phone,
+            context: "critical_lab_alert",
+            errorMessage: `Not sent: ${resolved.reason}`,
+          });
+          dispatch.sms = "skipped";
+        }
       } else {
-        await sendSms({
-          phoneNumber: account.phone,
-          message: `Your lab results are now available in your WelliRecord. Log in to view: ${VAULT_LINK}`,
+        const resolved = await resolveTemplatedMessage({
+          name: "Lab Result Ready",
+          channel: "sms",
+          variables: { link: VAULT_LINK },
         });
+
+        if (resolved.send) {
+          await sendSms({
+            phoneNumber: account.phone,
+            message: resolved.body,
+          });
+          dispatch.sms = "sent";
+        } else {
+          await DeliveryLog.create({
+            channel: "sms",
+            status: "skipped",
+            recipient: account.phone,
+            context: "lab_result_ready",
+            errorMessage: `Not sent: ${resolved.reason}`,
+          });
+          dispatch.sms = "skipped";
+        }
       }
-      dispatch.sms = "sent";
     } catch (e) {
       console.error("[releaseLabDeliveryService] SMS dispatch failed:", e.message);
       dispatch.sms = "failed";

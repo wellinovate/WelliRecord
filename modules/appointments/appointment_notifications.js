@@ -3,7 +3,7 @@ import { UserProfile } from "../users/user_profile_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { sendAppointmentConfirmationEmail } from "../../shared/utils/resend.js";
 import { sendSms } from "../../shared/utils/termii.js";
-import { createNotification } from "../notifications/notification_services.js";
+import { createNotification, resolveTemplatedMessage } from "../notifications/notification_services.js";
 import { DeliveryLog } from "../notifications/delivery_log_model.js";
 
 // ── Confirmation — fired right after an appointment is created.
@@ -40,12 +40,37 @@ export const notifyAppointmentBooked = async (appointmentId) => {
 
     if (patient.accountId) {
       try {
-        await createNotification({
-          recipientAccountId: patient.accountId,
-          type: "appointment",
-          title: "Appointment confirmed",
-          body: `Your appointment at ${orgName || "your facility"}${providerName ? ` with ${providerName}` : ""} is booked for ${new Date(appointment.scheduledFor).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Lagos" })}.`,
+        // Email confirmation above stays as-is — it's a branded HTML
+        // template (shared/utils/resend.js), a different rendering
+        // path than the plain-text {{variable}} templates in
+        // NotificationTemplate, and isn't gated by the toggle either.
+        // Only the in-app notification is template-driven here.
+        const resolved = await resolveTemplatedMessage({
+          name: "Appointment Confirmation",
+          channel: "in_app",
+          variables: {
+            org_name: orgName || "your facility",
+            provider_suffix: providerName ? ` with ${providerName}` : "",
+            datetime: new Date(appointment.scheduledFor).toLocaleString("en-NG", {
+              dateStyle: "medium",
+              timeStyle: "short",
+              timeZone: "Africa/Lagos",
+            }),
+          },
         });
+
+        if (resolved.send) {
+          await createNotification({
+            recipientAccountId: patient.accountId,
+            type: "appointment",
+            title: "Appointment confirmed",
+            body: resolved.body,
+          });
+        } else {
+          console.log(
+            `Appointment confirmation in-app notification skipped (${resolved.reason}) for account ${patient.accountId}`,
+          );
+        }
       } catch (err) {
         console.error("Appointment in-app notification failed:", err);
       }
@@ -84,10 +109,30 @@ const sendReminder = async (appointment) => {
     timeStyle: "short",
     timeZone: "Africa/Lagos",
   });
-  const message = `Reminder: you have an appointment at ${orgName} today at ${timeStr}. Reply if you need to reschedule.`;
+
+  const resolved = await resolveTemplatedMessage({
+    name: "Appointment Reminder",
+    channel: "sms",
+    variables: { org_name: orgName, time: timeStr },
+  });
+
+  if (!resolved.send) {
+    await DeliveryLog.create({
+      channel: "sms",
+      status: "skipped",
+      recipient: patient.phone,
+      context: "appointment_reminder",
+      errorMessage: `Not sent: ${resolved.reason}`,
+    });
+    await Appointment.updateOne(
+      { _id: appointment._id },
+      { $set: { reminderSentAt: new Date() } },
+    );
+    return;
+  }
 
   try {
-    await sendSms({ phoneNumber: patient.phone, message });
+    await sendSms({ phoneNumber: patient.phone, message: resolved.body });
     await DeliveryLog.create({
       channel: "sms",
       status: "sent",

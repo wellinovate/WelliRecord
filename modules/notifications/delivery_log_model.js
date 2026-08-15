@@ -13,7 +13,7 @@ const deliveryLogSchema = new Schema(
 
     status: {
       type: String,
-      enum: ["sent", "failed"],
+      enum: ["sent", "failed", "skipped"],
       required: true,
       index: true,
     },
