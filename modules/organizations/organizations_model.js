@@ -117,7 +117,13 @@ const organizationProfileSchema = new Schema(
     },
     verificationStatus: {
       type: String,
-      enum: ["not_submitted", "pending", "approved", "rejected"],
+      enum: [
+        "not_submitted",
+        "pending",
+        "approved",
+        "rejected",
+        "more_info_requested",
+      ],
       default: "not_submitted",
       index: true,
     },

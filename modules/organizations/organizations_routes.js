@@ -13,6 +13,7 @@ import {
 } from "./organizatons_controller.js";
 import { getPatientDetailController, getPatientsController, linkPatientToOrganizationController, searchPatientForOrganizationController } from "./patient/patient_controller.js";
 import { protect } from "../auth/auth_middleware.js";
+import { requireOrgVerified } from "./require_org_verified_middleware.js";
 import { addDoctorSchema, linkPatientSchema, searchPatientSchema, validate } from "./patient/patient_validator.js";
 import { getUserEncounterDetailControllerByOrganization } from "../encounter/encounter_controller.js";
 import { addDoctorToOrganizationController, getDoctorsController, searchDoctorForOrganizationController } from "../memberships/membership_controller.js";
@@ -39,10 +40,10 @@ router.post(
 );
 router.delete("/logo", protect, removeOrganizationLogoController);
 
-router.post("/register-patient", protect, registerPatientController);
-router.get("/patients", protect, getPatientsController);
-router.get("/memberships/doctors", protect, getDoctorsController);
-router.get("/patients/:patientId", protect, getPatientDetailController);
+router.post("/register-patient", protect, requireOrgVerified, registerPatientController);
+router.get("/patients", protect, requireOrgVerified, getPatientsController);
+router.get("/memberships/doctors", protect, requireOrgVerified, getDoctorsController);
+router.get("/patients/:patientId", protect, requireOrgVerified, getPatientDetailController);
 
 router.get("/search", searchProvidersController);
 router.get("/nearby", searchNearbyOrganizationsController);
@@ -50,6 +51,7 @@ router.get("/nearby", searchNearbyOrganizationsController);
 router.post(
   "/patient/search",
   protect,
+  requireOrgVerified,
   validate(searchPatientSchema),
   searchPatientForOrganizationController,
 );
@@ -57,20 +59,23 @@ router.post(
 router.post(
   "/doctor/search",
   protect,
+  requireOrgVerified,
   validate(searchPatientSchema),
   searchDoctorForOrganizationController,
 );
-router.get("/medical-history/encounter/:id/:patientId", protect, getUserEncounterDetailControllerByOrganization);
+router.get("/medical-history/encounter/:id/:patientId", protect, requireOrgVerified, getUserEncounterDetailControllerByOrganization);
 
 router.post(
   "/patient/link",
   protect,
+  requireOrgVerified,
   validate(linkPatientSchema),
   linkPatientToOrganizationController,
 );
 router.post(
   "/doctor/add",
   protect,
+  requireOrgVerified,
   validate(addDoctorSchema),
   addDoctorToOrganizationController,
 );
