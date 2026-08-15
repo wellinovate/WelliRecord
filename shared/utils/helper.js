@@ -1,10 +1,11 @@
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import crypto from "node:crypto";
+import { OrganizationMembership } from "../../modules/memberships/organization_membership_model.js";
 
 import dotenv from "dotenv";
 dotenv.config();
-export const signAccessToken = (results) => {
+export const signAccessToken = async (results) => {
   const { account, profile } = results;
 
   if (!account?._id && !account?.id) {
@@ -25,7 +26,6 @@ export const signAccessToken = (results) => {
       ? String(profile.id)
       : null,
   };
-  console.log("🚀 ~ signAccessToken ~ profile.wrOrgId:", profile.wrOrgId)
 
   if (account.accountType === "organization") {
     payload.organizationId = profile?._id
@@ -33,40 +33,33 @@ export const signAccessToken = (results) => {
       : profile?.id
       ? String(profile.id)
       : null;
-    // payload.wrOrgId = profile?.wrOrgId ?? null;
-
     payload.wrOrgId = profile.wrOrgId;
     payload.fullName = profile.organizationName;
-  }
+  } else if (payload.profileId) {
+    // BUGFIX: organizationId was only ever set on the org owner's
+    // token (accountType === "organization"). Staff accounts are
+    // accountType "user", identical to a patient, so their tokens
+    // never carried organizationId at all. shared/realtime/socket.js
+    // reads socket.data.user.organizationId to join each connection
+    // to `org:${organizationId}` — with it missing, every staff
+    // member's socket joined no room, so io.to(`org:${organizationId}`)
+    // broadcasts (lab_order_service.js, pharmacy_order_service.js)
+    // never reached them, only the org owner. Same underlying gap
+    // resolveActorContext (shared/vitals/vital_service.js) already
+    // works around per-request for REST; this resolves it once at
+    // login instead, via the same OrganizationMembership lookup, so
+    // it doesn't have to be re-derived on every socket/API call.
+    const membership = await OrganizationMembership.findOne({
+      userId: payload.profileId,
+      isActive: true,
+    })
+      .select("organizationId")
+      .lean();
 
-  // if (account.accountType === "organization") {
-  //   return jwt.sign(
-  //     {
-  //       sub: account._id,
-  //       isVerified: account.isVerified,
-  //       orgId: profile.wrOrgId,
-  //       organizationId: profile._id,
-  //       email: account.email,
-  //       fullName: profile.organizationName,
-  //       accountType: account.accountType,
-  //       role: account.accountType ?? null,
-  //     },
-  //     process.env.JWT_SECRET_KEY,
-  //     { expiresIn: "1d" },
-  //   );
-  // } else {
-  //   return jwt.sign(
-  //     {
-  //       sub: account._id,
-  //       email: account.email,
-  //       fullName: profile.fullName,
-  //       accountType: account.accountType,
-  //       role: account.role ?? null,
-  //     },
-  //     process.env.JWT_SECRET_KEY,
-  //     { expiresIn: "1d" },
-  //   );
-  // }
+    if (membership) {
+      payload.organizationId = String(membership.organizationId);
+    }
+  }
 
   return jwt.sign(payload, process.env.JWT_SECRET_KEY, {
     expiresIn: "1d",
@@ -75,7 +68,7 @@ export const signAccessToken = (results) => {
   });
 };
 
-export const signAccessTokenGoogle = (user) => {
+export const signAccessTokenGoogle = async (user) => {
   return signAccessToken({
     account: {
       _id: user.accountId,

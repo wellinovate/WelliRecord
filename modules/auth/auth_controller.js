@@ -58,7 +58,7 @@ export const login = async (req, res, next) => {
       profile: result.profile,
     };
 
-    const token = signAccessToken(results);
+    const token = await signAccessToken(results);
 
     res.cookie("accessToken", token, {
       httpOnly: true,
@@ -257,7 +257,7 @@ export const googleLoginController = async (req, res) => {
     }
 
     // Sign standard access token with complete payload + issuer/audience
-    const token = signAccessToken({ account, profile: user });
+    const token = await signAccessToken({ account, profile: user });
 
     return res.status(200).json({
       success: true,

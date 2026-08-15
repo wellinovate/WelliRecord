@@ -340,7 +340,7 @@ export const updateUserProfileController = async (req, res) => {
 
     let accessToken = null;
     if (account) {
-      accessToken = signAccessToken({ account, profile: updatedProfile });
+      accessToken = await signAccessToken({ account, profile: updatedProfile });
     }
 
     return res.status(200).json({
