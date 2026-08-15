@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
 import { labResultModel } from "./lab_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
-import { resolvePatientAccessContext } from "../vitals/vital_service.js";
-import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { resolvePatientAccessContext, resolveActorContext } from "../vitals/vital_service.js";
 import { resolveConsentAccess } from "../access/access_grant_service.js";
 
 export const createLabResultService = async ({ payload, authUser }) => {
@@ -182,24 +181,32 @@ export const getAllPatientLabResultsService = async ({
   limit = 10,
   authUser,
 }) => {
-  
-  let organizationId;
-    const wrOrgId = authUser?.wrOrgId || null;
-    const organization = await OrganizationProfile.findOne({
-      wrOrgId: wrOrgId,
-    });
-    if (!organization) {
-      const err = new Error("Organization not found for this account");
-      err.statusCode = 404;
-      throw err;
-    }
-    organizationId = organization._id;
-    const skip = (page - 1) * limit;
-  
-    const filter = {
-      organizationId: organizationId,
-      // recordStatus: "active",
-    };
+  // BUGFIX: this previously looked up
+  // `OrganizationProfile.findOne({ wrOrgId: authUser?.wrOrgId })`.
+  // The JWT never sets a `wrOrgId` claim (see signAccessToken in
+  // shared/utils/helper.js), so this always queried with
+  // `wrOrgId: undefined` — throwing "Organization not found" and
+  // 404ing for every provider, org owner and staff alike. It also
+  // never worked for staff even if wrOrgId had been set, since staff
+  // aren't the account the organization profile is keyed on.
+  // resolveActorContext (already fixed for this same bug in vitals)
+  // resolves organizationId correctly for both org owners and staff
+  // via OrganizationMembership, so reuse it here instead of
+  // re-deriving it from a claim that doesn't exist.
+  const { organizationId, isOrganizationActor } = await resolveActorContext(authUser);
+
+  if (!isOrganizationActor || !organizationId) {
+    const err = new Error("Organization not found for this account");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const skip = (page - 1) * limit;
+
+  const filter = {
+    organizationId: organizationId,
+    // recordStatus: "active",
+  };
 
   
 
