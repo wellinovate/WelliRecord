@@ -1,5 +1,6 @@
 import express from "express";
 import { protect } from "../auth/auth_middleware.js";
+import { requireWriteConsent } from "../access/require_write_consent_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
   createMedicationController,
@@ -17,6 +18,7 @@ router.post(
   "/",
   protect,
   validate(createMedicationSchema),
+  requireWriteConsent("medications"),
   createMedicationController,
 );
 

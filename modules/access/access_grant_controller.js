@@ -1,5 +1,6 @@
 import { vitalModel } from "../vitals/vitals_model.js";
 import { accessGrantModel } from "./access_grant_model.js";
+import { resolveActorContext } from "../vitals/vital_service.js";
 // import { accessAuditModel } from "./access_audit_model.js";
 
 import {
@@ -238,10 +239,53 @@ export const getPatientVitalsForProvider = async (req, res, next) => {
   }
 };
 
+export const getMyGrantedAccessAsProvider = async (req, res, next) => {
+  try {
+    const actor = await resolveActorContext(req.user);
+
+    if (!actor.isOrganizationActor) {
+      return res.status(403).json({
+        success: false,
+        message: "Only provider accounts can view grants issued to them.",
+      });
+    }
+
+    // Matches how findActiveAccessGrant checks granteeship elsewhere:
+    // either this specific staff member, or (if they belong to one)
+    // their organization was named as grantee.
+    const granteeConditions = [{ granteeUserId: actor.userId }];
+    if (actor.organizationId) {
+      granteeConditions.push({ granteeOrganizationId: actor.organizationId });
+    }
+
+    const grants = await accessGrantModel
+      .find({
+        status: "active",
+        $or: granteeConditions,
+      })
+      .populate({
+        path: "patientId",
+        select: "fullName wrId",
+      })
+      .select(
+        "patientId accessScope category permissions startsAt expiresAt status",
+      )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: grants.length,
+      data: grants,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const revokeAccessGrant = async (req, res, next) => {
   try {
     const { grantId } = req.params;
-    // console.log("🚀 ~ revokeAccessGrant ~ grantId:", grantId)
 
     const userId = getAuthUserId(req);
     // console.log("🚀 ~ revokeAccessGrant ~ userId:", userId)

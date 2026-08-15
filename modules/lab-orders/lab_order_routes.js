@@ -2,6 +2,7 @@ import express from "express";
 import { protect } from "../auth/auth_middleware.js";
 import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
 import { requirePermission } from "../team/require_permission_middleware.js";
+import { requireWriteConsent } from "../access/require_write_consent_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
   createLabOrderController,
@@ -31,6 +32,7 @@ router.post(
   restrictClinicalScope("lab-orders"),
   requirePermission("create_lab_orders"),
   validate(createLabOrderSchema),
+  requireWriteConsent("lab-results"),
   createLabOrderController,
 );
 
