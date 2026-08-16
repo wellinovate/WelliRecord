@@ -6,156 +6,205 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { generateEncounterCode } from "../../shared/utils/helper.js";
 import { vitalModel } from "../vitals/vitals_model.js";
 import { linkPatientToOrganizationService } from "../organizations/patient/patient_service.js";
+import { getMyOrganizationService } from "../organizations/verification_services.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+
+// Resolves the acting user's own organisation and confirms the queue
+// item actually belongs to it. Every queue item read/write below that
+// takes an existing queueId needs this — without it, `protect` alone
+// only proves *someone* is logged in, not that they belong to the
+// organisation the queue item (and its patient vitals/triage notes)
+// belongs to. Throws the same "not found" message either way so a
+// cross-org lookup can't be used to enumerate which queue IDs exist
+// at other facilities.
+const assertQueueItemOwnership = async (queueItem, authUser) => {
+  const org = await getMyOrganizationService({
+    accountId: authUser?.sub,
+    profileId: authUser?.profileId,
+  });
+
+  if (String(queueItem.organizationId) !== String(org._id)) {
+    throw new Error("Queue item not found");
+  }
+
+  return org;
+};
 
 export const createWalkInQueueService = async ({
   patientId,
   organizationId,
-  providerId = null,
-  visitType = "consultation",
-  priority = "normal",
-  chiefComplaint = null,
-  authUser,
+  departmentId = null,
+  assignedDoctorId = null,
+  visitType = "walk-in",
+  priority = "routine",
+  chiefComplaint = "",
+  triageNotes = "",
   checkedInBy = null,
+  authUser,
 }) => {
-
-  const {
-    actor,
-    patientId: patientIds,
-    isSelf,
-  } = await resolvePatientAccessContext({
-    patientId: patientId,
-    authUser,
-  });
- 
-  console.log(
-    "🚀 ~ createWalkInQueueService ~ organizationId:",
-    actor.organizationId,
-  );
-  console.log("🚀 ~ createWalkInQueueService ~ patientId:", patientId);
-  if (!patientIds || !actor.organizationId) {
-    throw new Error("patientId and organizationId are required");
-  }
-
-  if (!isValidObjectId(patientIds)) throw new Error("Invalid patientId");
-  if (!isValidObjectId(actor.organizationId))
+  if (!isValidObjectId(patientId)) throw new Error("Invalid patientId");
+  if (!isValidObjectId(organizationId))
     throw new Error("Invalid organizationId");
-  if (providerId && !isValidObjectId(providerId))
-    throw new Error("Invalid providerId");
+  if (departmentId && !isValidObjectId(departmentId))
+    throw new Error("Invalid departmentId");
+  if (assignedDoctorId && !isValidObjectId(assignedDoctorId))
+    throw new Error("Invalid assignedDoctorId");
   if (checkedInBy && !isValidObjectId(checkedInBy))
     throw new Error("Invalid checkedInBy");
 
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const dailyCount = await VisitQueue.countDocuments({
+    organizationId,
+    createdAt: { $gte: startOfDay, $lte: endOfDay },
+  });
+
+  const queueNumber = dailyCount + 1;
+
   const queueItem = await VisitQueue.create({
-    patientId: patientIds,
-    organizationId: actor.organizationId,
-    providerId,
+    patientId,
+    organizationId,
+    departmentId,
+    assignedDoctorId,
+    queueNumber,
     source: "walk-in",
     visitType,
     priority,
+    workflowStatus: "waiting",
     chiefComplaint,
-    workflowStatus: "checked-in",
-    checkedInAt: new Date(),
+    triageNotes,
     checkedInBy,
   });
 
-   const result = await linkPatientToOrganizationService({
-        patientIdentityId: patientIds,
-        organizationId: authUser.organizationId,
-        createdBy: authUser.sub,
-      });
-   console.log("🚀 ~ createWalkInQueueService ~ result:", result)
+  try {
+    await linkPatientToOrganizationService({
+      authUser,
+      payload: {
+        patientId,
+        relationshipType: "provider",
+        notes: "Auto-linked via visit queue walk-in check-in",
+      },
+    });
+  } catch (error) {
+    console.error("Auto linking failed during walk-in check-in:", error);
+  }
 
   return queueItem;
 };
 
 export const getQueueService = async ({ authUser, params }) => {
   const {
-    providerId,
+    departmentId,
+    assignedDoctorId,
     workflowStatus,
-    source,
+    priority,
+    visitType,
     page = 1,
     limit = 20,
-    dateFrom,
-    dateTo,
+    search,
   } = params;
 
-  const query = {};
+  const { actor } = await resolvePatientAccessContext({
+    authUser,
+  });
 
-  const organizationId = authUser.organizationId;
+  const organizationId = actor.organizationId;
 
-  if (organizationId) query.organizationId = organizationId;
-  if (providerId) query.providerId = providerId;
-  if (workflowStatus) query.workflowStatus = workflowStatus;
-  if (source) query.source = source;
+  if (!organizationId) {
+    throw new Error("Valid organization is required");
+  }
 
-  // default to today if no date range is passed
-  if (dateFrom || dateTo) {
-    query.checkedInAt = {};
-    if (dateFrom) query.checkedInAt.$gte = new Date(dateFrom);
-    if (dateTo) query.checkedInAt.$lte = new Date(dateTo);
-  } else {
-    const now = new Date();
+  const query = { organizationId };
 
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
+  if (departmentId && isValidObjectId(departmentId)) {
+    query.departmentId = departmentId;
+  }
 
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
+  if (assignedDoctorId && isValidObjectId(assignedDoctorId)) {
+    query.assignedDoctorId = assignedDoctorId;
+  }
 
-    query.checkedInAt = {
-      $gte: startOfDay,
-      $lte: endOfDay,
-    };
+  if (workflowStatus) {
+    query.workflowStatus = workflowStatus;
+  }
+
+  if (priority) {
+    query.priority = priority;
+  }
+
+  if (visitType) {
+    query.visitType = visitType;
   }
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const [items, total] = await Promise.all([
-    VisitQueue.find(query)
-      .populate("patientId", "fullName wrId phone")
-      .populate("providerId", "fullName email")
-      .populate({
-        path: "organizationId",
-        select: "organizationName accountId contactPersonName",
-        populate: {
-          path: "accountId",
-          select: "email fullName accountType isVerified",
-        },
-      })
-      .populate("appointmentId", "scheduledFor status reasonForVisit")
-      .populate(
-        "encounterId",
-        "encounterCode encounterTitle status startedAt endedAt",
-      )
-      .sort({ checkedInAt: 1, createdAt: 1 })
-      .skip(skip)
-      .limit(Number(limit)),
-    VisitQueue.countDocuments(query),
-  ]);
+  const [items, total, waitingCount, inProgressCount, triagedCount] =
+    await Promise.all([
+      VisitQueue.find(query)
+        .populate("patientId", "fullName email phone gender dateOfBirth wrId")
+        .populate("assignedDoctorId", "fullName email")
+        .populate("departmentId", "name")
+        .populate("encounterId", "encounterCode status startedAt")
+        .populate("appointmentId", "appointmentDate appointmentTime type")
+        .sort({ priority: -1, queueNumber: 1, createdAt: 1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+
+      VisitQueue.countDocuments(query),
+
+      VisitQueue.countDocuments({
+        organizationId,
+        workflowStatus: "waiting",
+      }),
+
+      VisitQueue.countDocuments({
+        organizationId,
+        workflowStatus: "in-progress",
+      }),
+
+      VisitQueue.countDocuments({
+        organizationId,
+        workflowStatus: "triaged",
+      }),
+    ]);
 
   return {
     items,
-    total,
-    page: Number(page),
-    limit: Number(limit),
-    totalPages: Math.ceil(total / Number(limit)),
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      pages: Math.ceil(total / Number(limit)),
+    },
+    stats: {
+      waiting: waitingCount,
+      inProgress: inProgressCount,
+      triaged: triagedCount,
+    },
   };
 };
 
-export const getQueueByIdService = async (queueId) => {
+export const getQueueByIdService = async (queueId, authUser) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
 
   const queueItem = await VisitQueue.findById(queueId)
-    .populate("patientId", "fullName wrId phone gender dateOfBirth")
-    .populate("providerId", "fullName email phone")
-    .populate("appointmentId", "scheduledFor status reasonForVisit")
-    .populate(
-      "encounterId",
-      "encounterCode encounterTitle status startedAt endedAt chiefComplaint notes",
-    );
+    .populate("patientId", "fullName email phone gender dateOfBirth wrId")
+    .populate("assignedDoctorId", "fullName email")
+    .populate("departmentId", "name")
+    .populate("encounterId")
+    .populate("appointmentId")
+    .populate("vitalId")
+    .lean();
 
   if (!queueItem) throw new Error("Queue item not found");
+
+  await assertQueueItemOwnership(queueItem, authUser);
 
   return queueItem;
 };
@@ -164,13 +213,14 @@ export const updateQueueStatusService = async ({
   queueId,
   workflowStatus,
   actorId = null,
+  authUser,
 }) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
 
   const allowedStatuses = [
-    "checked-in",
-    "triage",
     "waiting",
+    "triaged",
+    "in-consultation",
     "in-progress",
     "completed",
     "cancelled",
@@ -184,28 +234,22 @@ export const updateQueueStatusService = async ({
   const queueItem = await VisitQueue.findById(queueId);
   if (!queueItem) throw new Error("Queue item not found");
 
+  await assertQueueItemOwnership(queueItem, authUser);
+
   if (queueItem.workflowStatus === "completed") {
     throw new Error("Completed queue item cannot be updated");
   }
 
-  if (queueItem.workflowStatus === "no-show") {
-    throw new Error("No-show queue item cannot be updated");
-  }
-
   queueItem.workflowStatus = workflowStatus;
 
-  if (workflowStatus === "triage") {
-    queueItem.triagedBy = actorId || queueItem.triagedBy;
-  }
-
-  if (workflowStatus === "waiting" && !queueItem.triagedAt) {
-    queueItem.triagedAt = new Date();
-    queueItem.triagedBy = actorId || queueItem.triagedBy;
-  }
-
-  if (workflowStatus === "completed" && !queueItem.completedAt) {
+  if (workflowStatus === "completed") {
     queueItem.completedAt = new Date();
-    queueItem.completedBy = actorId || queueItem.completedBy;
+    queueItem.completedBy = actorId;
+  }
+
+  if (workflowStatus === "in-progress" && !queueItem.startedAt) {
+    queueItem.startedAt = new Date();
+    queueItem.startedBy = actorId;
   }
 
   await queueItem.save();
@@ -214,11 +258,12 @@ export const updateQueueStatusService = async ({
 
 export const saveTriageService = async ({
   queueId,
-  triageNotes = null,
-  chiefComplaint = null,
+  chiefComplaint,
+  triageNotes,
   priority,
   vitals = {},
   triagedBy = null,
+  authUser,
 }) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
   if (triagedBy && !isValidObjectId(triagedBy))
@@ -227,31 +272,29 @@ export const saveTriageService = async ({
   const queueItem = await VisitQueue.findById(queueId);
   if (!queueItem) throw new Error("Queue item not found");
 
+  await assertQueueItemOwnership(queueItem, authUser);
+
   if (
     ["completed", "cancelled", "no-show"].includes(queueItem.workflowStatus)
   ) {
-    throw new Error(`Cannot triage a ${queueItem.workflowStatus} queue item`);
+    throw new Error("Cannot triage an inactive queue item");
   }
 
-  queueItem.workflowStatus = "waiting";
-  queueItem.triagedAt = new Date();
-  queueItem.triagedBy = triagedBy;
-
-  if (triageNotes !== undefined) queueItem.triageNotes = triageNotes;
   if (chiefComplaint !== undefined) queueItem.chiefComplaint = chiefComplaint;
+  if (triageNotes !== undefined) queueItem.triageNotes = triageNotes;
   if (priority !== undefined) queueItem.priority = priority;
 
   queueItem.vitals = {
-    temperature: vitals.temperature ?? queueItem.vitals?.temperature ?? null,
-    pulse: vitals.pulse ?? queueItem.vitals?.pulse ?? null,
-    bloodPressure:
-      vitals.bloodPressure ?? queueItem.vitals?.bloodPressure ?? null,
-    respiratoryRate:
-      vitals.respiratoryRate ?? queueItem.vitals?.respiratoryRate ?? null,
-    spo2: vitals.spo2 ?? queueItem.vitals?.spo2 ?? null,
-    weight: vitals.weight ?? queueItem.vitals?.weight ?? null,
-    height: vitals.height ?? queueItem.vitals?.height ?? null,
+    ...queueItem.vitals,
+    ...vitals,
   };
+
+  queueItem.triagedAt = new Date();
+  queueItem.triagedBy = triagedBy;
+
+  if (queueItem.workflowStatus === "waiting") {
+    queueItem.workflowStatus = "triaged";
+  }
 
   await queueItem.save();
   return queueItem;
@@ -264,117 +307,152 @@ export const startEncounterFromQueueService = async ({
 }) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
   const queueItem = await VisitQueue.findById(queueId);
-  console.log(
-    "🚀 ~ startEncounterFromQueueService ~ queueItem:",
-    queueItem.vitals.bloodPressure,
-  );
   if (!queueItem) throw new Error("Queue item not found");
 
-  const { actor, patientId, isSelf } = await resolvePatientAccessContext({
+  const { actor, patientId } = await resolvePatientAccessContext({
     patientId: queueItem.patientId,
     authUser,
   });
-  console.log("🚀 ~ startEncounterFromQueueService ~ actor:", actor);
 
   const organizationId = actor.organizationId;
 
-  if (!organizationId || !isValidObjectId(organizationId)) {
+  if (!organizationId) {
     throw new Error("Valid organization is required");
+  }
+
+  // resolvePatientAccessContext resolves the acting user's own
+  // organisation — it doesn't check that organisation is the one this
+  // queue item actually belongs to. Without this, any authenticated
+  // provider at any facility could start an encounter (and thereby
+  // write vitals, own the patient chart entry, etc.) against another
+  // facility's queue item.
+  if (String(queueItem.organizationId) !== String(organizationId)) {
+    throw new Error("Queue item not found");
   }
 
   if (queueItem.encounterId) {
     throw new Error("Encounter already exists for this queue item");
   }
 
-  if (!["checked-in", "triage", "waiting"].includes(queueItem.workflowStatus)) {
-    throw new Error(
-      `Cannot start encounter from ${queueItem.workflowStatus} status`,
-    );
+  if (
+    ["completed", "cancelled", "no-show"].includes(queueItem.workflowStatus)
+  ) {
+    throw new Error("Cannot start encounter for this queue item");
   }
 
   const encounterCode = await generateEncounterCode(Encounter);
 
-  const encounter = await Encounter.create({
-    patientId: patientId,
-    providerId: organizationId,
-    organizationId: organizationId,
-    queueId: queueItem._id,
-    appointmentId: queueItem.appointmentId || null,
-    visitSource: queueItem.source,
-    encounterTitle: "Outpatient Consultation",
-    encounterType:
-      queueItem.visitType === "emergency" ? "emergency" : "outpatient",
-    encounterCode: encounterCode,
-    startedAt: new Date(),
-    reasonForVisit: queueItem.chiefComplaint || null,
-    chiefComplaint: queueItem.chiefComplaint || null,
-    priority:
-      queueItem.priority === "emergency"
-        ? "critical"
-        : queueItem.priority === "urgent"
-        ? "urgent"
-        : "routine",
-    status: "in-progress",
-    source: "provider",
-    notes: queueItem.triageNotes || null,
-  });
+  // Creating the encounter, updating the queue item, and writing the
+  // triage vitals across as a real Encounter/Vital record are three
+  // writes that should all succeed or all fail together — a partial
+  // write here would leave an Encounter with no vitals, or a queue
+  // item pointing at an encounter that never got its vitals recorded.
+  // A session was already being passed to vitalModel.create below
+  // (`{ session }`) but the session itself was never opened, so this
+  // whole function threw a ReferenceError on every call — "Start
+  // Encounter" from the queue was broken outright.
+  const session = await mongoose.startSession();
 
-  queueItem.encounterId = encounter._id;
-  queueItem.providerId = organizationId;
-  queueItem.workflowStatus = "in-progress";
-  queueItem.startedAt = new Date();
-  queueItem.startedBy = startedBy || organizationId;
+  try {
+    let encounter;
+    let vital;
 
-  await queueItem.save();
+    await session.withTransaction(async () => {
+      const created = await Encounter.create(
+        [
+          {
+            patientId: patientId,
+            providerId: organizationId,
+            organizationId: organizationId,
+            queueId: queueItem._id,
+            appointmentId: queueItem.appointmentId || null,
+            visitSource: queueItem.source,
+            encounterTitle: "Outpatient Consultation",
+            encounterType:
+              queueItem.visitType === "emergency" ? "emergency" : "outpatient",
+            encounterCode: encounterCode,
+            startedAt: new Date(),
+            reasonForVisit: queueItem.chiefComplaint || null,
+            chiefComplaint: queueItem.chiefComplaint || null,
+            priority:
+              queueItem.priority === "emergency"
+                ? "critical"
+                : queueItem.priority === "urgent"
+                ? "urgent"
+                : "routine",
+            status: "in-progress",
+            source: "provider",
+            notes: queueItem.triageNotes || null,
+          },
+        ],
+        { session },
+      );
+      encounter = created[0];
 
-  const vital = await vitalModel.create(
-    [
-      {
-        patientId: patientId,
-        recordedBy: organizationId,
-        providerId: organizationId,
-        organizationId,
-        encounterId: encounter._id,
-        source: "provider",
-        // createdContext: createdContext,
-        // ownershipType: payload.ownershipType || "shared",
-        // visibility: payload.visibility || "shared",
-        // patientAccess: payload.patientAccess || "full",
-        patientVisible: true,
+      queueItem.encounterId = encounter._id;
+      queueItem.providerId = organizationId;
+      queueItem.workflowStatus = "in-progress";
+      queueItem.startedAt = new Date();
+      queueItem.startedBy = startedBy || organizationId;
+      await queueItem.save({ session });
 
-        bloodPressure: queueItem.vitals.bloodPressure,
-        heartRate: queueItem.vitals.pulse,
-        temperature: queueItem.vitals.temperature,
-        respiratoryRate: queueItem.respiratoryRate,
-        oxygenSaturation: queueItem.vitals.spo2,
-        weight: queueItem.vitals.weight,
-        height: queueItem.vitals.height,
-        bloodGlucose: queueItem.vitals.bloodGlucose,
-        measuredAt: queueItem.createdAt || new Date(),
-        notes: queueItem.triageNotes || queueItem.chiefComplaint,
-      },
-    ],
-    { session },
-  );
+      const createdVitals = await vitalModel.create(
+        [
+          {
+            patientId: patientId,
+            recordedBy: organizationId,
+            providerId: organizationId,
+            organizationId,
+            encounterId: encounter._id,
+            source: "provider",
+            patientVisible: true,
 
-  if (queueItem.appointmentId) {
-    await Appointment.findByIdAndUpdate(queueItem.appointmentId, {
-      status: "checked-in",
-      organizationId,
+            bloodPressure: queueItem.vitals?.bloodPressure,
+            heartRate: queueItem.vitals?.pulse,
+            temperature: queueItem.vitals?.temperature,
+            // BUGFIX: was queueItem.respiratoryRate — that field only
+            // exists nested under queueItem.vitals (see
+            // saveTriageService), so this always wrote undefined and
+            // silently dropped whatever respiratory rate the nurse
+            // recorded at triage.
+            respiratoryRate: queueItem.vitals?.respiratoryRate,
+            oxygenSaturation: queueItem.vitals?.spo2,
+            weight: queueItem.vitals?.weight,
+            height: queueItem.vitals?.height,
+            measuredAt: queueItem.createdAt || new Date(),
+            notes: queueItem.triageNotes || queueItem.chiefComplaint,
+          },
+        ],
+        { session },
+      );
+      vital = createdVitals[0];
+
+      if (queueItem.appointmentId) {
+        await Appointment.findByIdAndUpdate(
+          queueItem.appointmentId,
+          { status: "checked-in", organizationId },
+          { session },
+        );
+      }
     });
-  }
 
-  return { queueItem, encounter };
+    return { queueItem, encounter, vital };
+  } finally {
+    await session.endSession();
+  }
 };
 
 export const completeQueueVisitService = async ({
   queueId,
   completedBy = null,
+  authUser,
 }) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
 
   const queueItem = await VisitQueue.findById(queueId);
   if (!queueItem) throw new Error("Queue item not found");
+
+  await assertQueueItemOwnership(queueItem, authUser);
 
   if (!queueItem.encounterId) {
     throw new Error("Cannot complete visit without linked encounter");
@@ -385,21 +463,33 @@ export const completeQueueVisitService = async ({
     throw new Error("Linked encounter not found");
   }
 
-  queueItem.workflowStatus = "completed";
-  queueItem.completedAt = new Date();
-  queueItem.completedBy = completedBy || null;
+  const session = await mongoose.startSession();
 
-  encounter.status = "completed";
-  encounter.endedAt = new Date();
+  try {
+    await session.withTransaction(async () => {
+      queueItem.workflowStatus = "completed";
+      queueItem.completedAt = new Date();
+      queueItem.completedBy = completedBy || null;
 
-  await Promise.all([queueItem.save(), encounter.save()]);
+      encounter.status = "completed";
+      encounter.endedAt = new Date();
 
-  if (queueItem.appointmentId) {
-    await Appointment.findByIdAndUpdate(queueItem.appointmentId, {
-      status: "completed",
-      providerId: queueItem.providerId || null,
+      await Promise.all([
+        queueItem.save({ session }),
+        encounter.save({ session }),
+      ]);
+
+      if (queueItem.appointmentId) {
+        await Appointment.findByIdAndUpdate(
+          queueItem.appointmentId,
+          { status: "completed", providerId: queueItem.providerId || null },
+          { session },
+        );
+      }
     });
-  }
 
-  return { queueItem, encounter };
+    return { queueItem, encounter };
+  } finally {
+    await session.endSession();
+  }
 };
