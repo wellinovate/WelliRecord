@@ -307,6 +307,7 @@ const READABLE_PROFILE_FIELDS = [
   "bloodGroup",
   "genotype",
   "confirmedNone",
+  "insurance",
   "isLicensed",
   "createdAt",
   "updatedAt",
@@ -541,6 +542,52 @@ export const updateUserProfileService = async ({ userId, payload }) => {
     }
 
     updateData.notificationPreferences = sanitizedPrefs;
+  }
+
+  if ("insurance" in payload) {
+    if (
+      typeof payload.insurance !== "object" ||
+      payload.insurance === null ||
+      Array.isArray(payload.insurance)
+    ) {
+      throw new Error("insurance must be an object");
+    }
+
+    const { hmoName, membershipId, planName, dependents } = payload.insurance;
+
+    const sanitizedInsurance = {
+      hmoName: sanitizeNullableString(hmoName),
+      membershipId: sanitizeNullableString(membershipId),
+      planName: sanitizeNullableString(planName),
+      dependents: [],
+    };
+
+    if (dependents !== undefined) {
+      if (!Array.isArray(dependents)) {
+        throw new Error("insurance.dependents must be an array");
+      }
+
+      sanitizedInsurance.dependents = dependents.map((dep) => {
+        const name = sanitizeString(dep?.name) || "";
+        if (!name) {
+          throw new Error("Each dependent must have a name");
+        }
+        return {
+          name,
+          relationship: sanitizeNullableString(dep?.relationship),
+          membershipId: sanitizeNullableString(dep?.membershipId),
+        };
+      });
+    } else {
+      // Keep whatever dependents already exist if the payload didn't
+      // touch that part of the insurance object.
+      const existing = profile.insurance?.toObject
+        ? profile.insurance.toObject()
+        : profile.insurance || {};
+      sanitizedInsurance.dependents = existing.dependents || [];
+    }
+
+    updateData.insurance = sanitizedInsurance;
   }
 
   if (Object.keys(updateData).length === 0) {

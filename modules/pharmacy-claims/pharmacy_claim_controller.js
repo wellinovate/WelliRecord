@@ -2,6 +2,7 @@ import {
   createClaimService,
   listClaimsService,
   getClaimSummaryService,
+  listMyClaimsService,
   getClaimByIdService,
   updateClaimStatusService,
 } from "./pharmacy_claim_service.js";
@@ -43,6 +44,11 @@ export const listClaimsController = handle(async (req, res) => {
 export const getClaimSummaryController = handle(async (req, res) => {
   const summary = await getClaimSummaryService({ authUser: req.user });
   res.status(200).json({ success: true, data: summary });
+});
+
+export const listMyClaimsController = handle(async (req, res) => {
+  const claims = await listMyClaimsService({ authUser: req.user });
+  res.status(200).json({ success: true, data: claims });
 });
 
 export const getClaimByIdController = handle(async (req, res) => {

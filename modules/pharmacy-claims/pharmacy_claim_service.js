@@ -111,6 +111,20 @@ export const getClaimSummaryService = async ({ authUser }) => {
   return { byStatus, outstanding };
 };
 
+// Patient-facing view — the patient's own claims across whichever
+// pharmacies filed them, not scoped to any single organization. Uses
+// profileId (UserProfile._id), the same identity PharmacyClaim.patientId
+// is keyed on, not the account id.
+export const listMyClaimsService = async ({ authUser }) => {
+  if (!authUser?.profileId) {
+    throw new AppError("No patient profile on this account", 400, "NO_PATIENT_PROFILE");
+  }
+  return PharmacyClaim.find({ patientId: authUser.profileId })
+    .select("-recordedByAccountId")
+    .sort({ createdAt: -1 })
+    .lean();
+};
+
 const assertClaimOwnership = async (claim, authUser) => {
   const org = await resolveActingOrg(authUser);
   if (String(claim.organizationId) !== String(org._id)) {

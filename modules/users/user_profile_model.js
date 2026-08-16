@@ -166,6 +166,28 @@ const userProfileSchema = new Schema(
       type: notificationPreferencesSchema,
       default: () => ({}),
     },
+    // Patient self-reported insurance info — NOT verified against any
+    // HMO system (no live HMO integration exists; the data-sharing
+    // agreement required for that isn't signed). This is exactly the
+    // same trust level as home address or emergency contacts: the
+    // patient enters what they know about their own coverage, and
+    // WelliRecord stores it, nothing more. Never render this as if it
+    // were a verified eligibility/coverage check.
+    insurance: {
+      hmoName: { type: String, trim: true, maxlength: 200, default: null },
+      membershipId: { type: String, trim: true, maxlength: 100, default: null },
+      planName: { type: String, trim: true, maxlength: 200, default: null },
+      dependents: {
+        type: [
+          {
+            name: { type: String, trim: true, maxlength: 200, required: true },
+            relationship: { type: String, trim: true, maxlength: 100, default: null },
+            membershipId: { type: String, trim: true, maxlength: 100, default: null },
+          },
+        ],
+        default: [],
+      },
+    },
   },
   {
     timestamps: true,
