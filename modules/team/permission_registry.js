@@ -60,6 +60,10 @@ export const PERMISSIONS = {
   manage_appointments: { label: "Manage appointments", category: "scheduling" },
   manage_queue: { label: "Manage the visit queue", category: "scheduling" },
 
+  view_referrals: { label: "View referrals sent and received", category: "clinical" },
+  create_referrals: { label: "Send a patient referral to another organization", category: "clinical" },
+  respond_to_referrals: { label: "Accept, decline, or complete referrals received", category: "clinical" },
+
   view_reports: { label: "View reports & analytics", category: "reports" },
 
   manage_team: { label: "Invite, suspend, and manage team members", category: "admin" },
@@ -79,6 +83,7 @@ const ROLE_DEFAULTS = {
     "view_prescriptions", "create_prescriptions",
     "view_vision_records", "write_vision_records",
     "manage_appointments",
+    "view_referrals", "create_referrals", "respond_to_referrals",
     "view_reports",
   ],
   clinician: [
@@ -88,6 +93,7 @@ const ROLE_DEFAULTS = {
     "view_prescriptions", "create_prescriptions",
     "view_vision_records", "write_vision_records",
     "manage_appointments",
+    "view_referrals", "create_referrals", "respond_to_referrals",
     "view_reports",
   ],
   nurse: [
@@ -108,6 +114,7 @@ const ROLE_DEFAULTS = {
   frontdesk: [
     "view_patients", "register_patients",
     "manage_appointments", "manage_queue",
+    "view_referrals",
   ],
   insurer_agent: [
     "view_patients", "view_reports",
