@@ -22,7 +22,6 @@ const CATALOGS = {
     roles: [
       "provider_admin",
       "doctor",
-      "clinician",
       "nurse",
       "lab_tech",
       "pharmacist",
