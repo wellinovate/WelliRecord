@@ -21,7 +21,7 @@ import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { createOrganizationProfile } from "../organizations/organizations_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createUserProfile } from "../users/users_services.js";
-import { sendVerificationEmail } from "../../shared/utils/resend.js";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../../shared/utils/resend.js";
 import bcrypt from "bcryptjs";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import { sendLoginOtp, verifyLoginOtp } from "../../shared/utils/termii.js";
@@ -784,6 +784,111 @@ export const verifyEmailService = async (token) => {
 
   return {
     message: "Email verified successfully.",
+  };
+};
+
+const RESET_TOKEN_COOLDOWN_MS = 1000 * 60 * 2; // 2 minutes between requests
+const RESET_TOKEN_TTL_MS = 1000 * 60 * 30; // 30 minutes, matches email verification
+
+const hashResetToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+// Requesting a reset never reveals whether the email exists — the response
+// is identical either way so the endpoint can't be used to enumerate
+// registered accounts. Only when an account *is* found do we generate a
+// token and send the email; the cooldown check below only applies then.
+export const requestPasswordResetService = async (email) => {
+  const normalizedEmail = String(email || "").toLowerCase().trim();
+
+  if (!normalizedEmail) {
+    throw new AppError("Email is required", 400, "EMAIL_REQUIRED");
+  }
+
+  const account = await Account.findOne({ email: normalizedEmail });
+
+  if (!account) {
+    return {
+      message: "If an account exists for that email, a reset link has been sent.",
+    };
+  }
+
+  const now = Date.now();
+  if (
+    account.resetPasswordLastSentAt &&
+    now - new Date(account.resetPasswordLastSentAt).getTime() < RESET_TOKEN_COOLDOWN_MS
+  ) {
+    // Still return the generic message — don't leak the cooldown state to
+    // the caller, same reasoning as the account-not-found case above.
+    return {
+      message: "If an account exists for that email, a reset link has been sent.",
+    };
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  account.resetPasswordTokenHash = hashResetToken(rawToken);
+  account.resetPasswordTokenExpiresAt = new Date(now + RESET_TOKEN_TTL_MS);
+  account.resetPasswordLastSentAt = new Date(now);
+
+  await account.save();
+
+  let fullName = account.email;
+  if (account.accountType === "organization") {
+    const org = await OrganizationProfile.findOne({ accountId: account._id }).select("organizationName");
+    fullName = org?.organizationName || account.email;
+  } else {
+    const profile = await UserProfile.findOne({ accountId: account._id }).select("fullName");
+    fullName = profile?.fullName || account.email;
+  }
+
+  await sendPasswordResetEmail({
+    email: account.email,
+    fullName,
+    token: rawToken,
+  });
+
+  return {
+    message: "If an account exists for that email, a reset link has been sent.",
+  };
+};
+
+export const resetPasswordService = async ({ token, newPassword }) => {
+  if (!token) {
+    throw new AppError("Reset token is required", 400, "TOKEN_REQUIRED");
+  }
+  if (!newPassword || newPassword.length < 8) {
+    throw new AppError(
+      "Password must be at least 8 characters",
+      400,
+      "INVALID_PASSWORD",
+    );
+  }
+
+  const tokenHash = hashResetToken(token);
+
+  const account = await Account.findOne({ resetPasswordTokenHash: tokenHash });
+
+  if (!account) {
+    throw new AppError("Invalid or expired reset link", 400, "INVALID_TOKEN");
+  }
+
+  if (
+    !account.resetPasswordTokenExpiresAt ||
+    account.resetPasswordTokenExpiresAt.getTime() < Date.now()
+  ) {
+    throw new AppError("This reset link has expired", 400, "TOKEN_EXPIRED");
+  }
+
+  // Assigning here (not findOneAndUpdate) so the pre("save") hook on
+  // Account re-hashes the password and stamps passwordChangedAt, same as
+  // every other password write in this codebase.
+  account.password = newPassword;
+  account.resetPasswordTokenHash = null;
+  account.resetPasswordTokenExpiresAt = null;
+  account.resetPasswordLastSentAt = null;
+
+  await account.save();
+
+  return {
+    message: "Password reset successfully. You can now log in with your new password.",
   };
 };
 

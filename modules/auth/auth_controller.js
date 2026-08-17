@@ -7,8 +7,10 @@ import {
 import {
   loginAccount,
   registerAccount,
+  requestPasswordResetService,
   resendLoginOtpService,
   resendVerificationEmailService,
+  resetPasswordService,
   startGoogleLoginOtp,
   verifyEmailService,
   verifyLoginCodeService,
@@ -314,6 +316,36 @@ export const resendLoginOtpController = async (req, res, next) => {
         challengeToken: result.challengeToken,
         maskedPhone: result.maskedPhone,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const forgotPasswordController = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const result = await requestPasswordResetService(email);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPasswordController = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    const result = await resetPasswordService({ token, newPassword });
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
     });
   } catch (error) {
     next(error);

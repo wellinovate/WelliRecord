@@ -169,6 +169,40 @@ export const sendTeamInviteEmail = async ({
   }
 };
 
+export const sendPasswordResetEmail = async ({ email, fullName, token }) => {
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: "Reset your WelliRecord password",
+      html: `
+        <div style="font-family: Arial;">
+          <h2>Reset your password</h2>
+          <p>Hello ${fullName || "there"},</p>
+          <p>We received a request to reset the password on your WelliRecord account. Click the button below to choose a new one:</p>
+          <a href="${resetUrl}"
+             style="display:inline-block;padding:12px 18px;background:#0B1F3A;color:#fff;text-decoration:none;border-radius:6px;">
+            Reset Password
+          </a>
+          <p>This link expires in 30 minutes.</p>
+          <p>If you didn't request this, you can ignore this email — your password will stay the same.</p>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the password reset email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Password reset email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
 export const sendVerificationEmail = async ({ email, fullName, token }) => {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
   try {

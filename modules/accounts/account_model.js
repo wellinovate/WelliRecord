@@ -90,6 +90,20 @@ const accountSchema = new Schema(
       default: null,
     },
 
+    resetPasswordTokenHash: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    resetPasswordTokenExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    resetPasswordLastSentAt: {
+      type: Date,
+      default: null,
+    },
+
     status: {
       type: String,
       enum: ["active", "suspended", "pending", "disabled"],
