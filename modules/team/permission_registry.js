@@ -28,6 +28,7 @@ export const PERMISSION_CATEGORIES = [
   { key: "patients", label: "Patients" },
   { key: "clinical", label: "Clinical records" },
   { key: "lab", label: "Lab" },
+  { key: "radiology", label: "Radiology" },
   { key: "pharmacy", label: "Pharmacy" },
   { key: "vision", label: "Vision" },
   { key: "scheduling", label: "Scheduling" },
@@ -45,6 +46,10 @@ export const PERMISSIONS = {
   view_lab_orders: { label: "View lab orders", category: "lab" },
   create_lab_orders: { label: "Create lab orders", category: "lab" },
   write_lab_results: { label: "Enter lab results", category: "lab" },
+
+  view_radiology_orders: { label: "View radiology orders", category: "radiology" },
+  create_radiology_orders: { label: "Create radiology orders", category: "radiology" },
+  write_radiology_reports: { label: "Upload images and publish radiology reports", category: "radiology" },
 
   view_prescriptions: { label: "View prescriptions", category: "pharmacy" },
   create_prescriptions: { label: "Create prescriptions", category: "pharmacy" },
@@ -81,6 +86,7 @@ const ROLE_DEFAULTS = {
     "view_patients", "register_patients",
     "view_clinical_records", "write_clinical_records",
     "view_lab_orders", "create_lab_orders",
+    "view_radiology_orders", "create_radiology_orders",
     "view_prescriptions", "create_prescriptions",
     "view_vision_records", "write_vision_records",
     "manage_appointments",
@@ -91,6 +97,7 @@ const ROLE_DEFAULTS = {
     "view_patients", "register_patients",
     "view_clinical_records", "write_clinical_records",
     "view_lab_orders", "create_lab_orders",
+    "view_radiology_orders", "create_radiology_orders",
     "view_prescriptions", "create_prescriptions",
     "view_vision_records", "write_vision_records",
     "manage_appointments",
@@ -101,11 +108,13 @@ const ROLE_DEFAULTS = {
     "view_patients",
     "view_clinical_records", "write_clinical_records",
     "view_lab_orders",
+    "view_radiology_orders",
     "manage_queue",
   ],
   lab_tech: [
     "view_patients",
     "view_lab_orders", "create_lab_orders", "write_lab_results",
+    "view_radiology_orders", "create_radiology_orders", "write_radiology_reports",
   ],
   pharmacist: [
     "view_patients",

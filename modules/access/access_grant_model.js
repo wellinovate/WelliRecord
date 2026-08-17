@@ -84,6 +84,7 @@ const accessGrantSchema = new Schema(
         "allergies",
         "diagnoses",
         "lab-results",
+        "radiology",
         "procedures",
         "immunizations",
         "vision",

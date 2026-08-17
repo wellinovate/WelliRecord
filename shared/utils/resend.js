@@ -169,6 +169,45 @@ export const sendTeamInviteEmail = async ({
   }
 };
 
+export const sendRadiologyReportReadyEmail = async ({
+  email,
+  patientName,
+  examName,
+  isCritical = false,
+}) => {
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: isCritical
+        ? "🚨 Urgent: Your Imaging Report Is Ready to View - WelliRecord™"
+        : "Your Imaging Report Is Ready to View - WelliRecord™",
+      html: `
+        <div style="font-family: Arial;">
+          <h2>${isCritical ? "🚨 Urgent: Your Imaging Report Is Ready" : "Your Imaging Report Is Ready"}</h2>
+          <p>Hi ${patientName || "there"},</p>
+          <p>Your report for <strong>${examName || "your imaging exam"}</strong> has been securely added to your WelliRecord.</p>
+          <a href="https://wellirecord.com/vault"
+             style="display:inline-block;padding:12px 18px;background:#0B1F3A;color:#fff;text-decoration:none;border-radius:6px;">
+            Log in to View Your Report
+          </a>
+          ${isCritical ? "<p>If your result is abnormal, unexpected, or marked urgent, speak with your healthcare provider before making medical decisions.</p>" : ""}
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the radiology report email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Radiology report ready email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
 export const sendPasswordResetEmail = async ({ email, fullName, token }) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
   try {

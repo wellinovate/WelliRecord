@@ -67,6 +67,7 @@ export const createAccessGrantSchema = z
         "allergies",
         "diagnoses",
         "lab-results",
+        "radiology",
         "procedures",
         "immunizations",
         "vision",

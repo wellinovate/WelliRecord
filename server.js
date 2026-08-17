@@ -39,6 +39,7 @@ import { seedDefaultLabTestCatalog } from "./modules/lab-tests-catalog/lab_test_
 import { startAppointmentReminderScheduler } from "./modules/appointments/appointment_notifications.js";
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
+import radiologyOrderRoutes from "./modules/radiology-orders/radiology_order_routes.js";
 import labTestCatalogRoutes from "./modules/lab-tests-catalog/lab_test_catalog_routes.js";
 import labDeliveryRoutes from "./modules/lab-delivery/lab_delivery_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
@@ -136,6 +137,7 @@ app.use("/api/v1/allergies", allergyRoutes);
 app.use("/api/v1/diagnoses", diagnosisRoutes);
 app.use("/api/v1/lab-results", labResultRoutes);
 app.use("/api/v1/lab-orders", labOrderRoutes);
+app.use("/api/v1/radiology-orders", radiologyOrderRoutes);
 app.use("/api/v1/lab-tests-catalog", labTestCatalogRoutes);
 app.use("/api/v1/lab-delivery", labDeliveryRoutes);
 app.use("/api/v1/pharmacy-orders", pharmacyOrderRoutes);
