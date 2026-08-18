@@ -6,6 +6,8 @@ import {
   updateDutyAssignmentService,
   cancelDutyAssignmentService,
   publishRosterService,
+  checkInDutyAssignmentService,
+  checkOutDutyAssignmentService,
 } from "./roster_service.js";
 import { getRostersQuerySchema } from "./roster_validation.js";
 
@@ -103,6 +105,36 @@ export const publishRosterController = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Roster published",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const checkInDutyAssignmentController = async (req, res, next) => {
+  try {
+    const { assignmentId } = req.params;
+    const payload = req.validated;
+    const result = await checkInDutyAssignmentService({ id: assignmentId, payload, authUser: req.user });
+    return res.status(200).json({
+      success: true,
+      message: "Checked in successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const checkOutDutyAssignmentController = async (req, res, next) => {
+  try {
+    const { assignmentId } = req.params;
+    const payload = req.validated;
+    const result = await checkOutDutyAssignmentService({ id: assignmentId, payload, authUser: req.user });
+    return res.status(200).json({
+      success: true,
+      message: "Checked out successfully",
       data: result,
     });
   } catch (error) {

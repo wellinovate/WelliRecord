@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { z } from "zod";
-import { STAFF_ROLE_TYPES, DUTY_TYPE_VALUES } from "./duty_assignment_model.js";
+import { STAFF_ROLE_TYPES, DUTY_TYPE_VALUES, CHECK_IN_METHOD_VALUES } from "./duty_assignment_model.js";
 
 const objectIdSchema = z.string().refine((val) => mongoose.Types.ObjectId.isValid(val), {
   message: "Invalid ObjectId",
@@ -50,4 +50,29 @@ export const cancelDutyAssignmentSchema = z.object({
 export const getRostersQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1).optional(),
   limit: z.coerce.number().min(1).max(100).default(20).optional(),
+});
+
+export const checkInSchema = z.object({
+  method: z.enum(CHECK_IN_METHOD_VALUES),
+
+  // Required only when method is "qr" — enforced in the refine below
+  // rather than making it universally optional-but-ignored.
+  qrCode: z.string().trim().min(1).max(200).optional(),
+
+  // Required only when method is "geofence".
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+}).refine((data) => (data.method === "qr" ? !!data.qrCode : true), {
+  message: "qrCode is required when method is 'qr'",
+  path: ["qrCode"],
+}).refine(
+  (data) => (data.method === "geofence" ? data.latitude != null && data.longitude != null : true),
+  {
+    message: "latitude and longitude are required when method is 'geofence'",
+    path: ["latitude"],
+  },
+);
+
+export const checkOutSchema = z.object({
+  notes: z.string().trim().max(1000).optional(),
 });

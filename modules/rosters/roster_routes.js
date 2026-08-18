@@ -9,12 +9,16 @@ import {
   updateDutyAssignmentController,
   cancelDutyAssignmentController,
   publishRosterController,
+  checkInDutyAssignmentController,
+  checkOutDutyAssignmentController,
 } from "./roster_controller.js";
 import {
   createRosterSchema,
   createDutyAssignmentSchema,
   updateDutyAssignmentSchema,
   cancelDutyAssignmentSchema,
+  checkInSchema,
+  checkOutSchema,
 } from "./roster_validation.js";
 
 // NOTE: lab_order_routes.js and pharmacy_order_routes.js gate every route
@@ -55,6 +59,20 @@ router.patch(
   protect,
   validate(cancelDutyAssignmentSchema),
   cancelDutyAssignmentController,
+);
+
+router.post(
+  "/assignments/:assignmentId/check-in",
+  protect,
+  validate(checkInSchema),
+  checkInDutyAssignmentController,
+);
+
+router.post(
+  "/assignments/:assignmentId/check-out",
+  protect,
+  validate(checkOutSchema),
+  checkOutDutyAssignmentController,
 );
 
 export default router;

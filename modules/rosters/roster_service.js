@@ -1,5 +1,5 @@
 import { rosterModel } from "./roster_model.js";
-import { dutyAssignmentModel } from "./duty_assignment_model.js";
+import { dutyAssignmentModel, LATE_GRACE_MINUTES } from "./duty_assignment_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { getIO } from "../../shared/realtime/socket.js";
 
@@ -43,6 +43,14 @@ const serializeAssignment = (item) => ({
   backupStaffId: item.backupStaffId,
   cancelReason: item.cancelReason,
   notes: item.notes,
+  checkedInAt: item.checkedInAt,
+  checkInMethod: item.checkInMethod,
+  checkInLocation: item.checkInLocation,
+  checkInQrCode: item.checkInQrCode,
+  checkedOutAt: item.checkedOutAt,
+  lateByMinutes: item.lateByMinutes,
+  overtimeMinutes: item.overtimeMinutes,
+  missedCheckOut: item.missedCheckOut,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
 });
@@ -216,6 +224,135 @@ export const publishRosterService = async ({ id, authUser }) => {
 
   const serialized = serializeRoster(roster);
   broadcast(organization._id, "roster_published", { roster: serialized });
+
+  return serialized;
+};
+
+// Combines an assignment's date + startTime/endTime into real Date
+// objects. Duty windows that cross midnight (e.g. night call, 20:00 to
+// 08:00) are handled by rolling endTime to the next day when it's
+// numerically earlier than startTime.
+const resolveShiftWindow = (assignment) => {
+  const [startH, startM] = assignment.startTime.split(":").map(Number);
+  const [endH, endM] = assignment.endTime.split(":").map(Number);
+
+  const start = new Date(assignment.date);
+  start.setHours(startH, startM, 0, 0);
+
+  const end = new Date(assignment.date);
+  end.setHours(endH, endM, 0, 0);
+  if (end <= start) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  return { start, end };
+};
+
+export const checkInDutyAssignmentService = async ({ id, payload, authUser }) => {
+  const organization = await resolveOrganization(authUser);
+
+  const assignment = await dutyAssignmentModel.findOne({ _id: id, organizationId: organization._id });
+  if (!assignment) {
+    const err = new Error("Duty assignment not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Self-service check-in only, for now: the staff member checking in
+  // must be the staff member assigned. A supervisor override endpoint
+  // (check someone else in, with a reason logged) is a separate
+  // concern, not folded into this one — don't silently allow it here.
+  if (String(assignment.staffId) !== String(authUser?.sub)) {
+    const err = new Error("You can only check yourself in for your own duty assignment");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (assignment.checkedInAt) {
+    const err = new Error("Already checked in for this assignment");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  if (assignment.status === "cancelled") {
+    const err = new Error("Cannot check in to a cancelled assignment");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const now = new Date();
+  const { start } = resolveShiftWindow(assignment);
+  const minutesLate = Math.max(0, Math.round((now - start) / 60000) - LATE_GRACE_MINUTES);
+
+  assignment.checkedInAt = now;
+  assignment.checkInMethod = payload.method;
+  assignment.checkInQrCode = payload.qrCode || null;
+  if (payload.method === "geofence") {
+    assignment.checkInLocation = { latitude: payload.latitude, longitude: payload.longitude };
+  }
+  assignment.lateByMinutes = minutesLate;
+  assignment.status = minutesLate > 0 ? "late" : "checked-in";
+
+  await assignment.save();
+
+  const serialized = serializeAssignment(assignment);
+  broadcast(organization._id, "duty_assignment_change", {
+    operationType: "check-in",
+    assignmentId: assignment._id,
+    assignment: serialized,
+  });
+
+  return serialized;
+};
+
+export const checkOutDutyAssignmentService = async ({ id, payload, authUser }) => {
+  const organization = await resolveOrganization(authUser);
+
+  const assignment = await dutyAssignmentModel.findOne({ _id: id, organizationId: organization._id });
+  if (!assignment) {
+    const err = new Error("Duty assignment not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (String(assignment.staffId) !== String(authUser?.sub)) {
+    const err = new Error("You can only check yourself out for your own duty assignment");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (!assignment.checkedInAt) {
+    const err = new Error("Cannot check out before checking in");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  if (assignment.checkedOutAt) {
+    const err = new Error("Already checked out for this assignment");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const now = new Date();
+  const { end } = resolveShiftWindow(assignment);
+  const overtimeMinutes = Math.max(0, Math.round((now - end) / 60000));
+
+  assignment.checkedOutAt = now;
+  assignment.overtimeMinutes = overtimeMinutes;
+  assignment.missedCheckOut = false;
+  assignment.status = "completed";
+  if (payload.notes) {
+    assignment.notes = payload.notes;
+  }
+
+  await assignment.save();
+
+  const serialized = serializeAssignment(assignment);
+  broadcast(organization._id, "duty_assignment_change", {
+    operationType: "check-out",
+    assignmentId: assignment._id,
+    assignment: serialized,
+  });
 
   return serialized;
 };
