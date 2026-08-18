@@ -245,15 +245,17 @@ export const googleLoginController = async (req, res) => {
     // yet (never collected there), so they skip OTP this one time and are
     // routed to onboarding by the frontend to add one — every login after
     // that has a phone on file and goes through OTP normally.
-    if (account.phone) {
-      const otpResult = await startGoogleLoginOtp(account);
+    if (account.phone || account.email) {
+      const otpResult = await startGoogleLoginOtp(account, req.body.channel);
 
       return res.status(200).json({
         success: true,
         message: otpResult.message,
         requiresOtp: true,
+        channel: otpResult.channel,
         challengeToken: otpResult.challengeToken,
         maskedPhone: otpResult.maskedPhone,
+        maskedEmail: otpResult.maskedEmail,
         isNewAccount,
       });
     }
@@ -305,16 +307,18 @@ export const verifyEmailController = async (req, res, next) => {
 
 export const resendLoginOtpController = async (req, res, next) => {
   try {
-    const { email, challengeToken } = req.body;
+    const { email, challengeToken, channel } = req.body;
 
-    const result = await resendLoginOtpService({ email, challengeToken });
+    const result = await resendLoginOtpService({ email, challengeToken, channel });
 
     return res.status(200).json({
       success: true,
       message: result.message,
       data: {
+        channel: result.channel,
         challengeToken: result.challengeToken,
         maskedPhone: result.maskedPhone,
+        maskedEmail: result.maskedEmail,
       },
     });
   } catch (error) {

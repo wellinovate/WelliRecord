@@ -85,6 +85,7 @@ const loginSchema = z.object({
     .email("Valid email is required")
     .transform((val) => val.toLowerCase()),
   password: z.string().min(6, "Password is required"),
+  channel: z.enum(["sms", "email"]).optional(),
 });
 
 export const validateRegisterRequest = (req, res, next) => {
