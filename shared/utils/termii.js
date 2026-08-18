@@ -8,6 +8,7 @@ const TERMII_BASE_URL =
   process.env.TERMII_BASE_URL?.trim() || "https://api.ng.termii.com";
 const TERMII_SENDER_ID = process.env.TERMII_SENDER_ID?.trim() || "WelliRecord";
 const TERMII_OTP_CHANNEL = process.env.TERMII_OTP_CHANNEL?.trim() || "dnd";
+const TERMII_EMAIL_CONFIGURATION_ID = process.env.TERMII_EMAIL_CONFIGURATION_ID?.trim();
 
 const allowedOtpChannels = ["dnd", "generic", "whatsapp"];
 
@@ -162,6 +163,68 @@ export const verifyLoginOtp = async ({ pinId, pin }) => {
       "Invalid or expired login code",
       400,
       "INVALID_LOGIN_CODE"
+    );
+  }
+};
+
+export const generateOtpCode = (length = 6) => {
+  const digits = "0123456789";
+  let otp = "";
+  for (let i = 0; i < length; i++) {
+    otp += digits[Math.floor(Math.random() * 10)];
+  }
+  return otp;
+};
+
+export const sendEmailOtp = async ({ email, code }) => {
+  if (!TERMII_API_KEY) {
+    throw new AppError(
+      "Email OTP service is not configured",
+      500,
+      "EMAIL_NOT_CONFIGURED"
+    );
+  }
+
+  if (!email) {
+    throw new AppError(
+      "Email address is required",
+      400,
+      "EMAIL_REQUIRED"
+    );
+  }
+
+  const otpCode = code || generateOtpCode(6);
+
+  try {
+    const payload = {
+      api_key: TERMII_API_KEY,
+      email_address: email.trim().toLowerCase(),
+      code: String(otpCode),
+    };
+
+    if (TERMII_EMAIL_CONFIGURATION_ID) {
+      payload.email_configuration_id = TERMII_EMAIL_CONFIGURATION_ID;
+    }
+
+    const { data } = await axios.post(
+      `${TERMII_BASE_URL}/api/email/otp/send`,
+      payload
+    );
+
+    return {
+      code: otpCode,
+      raw: data,
+    };
+  } catch (error) {
+    console.error(
+      "Termii send email OTP error:",
+      error.response?.data || error.message
+    );
+
+    throw new AppError(
+      "Unable to send email verification code. Please try again.",
+      502,
+      "EMAIL_OTP_FAILED"
     );
   }
 };
