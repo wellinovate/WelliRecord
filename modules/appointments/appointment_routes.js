@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createAppointmentController,
+  getSlotAvailabilityController,
   getAppointmentsController,
   getAppointmentByIdController,
   updateAppointmentController,
@@ -12,6 +13,7 @@ import { protect } from "../auth/auth_middleware.js";
 const router = express.Router();
 
 router.post("/", protect, createAppointmentController);
+router.get("/availability", protect, getSlotAvailabilityController);
 router.get("/", protect, getAppointmentsController);
 router.get("/:appointmentId", protect, getAppointmentByIdController);
 router.patch("/:appointmentId", protect, updateAppointmentController);

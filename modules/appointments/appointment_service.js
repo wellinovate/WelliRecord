@@ -601,3 +601,79 @@ export const markAppointmentNoShowService = async (appointmentId) => {
 
 //   return appointment;
 // };
+
+
+export const getSlotAvailabilityService = async ({
+  organizationId,
+  providerId = null,
+  date,
+}) => {
+  if (!organizationId || !date) {
+    throw new Error("organizationId and date are required");
+  }
+
+  const STANDARD_SLOTS = [
+    "09:00",
+    "10:00",
+    "11:00",
+    "12:00",
+    "14:00",
+    "15:00",
+    "16:00",
+  ];
+
+  const startOfDay = new Date(`${date}T00:00:00.000Z`);
+  const endOfDay = new Date(`${date}T23:59:59.999Z`);
+
+  const query = {
+    organizationId,
+    scheduledFor: { $gte: startOfDay, $lte: endOfDay },
+    status: { $nin: ["cancelled", "no-show"] },
+  };
+
+  if (providerId) {
+    query.providerId = providerId;
+  }
+
+  const existingAppointments = await Appointment.find(query).select("scheduledFor status").lean();
+
+  const now = new Date();
+  const isToday = now.toISOString().slice(0, 10) === date;
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  const slotCapacity = providerId ? 1 : 2;
+
+  const slots = STANDARD_SLOTS.map((slot) => {
+    const [slotHour, slotMin] = slot.split(":").map(Number);
+    const isPast =
+      isToday &&
+      (slotHour < currentHour || (slotHour === currentHour && currentMinute > 15));
+
+    const bookedCount = existingAppointments.filter((apt) => {
+      const aptTime = new Date(apt.scheduledFor);
+      return aptTime.getUTCHours() === slotHour && aptTime.getUTCMinutes() === slotMin;
+    }).length;
+
+    const isBooked = bookedCount >= slotCapacity;
+    const available = !isPast && !isBooked;
+
+    let reason = null;
+    if (isPast) reason = "past";
+    else if (isBooked) reason = "booked";
+
+    return {
+      slot,
+      available,
+      bookedCount,
+      capacity: slotCapacity,
+      reason,
+    };
+  });
+
+  return {
+    date,
+    organizationId,
+    slots,
+  };
+};

@@ -1,5 +1,6 @@
 import {
   createAppointmentService,
+  getSlotAvailabilityService,
   getAppointmentsService,
   getAppointmentByIdService,
   updateAppointmentService,
@@ -100,6 +101,25 @@ export const markAppointmentNoShowController = async (req, res, next) => {
       success: true,
       message: "Appointment marked as no-show",
       data: appointment,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSlotAvailabilityController = async (req, res, next) => {
+  try {
+    const { organizationId, providerId, date } = req.query;
+    const result = await getSlotAvailabilityService({
+      organizationId,
+      providerId: providerId || null,
+      date,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Slot availability fetched successfully",
+      data: result,
     });
   } catch (error) {
     next(error);
