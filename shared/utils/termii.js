@@ -169,62 +169,76 @@ export const verifyLoginOtp = async ({ pinId, pin }) => {
 
 export const generateOtpCode = (length = 6) => {
   const digits = "0123456789";
-  let otp = "";
+  let code = "";
   for (let i = 0; i < length; i++) {
-    otp += digits[Math.floor(Math.random() * 10)];
+    code += digits[Math.floor(Math.random() * digits.length)];
   }
-  return otp;
+  return code;
 };
 
+// Termii's email OTP endpoint only delivers a code we supply — it does not
+// generate or store one, and their Verify Token API cannot check email
+// OTPs at all. Generation and verification of the code happen on our side
+// (see hashOtpCode / verifyLoginCodeService in auth_services.js).
 export const sendEmailOtp = async ({ email, code }) => {
   if (!TERMII_API_KEY) {
     throw new AppError(
       "Email OTP service is not configured",
       500,
-      "EMAIL_NOT_CONFIGURED"
+      "EMAIL_OTP_NOT_CONFIGURED",
     );
   }
-
-  if (!email) {
+  if (!TERMII_EMAIL_CONFIGURATION_ID) {
     throw new AppError(
-      "Email address is required",
-      400,
-      "EMAIL_REQUIRED"
+      "Email OTP configuration is missing",
+      500,
+      "EMAIL_OTP_NOT_CONFIGURED",
     );
   }
-
-  const otpCode = code || generateOtpCode(6);
+  if (!email || !code) {
+    throw new AppError(
+      "Email and code are required",
+      400,
+      "EMAIL_OTP_PARAMS_REQUIRED",
+    );
+  }
 
   try {
-    const payload = {
+    const { data } = await axios.post(`${TERMII_BASE_URL}/api/email/otp/send`, {
       api_key: TERMII_API_KEY,
-      email_address: email.trim().toLowerCase(),
-      code: String(otpCode),
-    };
+      email_address: email,
+      code,
+      email_configuration_id: TERMII_EMAIL_CONFIGURATION_ID,
+    });
 
-    if (TERMII_EMAIL_CONFIGURATION_ID) {
-      payload.email_configuration_id = TERMII_EMAIL_CONFIGURATION_ID;
+    const looksFailed =
+      (typeof data?.code === "string" && data.code.toLowerCase() !== "ok") ||
+      (typeof data?.message === "string" &&
+        /balance|insufficient|invalid|fail|error|reject/i.test(data.message) &&
+        !data?.message_id);
+
+    if (looksFailed) {
+      console.error("Termii send email OTP returned a failure body:", data);
+      throw new AppError(
+        data?.message || "Email OTP was not accepted for delivery",
+        502,
+        "EMAIL_OTP_SEND_FAILED",
+      );
     }
 
-    const { data } = await axios.post(
-      `${TERMII_BASE_URL}/api/email/otp/send`,
-      payload
-    );
-
-    return {
-      code: otpCode,
-      raw: data,
-    };
+    return data;
   } catch (error) {
+    if (error instanceof AppError) throw error;
+
     console.error(
       "Termii send email OTP error:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
 
     throw new AppError(
-      "Unable to send email verification code. Please try again.",
+      "Unable to send login code by email. Please try again.",
       502,
-      "EMAIL_OTP_FAILED"
+      "EMAIL_OTP_SEND_FAILED",
     );
   }
 };

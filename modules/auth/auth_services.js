@@ -24,7 +24,7 @@ import { createUserProfile } from "../users/users_services.js";
 import { sendVerificationEmail, sendPasswordResetEmail } from "../../shared/utils/resend.js";
 import bcrypt from "bcryptjs";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
-import { sendLoginOtp, verifyLoginOtp } from "../../shared/utils/termii.js";
+import { sendLoginOtp, verifyLoginOtp, sendEmailOtp, generateOtpCode } from "../../shared/utils/termii.js";
 import { LoginOtpChallenge } from "./login_otp_challenge_model.js";
 
 
@@ -200,158 +200,119 @@ export const registerOrganizationAccount = async (payload) => {
   });
 };
 
-// export const loginAccount = async ({ email, password }) => {
-//   const totalStart = performance.now();
+// 
+const hashOtpCode = (code) => crypto.createHash("sha256").update(String(code)).digest("hex");
 
-//   const normalizedEmail = email.trim().toLowerCase();
+const maskEmail = (email) => {
+  const [name, domain] = String(email || "").split("@");
+  if (!name || !domain) return email;
+  const visible = name.slice(0, 2);
+  return `${visible}${"*".repeat(Math.max(name.length - 2, 1))}@${domain}`;
+};
 
-//   const findStart = performance.now();
+const createSmsOtpChallenge = async (account) => {
+  const phone = account.phone;
 
-//   const account = await Account.findByEmailWithPassword(normalizedEmail);
+  if (!phone) {
+    throw new AppError(
+      "No phone number is attached to this account. Please contact support.",
+      400,
+      "PHONE_NOT_FOUND",
+    );
+  }
 
-//   console.log(
-//     "⏱ find account:",
-//     (performance.now() - findStart).toFixed(2),
-//     "ms"
-//   );
+  let otp;
+  try {
+    otp = await sendLoginOtp({ phoneNumber: phone });
+  } catch (error) {
+    if (error.message === "SMS_PROVIDER_INSUFFICIENT_BALANCE") {
+      throw new AppError(
+        "Login code could not be sent right now. Please contact support.",
+        503,
+        "OTP_PROVIDER_UNAVAILABLE",
+      );
+    }
+    if (error.message === "INVALID_PHONE_NUMBER") {
+      throw new AppError(
+        "Invalid phone number attached to this account. Please contact support.",
+        400,
+        "INVALID_ACCOUNT_PHONE",
+      );
+    }
+    throw new AppError(
+      "Unable to send login code. Please try again.",
+      502,
+      "OTP_SEND_FAILED",
+    );
+  }
 
-//   if (!account) {
-//     throw new Error("Invalid email or password");
-//   }
+  const challengeToken = generateLoginChallengeToken();
+  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
 
-//   if (!account.isActive || account.status !== "active") {
-//     throw new Error("Account is not active");
-//   }
+  await LoginOtpChallenge.create({
+    accountId: account._id,
+    challengeTokenHash,
+    channel: "sms",
+    termiiPinId: otp.pinId,
+    phone,
+    expiresAt: getLoginOtpExpiry(),
+  });
 
-//   const currentRounds = Number(account.password.split("$")[2]);
+  return {
+    requiresOtp: true,
+    channel: "sms",
+    challengeToken,
+    maskedPhone: maskPhone(phone),
+    message: "Login code sent successfully.",
+  };
+};
 
-//   console.log("bcrypt rounds:", currentRounds);
+const createEmailOtpChallenge = async (account) => {
+  const email = account.email;
 
-//   const passwordStart = performance.now();
+  if (!email) {
+    throw new AppError(
+      "No email address is attached to this account. Please contact support.",
+      400,
+      "EMAIL_NOT_FOUND",
+    );
+  }
 
-//   const isMatch = await account.comparePassword(password);
+  const code = generateOtpCode(6);
 
-//   console.log(
-//     "⏱ password compare:",
-//     (performance.now() - passwordStart).toFixed(2),
-//     "ms"
-//   );
+  try {
+    await sendEmailOtp({ email, code });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(
+      "Unable to send login code. Please try again.",
+      502,
+      "OTP_SEND_FAILED",
+    );
+  }
 
-//   if (!isMatch) {
-//     throw new Error("Invalid email or password");
-//   }
+  const challengeToken = generateLoginChallengeToken();
+  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
 
-//   let profile = null;
-//   let memberships = [];
+  await LoginOtpChallenge.create({
+    accountId: account._id,
+    challengeTokenHash,
+    channel: "email",
+    codeHash: hashOtpCode(code),
+    email,
+    expiresAt: getLoginOtpExpiry(),
+  });
 
-//   if (account.accountType === "user") {
-//     const profileStart = performance.now();
+  return {
+    requiresOtp: true,
+    channel: "email",
+    challengeToken,
+    maskedEmail: maskEmail(email),
+    message: "Login code sent successfully.",
+  };
+};
 
-//     profile = await UserProfile.findOne({ accountId: account._id })
-//       .select("_id firstName fullName lastName email phone avatar dateOfBirth gender wrId")
-//       .lean();
-
-//     console.log(
-//       "⏱ user profile:",
-//       (performance.now() - profileStart).toFixed(2),
-//       "ms"
-//     );
-
-//     if (!profile) {
-//       throw new Error("User profile not found");
-//     }
-
-//     if (account.role !== "patient") {
-//       const membershipStart = performance.now();
-
-//       memberships = await OrganizationMembership.find({
-//         userId: profile._id,
-//         status: "active",
-//       })
-//         .select(
-//           "_id userId organizationId role status departmentId permissions createdAt"
-//         )
-//         .populate({
-//           path: "organizationId",
-//           select:
-//             "organizationName organizationId organizationType logo address contactEmail phone",
-//         })
-//         .lean();
-
-//       console.log(
-//         "⏱ memberships:",
-//         (performance.now() - membershipStart).toFixed(2),
-//         "ms"
-//       );
-//     }
-//   }
-
-//   if (account.accountType === "organization") {
-//     const orgProfileStart = performance.now();
-
-//     profile = await OrganizationProfile.findOne({
-//       accountId: account._id,
-//     })
-//       .select(
-//         "_id organizationName organizationId organizationType logo address contactEmail phone"
-//       )
-//       .lean();
-
-//     console.log(
-//       "⏱ organization profile:",
-//       (performance.now() - orgProfileStart).toFixed(2),
-//       "ms"
-//     );
-
-//     if (!profile) {
-//       throw new Error("Organization profile not found");
-//     }
-//   }
-
-//   Account.updateOne(
-//     { _id: account._id },
-//     { $set: { lastLoginAt: new Date() } }
-//   ).catch((err) => {
-//     console.error("Failed to update lastLoginAt:", err.message);
-//   });
-
-//   if (currentRounds > 10) {
-//     setImmediate(() => {
-//       bcrypt
-//         .hash(password, 10)
-//         .then((newHash) => {
-//           return Account.updateOne(
-//             { _id: account._id },
-//             {
-//               $set: {
-//                 password: newHash,
-//                 passwordChangedAt: new Date(),
-//               },
-//             }
-//           );
-//         })
-//         .catch((err) => {
-//           console.error("Password rehash failed:", err.message);
-//         });
-//     });
-//   }
-
-//   const safeAccount = account.toSafeObject();
-
-//   console.log(
-//     "⏱ TOTAL LOGIN:",
-//     (performance.now() - totalStart).toFixed(2),
-//     "ms"
-//   );
-
-//   return {
-//     account: safeAccount,
-//     profile,
-//     memberships,
-//   };
-// };
-
-export const loginAccount = async ({ email, password }) => {
+export const loginAccount = async ({ email, password, channel }) => {
   if (!email || !password) {
     throw new AppError(
       "Email and password are required",
@@ -359,16 +320,13 @@ export const loginAccount = async ({ email, password }) => {
       "MISSING_LOGIN_FIELDS",
     );
   }
-  const totalStart = performance.now();
 
   const normalizedEmail = email.trim().toLowerCase();
-
   const account = await Account.findByEmailWithPassword(normalizedEmail);
 
   if (!account) {
     throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
-
   if (!account.isActive || account.status !== "active") {
     throw new AppError("Account is not active", 403, "ACCOUNT_INACTIVE");
   }
@@ -381,135 +339,23 @@ export const loginAccount = async ({ email, password }) => {
   }
 
   const isMatch = await account.comparePassword(password);
-
   if (!isMatch) {
     throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
   }
 
-  const phone = account.phone;
+  const normalizedChannel = channel === "email" ? "email" : "sms";
 
-  if (!phone) {
-    throw new AppError(
-      "No phone number is attached to this account. Please contact support.",
-      400,
-      "PHONE_NOT_FOUND",
-    );
-  }
-
-  let otp;
-
-  try {
-    otp = await sendLoginOtp({ phoneNumber: phone });
-  } catch (error) {
-    if (error.message === "SMS_PROVIDER_INSUFFICIENT_BALANCE") {
-      throw new AppError(
-        "Login code could not be sent right now. Please contact support.",
-        503,
-        "OTP_PROVIDER_UNAVAILABLE",
-      );
-    }
-
-    if (error.message === "INVALID_PHONE_NUMBER") {
-      throw new AppError(
-        "Invalid phone number attached to this account. Please contact support.",
-        400,
-        "INVALID_ACCOUNT_PHONE",
-      );
-    }
-
-    throw new AppError(
-      "Unable to send login code. Please try again.",
-      502,
-      "OTP_SEND_FAILED",
-    );
-  }
-
-  const challengeToken = generateLoginChallengeToken();
-  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
-
-  await LoginOtpChallenge.create({
-    accountId: account._id,
-    challengeTokenHash,
-    termiiPinId: otp.pinId,
-    phone,
-    expiresAt: getLoginOtpExpiry(),
-  });
-
-  console.log(
-    "⏱ LOGIN PASSWORD STEP:",
-    (performance.now() - totalStart).toFixed(2),
-    "ms",
-  );
-
-  return {
-    requiresOtp: true,
-    challengeToken,
-    maskedPhone: maskPhone(phone),
-    message: "Login code sent successfully.",
-  };
+  return normalizedChannel === "email"
+    ? createEmailOtpChallenge(account)
+    : createSmsOtpChallenge(account);
 };
 
-// Sends an SMS login code to an existing account's phone on file, reusing
-// the same Termii OTP + LoginOtpChallenge mechanism password login already
-// uses. Used by Google sign-in for accounts that already existed before
-// this request (new accounts have no phone yet and skip straight to
-// onboarding instead — see googleLoginController).
-export const startGoogleLoginOtp = async (account) => {
-  const phone = account.phone;
+export const startGoogleLoginOtp = async (account, channel) => {
+  const normalizedChannel = channel === "email" ? "email" : "sms";
 
-  if (!phone) {
-    throw new AppError(
-      "No phone number is attached to this account. Please contact support.",
-      400,
-      "PHONE_NOT_FOUND",
-    );
-  }
-
-  let otp;
-
-  try {
-    otp = await sendLoginOtp({ phoneNumber: phone });
-  } catch (error) {
-    if (error.message === "SMS_PROVIDER_INSUFFICIENT_BALANCE") {
-      throw new AppError(
-        "Login code could not be sent right now. Please contact support.",
-        503,
-        "OTP_PROVIDER_UNAVAILABLE",
-      );
-    }
-
-    if (error.message === "INVALID_PHONE_NUMBER") {
-      throw new AppError(
-        "Invalid phone number attached to this account. Please contact support.",
-        400,
-        "INVALID_ACCOUNT_PHONE",
-      );
-    }
-
-    throw new AppError(
-      "Unable to send login code. Please try again.",
-      502,
-      "OTP_SEND_FAILED",
-    );
-  }
-
-  const challengeToken = generateLoginChallengeToken();
-  const challengeTokenHash = hashLoginChallengeToken(challengeToken);
-
-  await LoginOtpChallenge.create({
-    accountId: account._id,
-    challengeTokenHash,
-    termiiPinId: otp.pinId,
-    phone,
-    expiresAt: getLoginOtpExpiry(),
-  });
-
-  return {
-    requiresOtp: true,
-    challengeToken,
-    maskedPhone: maskPhone(phone),
-    message: "Login code sent successfully.",
-  };
+  return normalizedChannel === "email"
+    ? createEmailOtpChallenge(account)
+    : createSmsOtpChallenge(account);
 };
 
 export const verifyLoginCodeService = async ({ challengeToken, code }) => {
@@ -549,15 +395,20 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
     );
   }
 
-  const termiiResult = await verifyLoginOtp({
-    pinId: challenge.termiiPinId,
-    pin: code,
-  });
+  let verified = false;
 
-  const verified =
-    termiiResult?.verified === true ||
-    termiiResult?.status === "verified" ||
-    termiiResult?.message?.toLowerCase?.().includes("verified");
+  if (challenge.channel === "email") {
+    verified = challenge.codeHash === hashOtpCode(code);
+  } else {
+    const termiiResult = await verifyLoginOtp({
+      pinId: challenge.termiiPinId,
+      pin: code,
+    });
+    verified =
+      termiiResult?.verified === true ||
+      termiiResult?.status === "verified" ||
+      termiiResult?.message?.toLowerCase?.().includes("verified");
+  }
 
   if (!verified) {
     await LoginOtpChallenge.updateOne(
@@ -673,10 +524,9 @@ export const verifyLoginCodeService = async ({ challengeToken, code }) => {
 
 
 
-export const resendLoginOtpService = async ({ email, challengeToken }) => {
+export const resendLoginOtpService = async ({ email, challengeToken, channel }) => {
   let account = null;
 
-  // 1a. Try resolving account from challengeToken
   if (challengeToken && typeof challengeToken === "string") {
     const challengeTokenHash = hashLoginChallengeToken(challengeToken);
     const existingChallenge = await LoginOtpChallenge.findOne({ challengeTokenHash }).sort({ createdAt: -1 });
@@ -685,7 +535,6 @@ export const resendLoginOtpService = async ({ email, challengeToken }) => {
     }
   }
 
-  // 1b. Fallback to resolving account by email
   if (!account && email && typeof email === "string" && email.includes("@")) {
     account = await Account.findOne({ email: email.toLowerCase().trim() });
   }
@@ -694,16 +543,12 @@ export const resendLoginOtpService = async ({ email, challengeToken }) => {
     throw new AppError("Account not found", 404, "ACCOUNT_NOT_FOUND");
   }
 
-  if (!account.phone) {
-    throw new AppError("No phone attached to account", 400, "PHONE_NOT_FOUND");
-  }
-
-  // 2. Check cooldown (30 seconds between resends)
   const lastOtp = await LoginOtpChallenge.findOne({
     accountId: account._id,
   }).sort({ createdAt: -1 });
+
   if (lastOtp) {
-    const cooldownMs = 30 * 1000; // 30s
+    const cooldownMs = 30 * 1000;
     const now = Date.now();
     if (lastOtp.createdAt.getTime() + cooldownMs > now) {
       throw new AppError(
@@ -714,33 +559,13 @@ export const resendLoginOtpService = async ({ email, challengeToken }) => {
     }
   }
 
-  // 3. Send new OTP via Termii
-  let otp;
-  try {
-    otp = await sendLoginOtp({ phoneNumber: account.phone });
-  } catch (err) {
-    console.error("Resend OTP Termii error:", err);
-    throw new AppError("Unable to send OTP now. Please try again.", 502, "OTP_SEND_FAILED");
-  }
+  const normalizedChannel = channel === "email" || channel === "sms"
+    ? channel
+    : (lastOtp?.channel || "sms");
 
-  // 4. Generate challenge token
-  const newChallengeToken = generateLoginChallengeToken();
-  const challengeTokenHash = hashLoginChallengeToken(newChallengeToken);
-
-  // 5. Save OTP challenge
-  await LoginOtpChallenge.create({
-    accountId: account._id,
-    challengeTokenHash,
-    termiiPinId: otp.pinId,
-    phone: account.phone,
-    expiresAt: getLoginOtpExpiry(),
-  });
-
-  return {
-    message: "OTP resent successfully",
-    challengeToken: newChallengeToken,
-    maskedPhone: maskPhone(account.phone),
-  };
+  return normalizedChannel === "email"
+    ? createEmailOtpChallenge(account)
+    : createSmsOtpChallenge(account);
 };
 
 export const generateVerificationToken = () => {

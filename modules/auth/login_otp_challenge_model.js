@@ -10,40 +10,47 @@ const loginOtpChallengeSchema = new Schema(
       required: true,
       index: true,
     },
-
     challengeTokenHash: {
       type: String,
       required: true,
       unique: true,
       index: true,
     },
-
+    channel: {
+      type: String,
+      enum: ["sms", "email"],
+      default: "sms",
+      required: true,
+    },
+    // sms channel: Termii generates and stores the pin, and verifies it
+    // itself via /api/sms/otp/verify.
     termiiPinId: {
       type: String,
-      required: true,
     },
-
+    // email channel: we generate the code, hash it here, and compare on
+    // verify — Termii's Verify Token API doesn't support email OTPs.
+    codeHash: {
+      type: String,
+    },
     phone: {
       type: String,
-      required: true,
     },
-
+    email: {
+      type: String,
+    },
     attempts: {
       type: Number,
       default: 0,
     },
-
     maxAttempts: {
       type: Number,
       default: 3,
     },
-
     expiresAt: {
       type: Date,
       required: true,
       index: { expires: 0 },
     },
-
     usedAt: {
       type: Date,
       default: null,
