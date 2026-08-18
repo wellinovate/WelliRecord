@@ -45,6 +45,7 @@ import labDeliveryRoutes from "./modules/lab-delivery/lab_delivery_routes.js";
 import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes.js";
 import pharmacyInventoryRoutes from "./modules/pharmacy-inventory/pharmacy_inventory_routes.js";
 import localCustomerRoutes from "./modules/local-customers/local_customer_routes.js";
+import rosterRoutes from "./modules/rosters/roster_routes.js";
 import { initSocket } from "./shared/realtime/socket.js";
 // import { connectRedis } from "./shared/config/redis.js";
 import {
@@ -159,6 +160,7 @@ app.use("/api/v1/waitlist", waitlistRoutes);
 app.use("/api/v1/api-keys", apiKeyRoutes);
 app.use("/api/v1/team", teamRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/rosters", rosterRoutes);
 
 // Health check
 app.get("/", (req, res) => res.send("Wellirecord staging is running..."));
