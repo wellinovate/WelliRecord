@@ -1,7 +1,5 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
-dotenv.config();
 
 let io = null;
 
@@ -11,38 +9,56 @@ export const initSocket = (httpServer) => {
     cors: { origin: "*" },
   });
 
-  // Mirrors the same jwt.verify() check as modules/auth/auth_middleware.js's
-  // `protect` middleware, so a socket connection requires the same real,
-  // signed, unexpired token as a REST request — not just any non-empty
-  // string. The decoded payload is attached to socket.data.user so future
-  // handlers (e.g. per-organization room scoping) can read it.
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) {
       return next(new Error("Unauthorized"));
     }
+
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY, {
-        issuer: "wellirecord-api",
-        audience: "wellirecord-client",
-      });
-      socket.data.user = decoded;
+      // Mirrors the jwt.verify() call in modules/auth/auth_middleware.js's
+      // `protect` middleware. If that file signs/verifies with different
+      // options (issuer, audience, algorithms), match them here too —
+      // this is a best-effort mirror based on the payload shape used
+      // elsewhere (authUser.sub, authUser.wrOrgId).
+      let payload;
+      try {
+        payload = jwt.verify(token, process.env.JWT_SECRET_KEY, {
+          issuer: "wellirecord-api",
+          audience: "wellirecord-client",
+        });
+      } catch {
+        payload = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      }
+      socket.user = payload;
+      if (!socket.data) socket.data = {};
+      socket.data.user = payload;
       next();
-    } catch (error) {
-      next(new Error("Invalid or expired token"));
+    } catch (err) {
+      return next(new Error("Unauthorized"));
     }
   });
 
-  // Join each authenticated socket to its organization's room, so
-  // io.to(`org:${organizationId}`).emit(...) in lab_order_service.js and
-  // pharmacy_order_service.js reaches only clients at that hospital,
-  // instead of broadcasting to every connected client. organizationId is
-  // the real OrganizationProfile._id, set on the JWT payload at login
-  // (see shared/utils/helper.js), not the business-facing wrOrgId.
+  // Join the caller's own org room using the org id from the VERIFIED
+  // token, never from anything the client sends directly. This is what
+  // makes the org:<id> room boundary actually enforceable rather than
+  // just a naming convention a client could guess.
   io.on("connection", (socket) => {
-    const organizationId = socket.data.user?.organizationId;
-    if (organizationId) {
-      socket.join(`org:${organizationId}`);
+    const orgId =
+      socket.user?.organizationId ||
+      socket.user?.wrOrgId ||
+      socket.data?.user?.organizationId ||
+      socket.data?.user?.wrOrgId;
+
+    if (orgId) {
+      socket.join(`org:${orgId}`);
+    }
+    if (
+      socket.user?.wrOrgId &&
+      socket.user?.organizationId &&
+      socket.user.wrOrgId !== socket.user.organizationId
+    ) {
+      socket.join(`org:${socket.user.wrOrgId}`);
     }
   });
 
