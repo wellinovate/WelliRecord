@@ -1,13 +1,24 @@
 // scripts/test-roster-socket.cjs
 //
-// Verifies org isolation for roster broadcasts: creates a roster and
-// assignment under ORG1, publishes it, and confirms ORG1's socket
-// receives roster_published / duty_assignment_change while ORG2's
-// socket receives neither. Mirrors the pattern in test-socket.cjs
-// used to verify lab_order_change isolation on Aug 7.
+// Two checks in one run:
+//
+// 1. Auth rejection: connects a socket with a deliberately garbage
+//    token and confirms the server rejects the connection outright
+//    (connect_error fires, socket never connects). This is the
+//    regression check for the jwt.verify() fix in shared/realtime/socket.js
+//    (744180d) — before that fix, presence-only checking meant any
+//    non-empty string was accepted.
+//
+// 2. Org isolation: creates a roster and assignment under ORG1,
+//    publishes it, and confirms ORG1's socket receives
+//    roster_published / duty_assignment_change while ORG2's socket
+//    (a real, valid token for a different org) receives neither.
+//    Mirrors the pattern in test-socket.cjs used to verify
+//    lab_order_change isolation on Aug 7.
 //
 // Requires two valid JWTs for staff in two different organizations,
-// and a valid staffId (UserProfile _id) to assign in ORG1.
+// and a valid staffId (UserProfile _id) to assign in ORG1. No garbage
+// token needs to be supplied — one is generated inline.
 //
 // Usage:
 //   BASE_URL=https://wellirecord.onrender.com \
@@ -22,6 +33,7 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:4000";
 const ORG1_TOKEN = process.env.ORG1_TOKEN;
 const ORG2_TOKEN = process.env.ORG2_TOKEN;
 const ORG1_STAFF_ID = process.env.ORG1_STAFF_ID;
+const GARBAGE_TOKEN = "not.a.real.jwt-" + Date.now();
 
 if (!ORG1_TOKEN || !ORG2_TOKEN || !ORG1_STAFF_ID) {
   console.error("Missing ORG1_TOKEN, ORG2_TOKEN, or ORG1_STAFF_ID env vars.");
@@ -48,6 +60,38 @@ function connectSocket(label, token) {
   return socket;
 }
 
+// Separate from connectSocket() above: this one tracks connect vs.
+// connect_error explicitly rather than listening for roster events,
+// since the point here is proving the handshake itself is rejected.
+function attemptInvalidConnect() {
+  return new Promise((resolve) => {
+    const socket = io(BASE_URL, { auth: { token: GARBAGE_TOKEN }, reconnection: false });
+    let settled = false;
+
+    socket.on("connect", () => {
+      if (settled) return;
+      settled = true;
+      socket.disconnect();
+      resolve({ connected: true, error: null });
+    });
+
+    socket.on("connect_error", (err) => {
+      if (settled) return;
+      settled = true;
+      socket.disconnect();
+      resolve({ connected: false, error: err.message });
+    });
+
+    // Fallback in case neither event fires within a reasonable window.
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      socket.disconnect();
+      resolve({ connected: false, error: "timeout, no connect or connect_error" });
+    }, 3000);
+  });
+}
+
 async function apiCall(path, token, method = "GET", body) {
   const res = await fetch(`${BASE_URL}/api/v1${path}`, {
     method,
@@ -69,6 +113,20 @@ function wait(ms) {
 }
 
 async function run() {
+  console.log("Attempting connection with a garbage token...");
+  const invalidAttempt = await attemptInvalidConnect();
+
+  console.log(`Garbage token connected: ${invalidAttempt.connected} (expected: false)`);
+  if (invalidAttempt.error) {
+    console.log(`  connect_error: ${invalidAttempt.error}`);
+  }
+  const authRejectionPass = invalidAttempt.connected === false;
+  console.log(
+    authRejectionPass
+      ? "PASS: invalid token was rejected at the handshake.\n"
+      : "FAIL: invalid token was accepted — jwt.verify() in socket.js is not being enforced.\n",
+  );
+
   const org1Socket = connectSocket("org1", ORG1_TOKEN);
   const org2Socket = connectSocket("org2", ORG2_TOKEN);
 
@@ -109,12 +167,19 @@ async function run() {
   console.log(`ORG1 received roster_published: ${org1GotPublish} (expected: true)`);
   console.log(`ORG2 received roster_published: ${org2GotPublish} (expected: false)`);
 
-  const pass = org1GotPublish && !org2GotPublish;
-  console.log(pass ? "\nPASS: org isolation holds for roster_published." : "\nFAIL: check org room scoping in roster_service.js broadcast().");
+  const isolationPass = org1GotPublish && !org2GotPublish;
+  console.log(
+    isolationPass
+      ? "PASS: org isolation holds for roster_published."
+      : "FAIL: check org room scoping in roster_service.js broadcast().",
+  );
+
+  const overallPass = authRejectionPass && isolationPass;
+  console.log(`\n${overallPass ? "ALL CHECKS PASSED" : "ONE OR MORE CHECKS FAILED"}`);
 
   org1Socket.disconnect();
   org2Socket.disconnect();
-  process.exit(pass ? 0 : 1);
+  process.exit(overallPass ? 0 : 1);
 }
 
 run().catch((err) => {
