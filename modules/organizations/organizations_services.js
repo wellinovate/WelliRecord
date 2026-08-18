@@ -309,6 +309,9 @@ export const searchProvidersServices = async ({
       phone: item.phone || null,
       specialty: item.contactPersonRole || null,
       telemedicineAvailable: item.organizationType === "telehealth",
+      logo: item.logo || null,
+      address: item.officeAddress || null,
+      wrOrgId: item.wrOrgId || null,
       organization: {
         _id: item._id,
         name: item.organizationName,
@@ -407,6 +410,7 @@ export const searchProvidersService = async ({
               officeAddress: 1,
               contactPersonName: 1,
               contactPersonRole: 1,
+              logo: 1,
               wrOrgId: 1,
             },
           },
@@ -440,6 +444,8 @@ export const searchProvidersService = async ({
       // consent access (see access_grant_validation.js) — was being
       // fetched from the DB above (wrOrgId: 1 in the $project stage)
       // and then silently dropped here before the response went out.
+      logo: item.logo || null,
+      address: item.officeAddress || null,
       wrOrgId: item.wrOrgId || null,
       organization: {
         _id: item._id,
