@@ -53,11 +53,22 @@ export const signAccessToken = async (results) => {
       userId: payload.profileId,
       isActive: true,
     })
-      .select("organizationId")
+      .select("organizationId membershipRole")
       .lean();
 
     if (membership) {
       payload.organizationId = String(membership.organizationId);
+      // Account.role only distinguishes provider_admin/doctor/nurse from
+      // everyone else — ACCOUNT_ROLE_MAP (team_services.js) collapses
+      // clinician, frontdesk, pharmacist, lab_tech, telehealth_provider,
+      // insurer_agent, and support_staff all down to the generic "staff"
+      // at the Account level, since Account.role's enum is coarser than
+      // membershipRole's. Using `role` alone for frontend role-gating
+      // (ProviderLayout.tsx's hasAccess check) meant every one of those
+      // roles failed every role-specific nav item — only provider_admin/
+      // doctor/nurse ever worked. membershipRole is the actual granular
+      // job function; carry it so the frontend can prefer it.
+      payload.membershipRole = membership.membershipRole || null;
     }
   }
 
