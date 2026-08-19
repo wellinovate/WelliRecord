@@ -6,6 +6,7 @@ import {
   getVisionRecordController,
   getAllPatientVisionController,
 } from "./vision_record_controller.js";
+import { createUpload, IMAGE_MIME_TYPES } from "../../shared/middlewares/upload.js";
 
 // Up to 6 photos per visit (see upload.array("photos", 6) below).
 const upload = createUpload({ maxSizeMB: 10, allowedMimeTypes: IMAGE_MIME_TYPES, maxFiles: 6 });
