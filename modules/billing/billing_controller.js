@@ -13,8 +13,8 @@ import { getInvoicesQuerySchema } from "./billing_validation.js";
 
 export const verifyInvoiceController = async (req, res, next) => {
   try {
-    const { invoiceNumber } = req.params;
-    const result = await verifyInvoiceService({ invoiceNumber });
+    const { token } = req.params;
+    const result = await verifyInvoiceService({ token });
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
     next(error);

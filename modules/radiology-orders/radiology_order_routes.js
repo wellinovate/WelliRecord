@@ -1,5 +1,4 @@
 import express from "express";
-import multer from "multer";
 import { protect } from "../auth/auth_middleware.js";
 import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
 import { requirePermission } from "../team/require_permission_middleware.js";
@@ -12,6 +11,7 @@ import {
   uploadRadiologyImageController,
   publishRadiologyReportController,
 } from "./radiology_order_controller.js";
+import { createUpload, RADIOLOGY_MIME_TYPES } from "../../shared/middlewares/upload.js";
 import {
   createRadiologyOrderSchema,
   updateRadiologyOrderStatusSchema,
@@ -19,7 +19,9 @@ import {
 } from "./radiology_order_validation.js";
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+// 50MB covers a single DICOM slice/image comfortably; revisit if real
+// multi-frame studies coming through this route need more.
+const upload = createUpload({ maxSizeMB: 50, allowedMimeTypes: RADIOLOGY_MIME_TYPES, maxFiles: 1 });
 
 router.get(
   "/",

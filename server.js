@@ -189,6 +189,17 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("ERROR:", err);
 
+  // multer's own errors (file too large, rejected by fileFilter) don't
+  // carry a statusCode, so they'd otherwise fall through to 500 —
+  // these are always a bad request, not a server failure.
+  if (err.name === "MulterError" || err.code === "UPLOAD_REJECTED") {
+    return res.status(400).json({
+      success: false,
+      message: err.message || "File upload failed",
+      code: err.code || "UPLOAD_ERROR",
+    });
+  }
+
   res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || "Internal Server Error",

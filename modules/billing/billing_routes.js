@@ -2,6 +2,7 @@ import express from "express";
 import { protect } from "../auth/auth_middleware.js";
 import { requirePermission } from "../team/require_permission_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
+import { invoiceVerifyLimiter } from "../../shared/middlewares/rate_limit.js";
 import {
   getCheckoutSuggestionsController,
   createInvoiceController,
@@ -23,7 +24,13 @@ import {
 const router = express.Router();
 
 // Public — no auth. This is what a scanned invoice QR code hits.
-router.get("/invoices/verify/:invoiceNumber", verifyInvoiceController);
+// Keyed on a random verificationToken, not the sequential
+// invoiceNumber — see the comment on verifyInvoiceService for why.
+router.get(
+  "/invoices/verify/:token",
+  invoiceVerifyLimiter,
+  verifyInvoiceController,
+);
 
 // Patient's own invoices — must come before "/:id" so "/my" doesn't get
 // swallowed as an id param.

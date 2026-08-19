@@ -52,6 +52,19 @@ const invoiceSchema = new Schema(
       index: true,
     },
 
+    // Separate from invoiceNumber on purpose. invoiceNumber is
+    // sequential (WR-INV-2026-000001, ...002, ...) so it's guessable —
+    // fine for an internal record label, not safe as the lookup key
+    // for the public, unauthenticated QR-code verification endpoint.
+    // A random token means scanning through sequential numbers can't
+    // be used to enumerate other patients' invoices.
+    verificationToken: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
     lineItems: {
       type: [invoiceLineItemSchema],
       default: [],

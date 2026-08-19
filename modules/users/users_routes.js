@@ -1,6 +1,6 @@
 import express from "express";
-import multer from "multer";
 import { protect } from "../auth/auth_middleware.js";
+import { createUpload, IMAGE_MIME_TYPES } from "../../shared/middlewares/upload.js";
 import { getMyVitalsController } from "../vitals/vital_controller.js";
 import * as medicalHistoryController from "./users_controller.js";
 import { getMyMedicationsController } from "../medications/medication_controller.js";
@@ -13,7 +13,7 @@ import { getMyProceduresController } from "../procedure/procedure_controller.js"
 
 const router = express.Router();
 
-const avatarUpload = multer({ storage: multer.memoryStorage() });
+const avatarUpload = createUpload({ maxSizeMB: 5, allowedMimeTypes: IMAGE_MIME_TYPES, maxFiles: 1 });
 
 
 

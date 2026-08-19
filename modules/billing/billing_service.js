@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { invoiceModel } from "./invoice_model.js";
 import { paymentModel } from "./payment_model.js";
 import { receiptModel } from "./receipt_model.js";
@@ -80,6 +81,7 @@ const serializeInvoice = (item) => ({
   totalAmount: item.totalAmount,
   amountPaid: item.amountPaid,
   status: item.status,
+  verificationToken: item.verificationToken,
   dueDate: item.dueDate,
   voidedAt: item.voidedAt,
   voidReason: item.voidReason,
@@ -212,9 +214,13 @@ export const createInvoiceService = async ({ payload, authUser }) => {
   const patientResponsibility = round2(Math.max(0, totalAmount - hmoContribution));
 
   const invoiceNumber = await generateInvoiceNumber();
+  // 20 random bytes -> 40 hex chars. Only used as the public verify
+  // lookup key, never displayed, so length/format isn't a UX concern.
+  const verificationToken = crypto.randomBytes(20).toString("hex");
 
   const invoice = await invoiceModel.create({
     invoiceNumber,
+    verificationToken,
     patientId,
     organizationId: actor.organizationId,
     encounterId: payload.encounterId || null,
@@ -340,15 +346,21 @@ export const getMyInvoicesService = async ({ patientId, status }) => {
 // and nothing more: no line items, no clinical detail, no contact
 // info beyond the organization name. Patient name is partially masked
 // since this endpoint has no access control at all.
-export const verifyInvoiceService = async ({ invoiceNumber }) => {
+export const verifyInvoiceService = async ({ token }) => {
+  if (!token) {
+    const error = new Error("No invoice found for that verification link");
+    error.statusCode = 404;
+    throw error;
+  }
+
   const invoice = await invoiceModel
-    .findOne({ invoiceNumber })
+    .findOne({ verificationToken: token })
     .populate("patientId", "fullName")
     .populate("organizationId", "organizationName")
     .lean();
 
   if (!invoice) {
-    const error = new Error("No invoice found with that number");
+    const error = new Error("No invoice found for that verification link");
     error.statusCode = 404;
     throw error;
   }

@@ -1,5 +1,4 @@
 import express from "express";
-import multer from "multer";
 import { protect, requireRole } from "../auth/auth_middleware.js";
 import { requirePermission } from "../team/require_permission_middleware.js";
 import {
@@ -8,7 +7,8 @@ import {
   getAllPatientVisionController,
 } from "./vision_record_controller.js";
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Up to 6 photos per visit (see upload.array("photos", 6) below).
+const upload = createUpload({ maxSizeMB: 10, allowedMimeTypes: IMAGE_MIME_TYPES, maxFiles: 6 });
 const router = express.Router();
 
 // Write: provider-side accounts only. requireRole runs in addition to
