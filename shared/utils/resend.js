@@ -242,29 +242,103 @@ export const sendPasswordResetEmail = async ({ email, fullName, token }) => {
   }
 };
 
-export const sendVerificationEmail = async ({ email, fullName, token }) => {
+export const sendVerificationEmail = async ({ email, fullName, userName, token }) => {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  const rawName = fullName || userName || "";
+  const displayName = rawName && !rawName.includes("@") ? rawName : (email && email.includes("@") ? email.split("@")[0] : "there");
+  const currentYear = new Date().getFullYear();
+
   try {
     const response = await resend.emails.send({
       from: "WelliRecord <noreply@send.wellirecord.com>",
       to: email,
-      subject: "Verify your email",
+      subject: "Verify your email address - WelliRecord™",
       html: `
-        <div style="font-family: Arial;">
-          <h2>Verify your email</h2>
-          <p>Hello ${fullName || "there"},</p>
-          <p>Click the button below to verify your account:</p>
-          <a href="${verifyUrl}" 
-             style="display:inline-block;padding:12px 18px;background:#0B1F3A;color:#fff;text-decoration:none;border-radius:6px;">
-            Verify Email
-          </a>
-          <p>This link expires in 30 minutes.</p>
+        <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 16px; margin: 0; color: #1e293b;">
+          <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+            
+            <!-- Header with WelliRecord Brand -->
+            <div style="background-color: #071B3F; padding: 28px 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">WelliRecord<span style="color: #38bdf8; font-size: 16px; vertical-align: top;">™</span></h1>
+              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase;">Patient-Owned Health Records</p>
+            </div>
+
+            <!-- Body Content -->
+            <div style="padding: 36px 32px 32px 32px;">
+              <p style="font-size: 16px; color: #334155; margin: 0 0 16px 0;">Hello <strong>${displayName}</strong>,</p>
+              
+              <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 14px 0; line-height: 1.3;">Verify your email address</h2>
+              
+              <p style="font-size: 15px; line-height: 1.6; color: #475569; margin: 0 0 12px 0;">
+                Welcome to <strong>WelliRecord™</strong>.
+              </p>
+              
+              <p style="font-size: 15px; line-height: 1.6; color: #475569; margin: 0 0 28px 0;">
+                Please click the button below to confirm your email address and activate your account.
+              </p>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin-bottom: 28px;">
+                <a href="${verifyUrl}" 
+                   style="display: inline-block; background-color: #062B67; color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 32px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(6, 43, 103, 0.2);">
+                  Verify Email Address
+                </a>
+              </div>
+
+              <!-- Expiry Note -->
+              <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin: 0 0 28px 0; text-align: center; background-color: #f8fafc; padding: 10px 16px; border-radius: 8px;">
+                ⏱ This verification link expires in <strong>30 minutes</strong>. If you did not create this account, you can safely ignore this email.
+              </p>
+
+              <!-- Security Tip Box -->
+              <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 16px 18px; border-radius: 8px; margin-bottom: 18px;">
+                <h4 style="margin: 0 0 6px 0; color: #0369a1; font-size: 14px; font-weight: 700;">🔐 Security Tip</h4>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #0c4a6e;">
+                  Never share your verification link, password, or login credentials with anyone. WelliRecord™ will never ask you to send your password by email.
+                </p>
+              </div>
+
+              <!-- Medical Tip Box -->
+              <div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 16px 18px; border-radius: 8px; margin-bottom: 28px;">
+                <h4 style="margin: 0 0 6px 0; color: #854d0e; font-size: 14px; font-weight: 700;">🩺 Medical Tip</h4>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #713f12;">
+                  Keeping your health information accurate and up to date can help healthcare providers make better-informed decisions when you need care.
+                </p>
+              </div>
+
+              <!-- Fallback Link -->
+              <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-bottom: 10px;">
+                <p style="font-size: 12px; color: #94a3b8; margin: 0 0 6px 0;">
+                  If the button above does not work, copy and paste this link into your browser:
+                </p>
+                <p style="font-size: 12px; color: #0284c7; word-break: break-all; margin: 0;">
+                  <a href="${verifyUrl}" style="color: #0284c7; text-decoration: underline;">${verifyUrl}</a>
+                </p>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f1f5f9; padding: 28px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 14px; font-weight: 800; color: #071B3F; margin: 0 0 4px 0;">WelliRecord™</p>
+              <p style="font-size: 13px; font-weight: 600; color: #334155; margin: 0 0 8px 0;">One patient. One trusted record. Accessible when it matters.</p>
+              <p style="font-size: 11px; color: #64748b; margin: 0 0 14px 0; line-height: 1.4;">
+                Patient-Owned Health Records • Secure & Encrypted • Consent-Driven Access • Audit Trail
+              </p>
+              <p style="font-size: 12px; color: #475569; margin: 0 0 14px 0;">
+                Need help? <a href="mailto:support@wellirecord.com" style="color: #0284c7; font-weight: 700; text-decoration: none;">Contact WelliRecord™ Support</a>
+              </p>
+              <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+                © ${currentYear} WelliRecord™. All rights reserved.
+              </p>
+            </div>
+
+          </div>
         </div>
       `,
     });
 
     if (response.error) {
-      console.error("Resend rejected the email:", response.error);
+      console.error("Resend rejected the verification email:", response.error);
       throw new Error("EMAIL_SEND_FAILED");
     }
 

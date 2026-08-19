@@ -751,9 +751,18 @@ export const resendVerificationEmailService = async (email) => {
 
   await account.save();
 
+  let fullName = "";
+  if (account.accountType === "user") {
+    const profile = await UserProfile.findOne({ accountId: account._id });
+    fullName = profile?.fullName || profile?.firstName || "";
+  } else {
+    const profile = await OrganizationProfile.findOne({ accountId: account._id });
+    fullName = profile?.organizationName || profile?.contactPersonName || "";
+  }
+
   await sendVerificationEmail({
     email: account.email,
-    fullName: account.email,
+    fullName: fullName || account.email,
     token: rawToken,
   });
 
