@@ -90,12 +90,20 @@ export const getSharedRecordController = async (req, res, next) => {
     const bundle = await getBridgeRecordBundle({ grant, filter });
 
     const patient = await UserProfile.findById(grant.patientId)
-      .select("fullName firstName lastName dateOfBirth gender wrId")
+      .select("fullName firstName lastName dateOfBirth gender wrId bloodGroup genotype emergencyContacts")
       .lean();
 
     if (grant.oneTimeUse) {
       await markBridgeLinkUsed(grant._id);
     }
+
+    // Blood group, genotype, and emergency contacts are only disclosed
+    // on a full-record share — a category-scoped share (e.g. "just my
+    // labs" for a referral) shouldn't also leak this. Emergency Card
+    // links are always created with accessScope "full-record" (see
+    // requestEmergencyShareLink in EmergencyCardPage.tsx), so this is
+    // the boundary that actually matters in practice.
+    const isFullRecord = grant.accessScope === "full-record";
 
     return res.status(200).json({
       success: true,
@@ -106,6 +114,9 @@ export const getSharedRecordController = async (req, res, next) => {
               wrId: patient.wrId,
               dateOfBirth: patient.dateOfBirth,
               gender: patient.gender,
+              bloodGroup: isFullRecord ? patient.bloodGroup : null,
+              genotype: isFullRecord ? patient.genotype : null,
+              emergencyContacts: isFullRecord ? patient.emergencyContacts : [],
             }
           : null,
         scope: grant.accessScope,
