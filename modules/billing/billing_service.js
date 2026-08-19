@@ -5,6 +5,7 @@ import { generateInvoiceNumber, generateReceiptNumber } from "./billing_sequence
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
+import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { labOrderModel } from "../lab-orders/lab_order_model.js";
 import { pharmacyOrderModel } from "../pharmacy-orders/pharmacy_order_model.js";
 import { radiologyOrderModel } from "../radiology-orders/radiology_order_model.js";
@@ -19,6 +20,36 @@ const broadcast = (organizationId, event, invoice) => {
     documentId: invoice.id,
     document: invoice,
   });
+};
+
+const resolvePatientDoc = async (patientRef) => {
+  if (!patientRef) return null;
+  if (typeof patientRef === "object" && patientRef.fullName) return patientRef;
+  const rawId = String(patientRef?._id || patientRef);
+
+  const user = await UserProfile.findById(rawId).select("fullName firstName lastName wrId").lean();
+  if (user && (user.fullName || user.firstName)) {
+    return {
+      _id: user._id,
+      fullName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+      firstName: user.firstName,
+      lastName: user.lastName,
+      wrId: user.wrId,
+    };
+  }
+
+  const identity = await PatientIdentity.findById(rawId).select("fullName firstName lastName wrId").lean();
+  if (identity && (identity.fullName || identity.firstName)) {
+    return {
+      _id: identity._id,
+      fullName: identity.fullName || `${identity.firstName || ""} ${identity.lastName || ""}`.trim(),
+      firstName: identity.firstName,
+      lastName: identity.lastName,
+      wrId: identity.wrId,
+    };
+  }
+
+  return { _id: rawId, fullName: "Patient " + rawId.slice(-6).toUpperCase(), wrId: "" };
 };
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -242,12 +273,49 @@ export const getInvoicesService = async ({ authUser, status, page = 1, limit = 2
     invoiceModel.countDocuments(filter),
   ]);
 
+  const patientIds = [...new Set(items.map((i) => String(i.patientId?._id || i.patientId)).filter(Boolean))];
+  const [userProfiles, patientIdentities] = await Promise.all([
+    UserProfile.find({ _id: { $in: patientIds } }).select("fullName firstName lastName wrId").lean(),
+    PatientIdentity.find({ _id: { $in: patientIds } }).select("fullName firstName lastName wrId").lean(),
+  ]);
+
+  const patientMap = new Map();
+  userProfiles.forEach((u) => {
+    patientMap.set(String(u._id), {
+      _id: u._id,
+      fullName: u.fullName || `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+      firstName: u.firstName,
+      lastName: u.lastName,
+      wrId: u.wrId,
+    });
+  });
+  patientIdentities.forEach((p) => {
+    if (!patientMap.has(String(p._id))) {
+      patientMap.set(String(p._id), {
+        _id: p._id,
+        fullName: p.fullName || `${p.firstName || ""} ${p.lastName || ""}`.trim(),
+        firstName: p.firstName,
+        lastName: p.lastName,
+        wrId: p.wrId,
+      });
+    }
+  });
+
   return {
-    items: items.map(serializeInvoice).map((inv, i) => ({
-      ...inv,
-      patientId: items[i].patientId,
-      encounterId: items[i].encounterId,
-    })),
+    items: items.map((item) => {
+      const serialized = serializeInvoice(item);
+      const rawPid = String(item.patientId?._id || item.patientId);
+      const resolvedPatient =
+        (typeof item.patientId === "object" && item.patientId?.fullName && item.patientId) ||
+        patientMap.get(rawPid) ||
+        { _id: rawPid, fullName: "Patient #" + rawPid.slice(-6).toUpperCase(), wrId: "" };
+
+      return {
+        ...serialized,
+        patientId: resolvedPatient,
+        encounterId: item.encounterId,
+      };
+    }),
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -285,7 +353,11 @@ export const verifyInvoiceService = async ({ invoiceNumber }) => {
     throw error;
   }
 
-  const fullName = invoice.patientId?.fullName || "";
+  let fullName = invoice.patientId?.fullName || "";
+  if (!fullName && invoice.patientId) {
+    const resolved = await resolvePatientDoc(invoice.patientId);
+    fullName = resolved?.fullName || "";
+  }
   const maskedName = fullName
     ? fullName
         .split(" ")
@@ -339,9 +411,10 @@ export const getInvoiceByIdService = async ({ id, authUser }) => {
     receiptModel.find({ invoiceId: id }).sort({ issuedAt: -1 }).lean(),
   ]);
 
+  const resolvedPatient = await resolvePatientDoc(invoice.patientId);
   return {
     ...serializeInvoice(invoice),
-    patientId: invoice.patientId,
+    patientId: resolvedPatient || invoice.patientId,
     organizationId: invoice.organizationId,
     encounterId: invoice.encounterId,
     payments,
@@ -453,11 +526,26 @@ export const sendInvoiceService = async ({ id, isReminder = false }) => {
     throw error;
   }
 
-  const patientProfile = await UserProfile.findById(invoice.patientId._id || invoice.patientId).populate(
-    "accountId",
-    "email",
-  );
-  const email = patientProfile?.accountId?.email;
+  const rawPid = String(invoice.patientId?._id || invoice.patientId);
+  let patientProfile = await UserProfile.findById(rawPid).populate("accountId", "email").lean();
+  let patientName = patientProfile?.fullName || `${patientProfile?.firstName || ""} ${patientProfile?.lastName || ""}`.trim();
+  let email = patientProfile?.accountId?.email;
+  let recipientAccountId = patientProfile?.accountId?._id;
+
+  if (!patientProfile) {
+    const localPatient = await PatientIdentity.findById(rawPid).lean();
+    if (localPatient) {
+      patientName = localPatient.fullName || `${localPatient.firstName || ""} ${localPatient.lastName || ""}`.trim();
+      email = localPatient.email;
+      if (localPatient.userId) {
+        const linkedUser = await UserProfile.findById(localPatient.userId).populate("accountId", "email").lean();
+        if (linkedUser?.accountId) {
+          recipientAccountId = linkedUser.accountId._id;
+          email = email || linkedUser.accountId.email;
+        }
+      }
+    }
+  }
 
   const remaining = round2(invoice.totalAmount - invoice.amountPaid);
 
@@ -465,7 +553,7 @@ export const sendInvoiceService = async ({ id, isReminder = false }) => {
     if (isReminder) {
       await sendPaymentReminderEmail({
         email,
-        patientName: patientProfile.fullName,
+        patientName: patientName,
         invoiceNumber: invoice.invoiceNumber,
         amountDue: remaining,
         organizationName: invoice.organizationId?.organizationName,
@@ -474,7 +562,7 @@ export const sendInvoiceService = async ({ id, isReminder = false }) => {
     } else {
       await sendInvoiceEmail({
         email,
-        patientName: patientProfile.fullName,
+        patientName: patientName,
         invoiceNumber: invoice.invoiceNumber,
         totalAmount: invoice.totalAmount,
         organizationName: invoice.organizationId?.organizationName,
@@ -484,9 +572,9 @@ export const sendInvoiceService = async ({ id, isReminder = false }) => {
     await invoice.save();
   }
 
-  if (patientProfile?.accountId?._id) {
+  if (recipientAccountId) {
     await createNotification({
-      recipientAccountId: patientProfile.accountId._id,
+      recipientAccountId: recipientAccountId,
       type: isReminder ? "payment_reminder" : "invoice_issued",
       title: isReminder ? "Payment reminder" : "New invoice from " + (invoice.organizationId?.organizationName || "your provider"),
       body: isReminder
