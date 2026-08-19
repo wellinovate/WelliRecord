@@ -260,7 +260,7 @@ export const sendVerificationEmail = async ({ email, fullName, userName, token }
             <!-- Header with WelliRecord Brand -->
             <div style="background-color: #071B3F; padding: 28px 32px; text-align: center;">
               <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">WelliRecord<span style="color: #38bdf8; font-size: 16px; vertical-align: top;">™</span></h1>
-              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase;">Patient-Owned Health Records</p>
+              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500; letter-spacing: 1px; font-weight: 700; text-transform: uppercase;">YOUR HEALTH, SECURED. EVERYWHERE.</p>
             </div>
 
             <!-- Body Content -->
@@ -366,7 +366,7 @@ export const sendLoginOtpEmail = async ({ email, code, fullName, userName }) => 
             <!-- Header with WelliRecord Brand -->
             <div style="background-color: #071B3F; padding: 28px 32px; text-align: center;">
               <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">WelliRecord<span style="color: #38bdf8; font-size: 16px; vertical-align: top;">™</span></h1>
-              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase;">Patient-Owned Health Records</p>
+              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500; letter-spacing: 1px; font-weight: 700; text-transform: uppercase;">YOUR HEALTH, SECURED. EVERYWHERE.</p>
             </div>
 
             <!-- Body Content -->
