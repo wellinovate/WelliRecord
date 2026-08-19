@@ -348,3 +348,100 @@ export const sendVerificationEmail = async ({ email, fullName, userName, token }
     throw new Error("EMAIL_SEND_FAILED");
   }
 };
+
+export const sendLoginOtpEmail = async ({ email, code, fullName, userName }) => {
+  const rawName = fullName || userName || "";
+  const displayName = rawName && !rawName.includes("@") ? rawName : (email && email.includes("@") ? email.split("@")[0] : "there");
+  const currentYear = new Date().getFullYear();
+
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: "🔐 Verify your WelliRecord™ account - Login Code",
+      html: `
+        <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 16px; margin: 0; color: #1e293b;">
+          <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+            
+            <!-- Header with WelliRecord Brand -->
+            <div style="background-color: #071B3F; padding: 28px 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">WelliRecord<span style="color: #38bdf8; font-size: 16px; vertical-align: top;">™</span></h1>
+              <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase;">Patient-Owned Health Records</p>
+            </div>
+
+            <!-- Body Content -->
+            <div style="padding: 36px 32px 32px 32px;">
+              <p style="font-size: 16px; color: #334155; margin: 0 0 16px 0;">Hello <strong>${displayName}</strong>,</p>
+              
+              <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 14px 0; line-height: 1.3;">🔐 Verify your WelliRecord™ account</h2>
+              
+              <p style="font-size: 15px; line-height: 1.6; color: #475569; margin: 0 0 24px 0;">
+                Use the verification code below to continue with your WelliRecord™ account securely.
+              </p>
+
+              <!-- OTP Code Display Card -->
+              <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px 20px; text-align: center; margin-bottom: 24px;">
+                <p style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #166534; margin: 0 0 8px 0;">Your verification code</p>
+                <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #062B67; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; margin: 4px 0 10px 0;">
+                  ${code}
+                </div>
+                <p style="font-size: 13px; font-weight: 600; color: #15803d; margin: 0;">⏱ Expires in 10 minutes</p>
+              </div>
+
+              <!-- Security Notices -->
+              <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 14px 0;">
+                For your security, <strong>do not share this code with anyone</strong>. WelliRecord™ will never ask you to provide your verification code by phone, email, or message.
+              </p>
+              
+              <p style="font-size: 13px; line-height: 1.5; color: #64748b; margin: 0 0 28px 0;">
+                If you did not request this code, you can safely ignore this email. Your account remains secure.
+              </p>
+
+              <!-- Medical Tip Box -->
+              <div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 16px 18px; border-radius: 8px; margin-bottom: 18px;">
+                <h4 style="margin: 0 0 6px 0; color: #854d0e; font-size: 14px; font-weight: 700;">🩺 Medical Tip</h4>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #713f12;">
+                  Keep your health information accurate and up to date. Complete and maintain your health profile so your trusted record is ready when you need it.
+                </p>
+              </div>
+
+              <!-- Security Tip Box -->
+              <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 16px 18px; border-radius: 8px; margin-bottom: 24px;">
+                <h4 style="margin: 0 0 6px 0; color: #0369a1; font-size: 14px; font-weight: 700;">🔐 Security Tip</h4>
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #0c4a6e;">
+                  Use a strong, unique password for your WelliRecord™ account and never share your login credentials with anyone.
+                </p>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f1f5f9; padding: 28px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 14px; font-weight: 800; color: #071B3F; margin: 0 0 4px 0;">WelliRecord™</p>
+              <p style="font-size: 13px; font-weight: 600; color: #334155; margin: 0 0 8px 0;">One patient. One trusted record. Accessible when it matters.</p>
+              <p style="font-size: 11px; color: #64748b; margin: 0 0 14px 0; line-height: 1.4;">
+                Patient-Owned Health Records • Secure & Encrypted • Consent-Driven Access • Audit Trail
+              </p>
+              <p style="font-size: 12px; color: #475569; margin: 0 0 14px 0;">
+                Need help? <a href="mailto:support@wellirecord.com" style="color: #0284c7; font-weight: 700; text-decoration: none;">Contact WelliRecord™ Support</a>
+              </p>
+              <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+                © 2026 WelliRecord™. All rights reserved.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the login OTP email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Login OTP email sending failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};

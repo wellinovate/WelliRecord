@@ -21,7 +21,7 @@ import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { createOrganizationProfile } from "../organizations/organizations_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createUserProfile } from "../users/users_services.js";
-import { sendVerificationEmail, sendPasswordResetEmail } from "../../shared/utils/resend.js";
+import { sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "../../shared/utils/resend.js";
 import bcrypt from "bcryptjs";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import { sendLoginOtp, verifyLoginOtp, sendEmailOtp, generateOtpCode } from "../../shared/utils/termii.js";
@@ -280,15 +280,37 @@ const createEmailOtpChallenge = async (account) => {
 
   const code = generateOtpCode(6);
 
+  let fullName = "";
   try {
-    await sendEmailOtp({ email, code });
+    if (account.accountType === "user") {
+      const profile = await UserProfile.findOne({ accountId: account._id });
+      fullName = profile?.fullName || profile?.firstName || "";
+    } else {
+      const profile = await OrganizationProfile.findOne({ accountId: account._id });
+      fullName = profile?.organizationName || profile?.contactPersonName || "";
+    }
+  } catch (e) {
+    // Non-fatal, fallback to default greeting
+  }
+
+  try {
+    if (process.env.RESEND_API_KEY) {
+      await sendLoginOtpEmail({ email, code, fullName });
+    } else {
+      await sendEmailOtp({ email, code });
+    }
   } catch (error) {
-    if (error instanceof AppError) throw error;
-    throw new AppError(
-      "Unable to send login code. Please try again.",
-      502,
-      "OTP_SEND_FAILED",
-    );
+    try {
+      await sendEmailOtp({ email, code });
+    } catch (fallbackError) {
+      console.error("Email OTP delivery failed:", error?.message, fallbackError?.message);
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        "Unable to send login code. Please try again.",
+        502,
+        "OTP_SEND_FAILED",
+      );
+    }
   }
 
   const challengeToken = generateLoginChallengeToken();
