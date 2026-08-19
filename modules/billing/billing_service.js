@@ -254,6 +254,44 @@ export const getMyInvoicesService = async ({ patientId, status }) => {
   return { items: items.map((item, i) => ({ ...serializeInvoice(item), organizationId: items[i].organizationId })) };
 };
 
+// Public, unauthenticated — the endpoint a scanned invoice QR code
+// hits. Deliberately returns only what's already printed on the paper
+// invoice (so a third party like an HMO auditor or a bank can confirm
+// a physical/PDF invoice matches the system record and wasn't altered)
+// and nothing more: no line items, no clinical detail, no contact
+// info beyond the organization name. Patient name is partially masked
+// since this endpoint has no access control at all.
+export const verifyInvoiceService = async ({ invoiceNumber }) => {
+  const invoice = await invoiceModel
+    .findOne({ invoiceNumber })
+    .populate("patientId", "fullName")
+    .populate("organizationId", "organizationName")
+    .lean();
+
+  if (!invoice) {
+    const error = new Error("No invoice found with that number");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const fullName = invoice.patientId?.fullName || "";
+  const maskedName = fullName
+    ? fullName
+        .split(" ")
+        .map((part, i) => (i === 0 ? part : `${part[0]}.`))
+        .join(" ")
+    : "Unknown patient";
+
+  return {
+    invoiceNumber: invoice.invoiceNumber,
+    patientName: maskedName,
+    organizationName: invoice.organizationId?.organizationName || "Unknown provider",
+    totalAmount: invoice.totalAmount,
+    status: invoice.status,
+    issuedAt: invoice.createdAt,
+  };
+};
+
 export const getInvoiceByIdService = async ({ id, authUser }) => {
   const invoice = await invoiceModel
     .findById(id)

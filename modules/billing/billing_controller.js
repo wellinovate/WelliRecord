@@ -7,8 +7,19 @@ import {
   recordPaymentService,
   voidInvoiceService,
   sendInvoiceService,
+  verifyInvoiceService,
 } from "./billing_service.js";
 import { getInvoicesQuerySchema } from "./billing_validation.js";
+
+export const verifyInvoiceController = async (req, res, next) => {
+  try {
+    const { invoiceNumber } = req.params;
+    const result = await verifyInvoiceService({ invoiceNumber });
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getCheckoutSuggestionsController = async (req, res, next) => {
   try {

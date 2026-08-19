@@ -12,6 +12,7 @@ import {
   voidInvoiceController,
   sendInvoiceController,
   sendPaymentReminderController,
+  verifyInvoiceController,
 } from "./billing_controller.js";
 import {
   createInvoiceSchema,
@@ -20,6 +21,9 @@ import {
 } from "./billing_validation.js";
 
 const router = express.Router();
+
+// Public — no auth. This is what a scanned invoice QR code hits.
+router.get("/invoices/verify/:invoiceNumber", verifyInvoiceController);
 
 // Patient's own invoices — must come before "/:id" so "/my" doesn't get
 // swallowed as an id param.
