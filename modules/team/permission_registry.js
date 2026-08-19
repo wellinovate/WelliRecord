@@ -33,6 +33,7 @@ export const PERMISSION_CATEGORIES = [
   { key: "vision", label: "Vision" },
   { key: "scheduling", label: "Scheduling" },
   { key: "reports", label: "Reports" },
+  { key: "billing", label: "Billing" },
   { key: "admin", label: "Administration" },
 ];
 
@@ -71,6 +72,9 @@ export const PERMISSIONS = {
   respond_to_referrals: { label: "Accept, decline, or complete referrals received", category: "clinical" },
 
   view_reports: { label: "View reports & analytics", category: "reports" },
+  view_invoices: { label: "View invoices", category: "billing" },
+  create_invoices: { label: "Checkout patients and issue invoices", category: "billing" },
+  manage_payments: { label: "Record payments, void invoices", category: "billing" },
 
   manage_team: { label: "Invite, suspend, and manage team members", category: "admin" },
 };
@@ -91,7 +95,7 @@ const ROLE_DEFAULTS = {
     "view_vision_records", "write_vision_records",
     "manage_appointments",
     "view_referrals", "create_referrals", "respond_to_referrals",
-    "view_reports",
+    "view_reports", "view_invoices", "create_invoices",
   ],
   clinician: [
     "view_patients", "register_patients",
@@ -102,7 +106,7 @@ const ROLE_DEFAULTS = {
     "view_vision_records", "write_vision_records",
     "manage_appointments",
     "view_referrals", "create_referrals", "respond_to_referrals",
-    "view_reports",
+    "view_reports", "view_invoices", "create_invoices",
   ],
   nurse: [
     "view_patients",
@@ -120,12 +124,13 @@ const ROLE_DEFAULTS = {
     "view_patients",
     "view_prescriptions", "dispense_medications",
     "view_pharmacy_inventory", "manage_pharmacy_inventory", "manage_pharmacy_purchasing",
-    "manage_hmo_claims",
+    "manage_hmo_claims", "view_invoices",
   ],
   frontdesk: [
     "view_patients", "register_patients",
     "manage_appointments", "manage_queue",
     "view_referrals",
+    "view_invoices", "create_invoices", "manage_payments",
   ],
   insurer_agent: [
     "view_patients", "view_reports",

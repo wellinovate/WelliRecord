@@ -1,0 +1,451 @@
+import { invoiceModel } from "./invoice_model.js";
+import { paymentModel } from "./payment_model.js";
+import { receiptModel } from "./receipt_model.js";
+import { generateInvoiceNumber, generateReceiptNumber } from "./billing_sequence_model.js";
+import { resolvePatientAccessContext } from "../vitals/vital_service.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { UserProfile } from "../users/user_profile_model.js";
+import { labOrderModel } from "../lab-orders/lab_order_model.js";
+import { pharmacyOrderModel } from "../pharmacy-orders/pharmacy_order_model.js";
+import { radiologyOrderModel } from "../radiology-orders/radiology_order_model.js";
+import { getIO } from "../../shared/realtime/socket.js";
+import { sendInvoiceEmail, sendPaymentReminderEmail } from "../../shared/utils/resend.js";
+import { createNotification } from "../notifications/notification_services.js";
+
+const broadcast = (organizationId, event, invoice) => {
+  const io = getIO();
+  if (!io) return;
+  io.to(`org:${organizationId}`).emit(event, {
+    documentId: invoice.id,
+    document: invoice,
+  });
+};
+
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+const serializeInvoice = (item) => ({
+  id: item._id,
+  invoiceNumber: item.invoiceNumber,
+  patientId: item.patientId,
+  organizationId: item.organizationId,
+  encounterId: item.encounterId,
+  recordedBy: item.recordedBy,
+  lineItems: (item.lineItems || []).map((li) => ({
+    id: li._id,
+    description: li.description,
+    category: li.category,
+    sourceType: li.sourceType,
+    sourceId: li.sourceId,
+    quantity: li.quantity,
+    unitPrice: li.unitPrice,
+    discount: li.discount,
+    lineTotal: li.lineTotal,
+  })),
+  subtotal: item.subtotal,
+  discountTotal: item.discountTotal,
+  taxTotal: item.taxTotal,
+  hmoContribution: item.hmoContribution,
+  patientResponsibility: item.patientResponsibility,
+  totalAmount: item.totalAmount,
+  amountPaid: item.amountPaid,
+  status: item.status,
+  dueDate: item.dueDate,
+  voidedAt: item.voidedAt,
+  voidReason: item.voidReason,
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt,
+});
+
+// Finds real, currently-unbilled charges already sitting on the
+// patient's lab/pharmacy/radiology orders (paymentStatus: "pending")
+// so a provider isn't retyping prices that already exist elsewhere.
+// This does not touch or change those source records' paymentStatus —
+// that only happens once the resulting invoice is actually paid, via
+// syncSourceRecordsPaymentStatus below.
+export const getCheckoutSuggestionsService = async ({ patientId, authUser }) => {
+  const wrOrgId = authUser?.wrOrgId || null;
+  const organization = await OrganizationProfile.findOne({ wrOrgId });
+  if (!organization) {
+    const error = new Error("Organization not found for this account");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const filter = { patientId, organizationId: organization._id, paymentStatus: "pending", recordStatus: "active" };
+
+  const [labOrders, pharmacyOrders, radiologyOrders] = await Promise.all([
+    labOrderModel.find(filter).select("testName price status").lean(),
+    pharmacyOrderModel.find(filter).select("medicationName quantity price status").lean(),
+    radiologyOrderModel.find(filter).select("examName price status").lean(),
+  ]);
+
+  return {
+    suggestions: [
+      ...labOrders.map((o) => ({
+        description: o.testName,
+        category: "laboratory",
+        sourceType: "lab_order",
+        sourceId: o._id,
+        quantity: 1,
+        unitPrice: o.price || 0,
+      })),
+      ...pharmacyOrders.map((o) => ({
+        description: o.medicationName,
+        category: "pharmacy",
+        sourceType: "pharmacy_order",
+        sourceId: o._id,
+        quantity: o.quantity || 1,
+        unitPrice: o.price || 0,
+      })),
+      ...radiologyOrders.map((o) => ({
+        description: o.examName,
+        category: "radiology",
+        sourceType: "radiology_order",
+        sourceId: o._id,
+        quantity: 1,
+        unitPrice: o.price || 0,
+      })),
+    ],
+  };
+};
+
+const SOURCE_MODEL_MAP = {
+  lab_order: labOrderModel,
+  pharmacy_order: pharmacyOrderModel,
+  radiology_order: radiologyOrderModel,
+};
+
+// Marks the source lab/pharmacy/radiology order as "paid" once the
+// invoice covering it is fully settled. Best-effort — a failure here
+// doesn't roll back the payment itself, since the payment record is
+// the source of truth; this is just keeping the older per-module
+// status flags in sync so those pages don't show stale "pending".
+const syncSourceRecordsPaymentStatus = async (lineItems) => {
+  await Promise.all(
+    lineItems
+      .filter((li) => li.sourceType !== "manual" && li.sourceId)
+      .map(async (li) => {
+        const model = SOURCE_MODEL_MAP[li.sourceType];
+        if (!model) return;
+        try {
+          await model.findByIdAndUpdate(li.sourceId, { paymentStatus: "paid" });
+        } catch (e) {
+          console.error(`[syncSourceRecordsPaymentStatus] failed for ${li.sourceType}:${li.sourceId}`, e.message);
+        }
+      }),
+  );
+};
+
+export const createInvoiceService = async ({ payload, authUser }) => {
+  const { actor, patientId } = await resolvePatientAccessContext({
+    patientId: payload.patientId,
+    authUser,
+  });
+
+  if (!actor.isOrganizationActor || !actor.organizationId) {
+    const error = new Error("Only a provider organization can issue an invoice");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const lineItemsInput = Array.isArray(payload.lineItems) ? payload.lineItems : [];
+  if (lineItemsInput.length === 0) {
+    const error = new Error("An invoice needs at least one line item");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const lineItems = lineItemsInput.map((li) => {
+    const quantity = Number(li.quantity) || 1;
+    const unitPrice = Number(li.unitPrice) || 0;
+    const discount = Number(li.discount) || 0;
+    const lineTotal = round2(Math.max(0, quantity * unitPrice - discount));
+    return {
+      description: li.description,
+      category: li.category || "other",
+      sourceType: li.sourceType || "manual",
+      sourceId: li.sourceId || null,
+      quantity,
+      unitPrice,
+      discount,
+      lineTotal,
+    };
+  });
+
+  const subtotal = round2(lineItems.reduce((sum, li) => sum + li.quantity * li.unitPrice, 0));
+  const discountTotal = round2(lineItems.reduce((sum, li) => sum + li.discount, 0));
+  const taxTotal = round2(Number(payload.taxTotal) || 0);
+  const hmoContribution = round2(Number(payload.hmoContribution) || 0);
+
+  const totalAmount = round2(Math.max(0, subtotal - discountTotal + taxTotal));
+  const patientResponsibility = round2(Math.max(0, totalAmount - hmoContribution));
+
+  const invoiceNumber = await generateInvoiceNumber();
+
+  const invoice = await invoiceModel.create({
+    invoiceNumber,
+    patientId,
+    organizationId: actor.organizationId,
+    encounterId: payload.encounterId || null,
+    recordedBy: authUser?.sub || null,
+    providerId: authUser?.sub || null,
+    source: "provider",
+    createdContext: "facility-chart",
+    lineItems,
+    subtotal,
+    discountTotal,
+    taxTotal,
+    hmoContribution,
+    patientResponsibility,
+    totalAmount,
+    dueDate: payload.dueDate || null,
+  });
+
+  const serialized = serializeInvoice(invoice);
+  broadcast(actor.organizationId, "invoice_change", serialized);
+  return serialized;
+};
+
+export const getInvoicesService = async ({ authUser, status, page = 1, limit = 20 }) => {
+  const wrOrgId = authUser?.wrOrgId || null;
+  const organization = await OrganizationProfile.findOne({ wrOrgId });
+  if (!organization) {
+    const error = new Error("Organization not found for this account");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const filter = { organizationId: organization._id };
+  if (status) filter.status = status;
+
+  const skip = (page - 1) * limit;
+  const [items, total] = await Promise.all([
+    invoiceModel
+      .find(filter)
+      .populate("patientId", "fullName firstName lastName wrId")
+      .populate("encounterId", "encounterLabel encounterCode")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    invoiceModel.countDocuments(filter),
+  ]);
+
+  return {
+    items: items.map(serializeInvoice).map((inv, i) => ({
+      ...inv,
+      patientId: items[i].patientId,
+      encounterId: items[i].encounterId,
+    })),
+    pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+export const getMyInvoicesService = async ({ patientId, status }) => {
+  const filter = { patientId };
+  if (status) filter.status = status;
+
+  const items = await invoiceModel
+    .find(filter)
+    .populate("organizationId", "organizationName")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return { items: items.map((item, i) => ({ ...serializeInvoice(item), organizationId: items[i].organizationId })) };
+};
+
+export const getInvoiceByIdService = async ({ id, authUser }) => {
+  const invoice = await invoiceModel
+    .findById(id)
+    .populate("patientId", "fullName firstName lastName wrId")
+    .populate("organizationId", "organizationName")
+    .populate("encounterId", "encounterLabel encounterCode")
+    .lean();
+
+  if (!invoice) {
+    const error = new Error("Invoice not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // A patient can view their own invoice directly (no org membership).
+  // A provider needs the requirePermission("view_invoices") check
+  // already applied at the route level, which implies org membership —
+  // but we still confirm the invoice actually belongs to their org so
+  // one org can't view another org's invoice by guessing an id.
+  const isOwningPatient = String(invoice.patientId?._id) === String(authUser?.sub);
+  const isSameOrgProvider =
+    authUser?.wrOrgId &&
+    String(invoice.organizationId?._id) &&
+    (await OrganizationProfile.exists({ _id: invoice.organizationId._id, wrOrgId: authUser.wrOrgId }));
+
+  if (!isOwningPatient && !isSameOrgProvider) {
+    const error = new Error("You don't have access to this invoice");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const [payments, receipts] = await Promise.all([
+    paymentModel.find({ invoiceId: id }).sort({ paidAt: -1 }).lean(),
+    receiptModel.find({ invoiceId: id }).sort({ issuedAt: -1 }).lean(),
+  ]);
+
+  return {
+    ...serializeInvoice(invoice),
+    patientId: invoice.patientId,
+    organizationId: invoice.organizationId,
+    encounterId: invoice.encounterId,
+    payments,
+    receipts,
+  };
+};
+
+export const recordPaymentService = async ({ id, payload, authUser }) => {
+  const invoice = await invoiceModel.findById(id);
+  if (!invoice) {
+    const error = new Error("Invoice not found");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (invoice.status === "void") {
+    const error = new Error("Cannot record a payment against a voided invoice");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const amount = Number(payload.amount);
+  if (!amount || amount <= 0) {
+    const error = new Error("Payment amount must be greater than zero");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const remaining = round2(invoice.totalAmount - invoice.amountPaid);
+  if (amount > remaining + 0.01) {
+    const error = new Error(
+      `Payment of ${amount} exceeds the outstanding balance of ${remaining}`,
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const payment = await paymentModel.create({
+    invoiceId: invoice._id,
+    amount,
+    method: payload.method,
+    reference: payload.reference || null,
+    notes: payload.notes || null,
+    recordedBy: authUser?.sub || null,
+    organizationId: invoice.organizationId,
+  });
+
+  invoice.amountPaid = round2(invoice.amountPaid + amount);
+  invoice.status =
+    invoice.amountPaid >= invoice.totalAmount - 0.01 ? "paid" : "partially-paid";
+  await invoice.save();
+
+  const receiptNumber = await generateReceiptNumber();
+  const receipt = await receiptModel.create({
+    receiptNumber,
+    invoiceId: invoice._id,
+    invoiceNumber: invoice.invoiceNumber,
+    paymentId: payment._id,
+    patientId: invoice.patientId,
+    organizationId: invoice.organizationId,
+    amount,
+    method: payload.method,
+  });
+
+  if (invoice.status === "paid") {
+    await syncSourceRecordsPaymentStatus(invoice.lineItems);
+  }
+
+  const serialized = serializeInvoice(invoice);
+  broadcast(invoice.organizationId, "invoice_change", serialized);
+
+  return { invoice: serialized, payment, receipt };
+};
+
+export const voidInvoiceService = async ({ id, reason, authUser }) => {
+  const invoice = await invoiceModel.findById(id);
+  if (!invoice) {
+    const error = new Error("Invoice not found");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (invoice.amountPaid > 0) {
+    const error = new Error(
+      "This invoice has payments recorded against it and cannot be voided. Issue a credit note instead.",
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  invoice.status = "void";
+  invoice.voidedAt = new Date();
+  invoice.voidedBy = authUser?.sub || null;
+  invoice.voidReason = reason || null;
+  await invoice.save();
+
+  const serialized = serializeInvoice(invoice);
+  broadcast(invoice.organizationId, "invoice_change", serialized);
+  return serialized;
+};
+
+export const sendInvoiceService = async ({ id, isReminder = false }) => {
+  const invoice = await invoiceModel
+    .findById(id)
+    .populate("patientId", "fullName")
+    .populate("organizationId", "organizationName");
+
+  if (!invoice) {
+    const error = new Error("Invoice not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const patientProfile = await UserProfile.findById(invoice.patientId._id || invoice.patientId).populate(
+    "accountId",
+    "email",
+  );
+  const email = patientProfile?.accountId?.email;
+
+  const remaining = round2(invoice.totalAmount - invoice.amountPaid);
+
+  if (email) {
+    if (isReminder) {
+      await sendPaymentReminderEmail({
+        email,
+        patientName: patientProfile.fullName,
+        invoiceNumber: invoice.invoiceNumber,
+        amountDue: remaining,
+        organizationName: invoice.organizationId?.organizationName,
+      });
+      invoice.lastReminderSentAt = new Date();
+    } else {
+      await sendInvoiceEmail({
+        email,
+        patientName: patientProfile.fullName,
+        invoiceNumber: invoice.invoiceNumber,
+        totalAmount: invoice.totalAmount,
+        organizationName: invoice.organizationId?.organizationName,
+      });
+      invoice.lastSentAt = new Date();
+    }
+    await invoice.save();
+  }
+
+  if (patientProfile?.accountId?._id) {
+    await createNotification({
+      recipientAccountId: patientProfile.accountId._id,
+      type: isReminder ? "payment_reminder" : "invoice_issued",
+      title: isReminder ? "Payment reminder" : "New invoice from " + (invoice.organizationId?.organizationName || "your provider"),
+      body: isReminder
+        ? `You have ₦${remaining.toLocaleString()} outstanding on invoice ${invoice.invoiceNumber}.`
+        : `Invoice ${invoice.invoiceNumber} for ₦${invoice.totalAmount.toLocaleString()} is ready to view.`,
+      link: "/patient/billing",
+    });
+  }
+
+  return { emailed: Boolean(email) };
+};

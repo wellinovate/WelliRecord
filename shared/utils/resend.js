@@ -208,6 +208,81 @@ export const sendRadiologyReportReadyEmail = async ({
   }
 };
 
+export const sendInvoiceEmail = async ({
+  email,
+  patientName,
+  invoiceNumber,
+  totalAmount,
+  organizationName,
+}) => {
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: `New invoice ${invoiceNumber} from ${organizationName || "your provider"}`,
+      html: `
+        <div style="font-family: Arial;">
+          <h2>You have a new invoice</h2>
+          <p>Hi ${patientName || "there"},</p>
+          <p>${organizationName || "Your provider"} has issued invoice <strong>${invoiceNumber}</strong> totaling <strong>₦${Number(totalAmount || 0).toLocaleString()}</strong>.</p>
+          <a href="https://wellirecord.com/patient/billing"
+             style="display:inline-block;padding:12px 18px;background:#0B1F3A;color:#fff;text-decoration:none;border-radius:6px;">
+            View Invoice
+          </a>
+          <p>Log in to your WelliRecord account to see the full breakdown and outstanding balance.</p>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the invoice email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Invoice email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
+export const sendPaymentReminderEmail = async ({
+  email,
+  patientName,
+  invoiceNumber,
+  amountDue,
+  organizationName,
+}) => {
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: email,
+      subject: `Payment reminder: ${invoiceNumber}`,
+      html: `
+        <div style="font-family: Arial;">
+          <h2>Payment reminder</h2>
+          <p>Hi ${patientName || "there"},</p>
+          <p>You have <strong>₦${Number(amountDue || 0).toLocaleString()}</strong> outstanding on invoice <strong>${invoiceNumber}</strong> from ${organizationName || "your provider"}.</p>
+          <a href="https://wellirecord.com/patient/billing"
+             style="display:inline-block;padding:12px 18px;background:#0B1F3A;color:#fff;text-decoration:none;border-radius:6px;">
+            View Invoice
+          </a>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the payment reminder email:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+
+    return response;
+  } catch (error) {
+    console.error("Payment reminder email failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
 export const sendPasswordResetEmail = async ({ email, fullName, token }) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
   try {
