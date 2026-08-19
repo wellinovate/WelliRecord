@@ -203,6 +203,17 @@ export const createInvoiceService = async ({ payload, authUser }) => {
 
   const serialized = serializeInvoice(invoice);
   broadcast(actor.organizationId, "invoice_change", serialized);
+
+  // Best-effort — matches the spec's "once generated, the invoice is
+  // automatically sent" step. A failed send shouldn't roll back or
+  // block the invoice itself; the provider can still resend manually
+  // from the invoice detail view if this fails.
+  try {
+    await sendInvoiceService({ id: invoice._id, isReminder: false });
+  } catch (e) {
+    console.error(`[createInvoiceService] auto-send failed for invoice ${invoice.invoiceNumber}:`, e.message);
+  }
+
   return serialized;
 };
 
