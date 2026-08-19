@@ -84,6 +84,7 @@ export const createRosterService = async ({ payload, authUser }) => {
   const roster = await rosterModel.create({
     organizationId: organization._id,
     title: payload.title,
+    department: payload.department || "General / All Departments",
     periodStart: payload.periodStart,
     periodEnd: payload.periodEnd,
     notes: payload.notes || undefined,

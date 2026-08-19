@@ -20,6 +20,13 @@ const rosterSchema = new Schema(
       maxlength: 200,
     },
 
+    department: {
+      type: String,
+      trim: true,
+      default: "General / All Departments",
+      maxlength: 120,
+    },
+
     periodStart: {
       type: Date,
       required: true,

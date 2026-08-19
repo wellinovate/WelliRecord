@@ -12,6 +12,7 @@ const timeSchema = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
 
 export const createRosterSchema = z.object({
   title: z.string().trim().min(1).max(200),
+  department: z.string().trim().max(120).optional(),
   periodStart: z.coerce.date(),
   periodEnd: z.coerce.date(),
   notes: z.string().trim().max(1500).optional(),
