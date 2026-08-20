@@ -1,14 +1,15 @@
 import express from "express";
 import { protect } from "../auth/auth_middleware.js";
+import { requirePermission } from "../team/require_permission_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
   createRosterController,
   getAllRostersController,
   getRosterController,
+  publishRosterController,
   addDutyAssignmentController,
   updateDutyAssignmentController,
   cancelDutyAssignmentController,
-  publishRosterController,
   checkInDutyAssignmentController,
   checkOutDutyAssignmentController,
 } from "./roster_controller.js";
@@ -21,28 +22,32 @@ import {
   checkOutSchema,
 } from "./roster_validation.js";
 
-// NOTE: lab_order_routes.js and pharmacy_order_routes.js gate every route
-// with restrictClinicalScope("lab-orders" / "pharmacy-orders"). Roster
-// data isn't clinical in the same sense (it's staffing, not patient
-// data), so it may need its own scope key — e.g. restrictClinicalScope
-// isn't necessarily the right guard here. Using `protect` alone below;
-// swap in whatever the equivalent non-clinical permission check is
-// before this goes past internal testing.
+// Read access (view_roster) is granted to every clinical/operational
+// role by default — seeing the schedule you're on isn't sensitive the
+// way editing it is. Write access (manage_roster) defaults to
+// frontdesk only, matching its existing ownership of
+// manage_appointments/manage_queue. Adjust ROLE_DEFAULTS in
+// permission_registry.js if that split doesn't match how staffing is
+// actually managed at a given organization — these are defaults, not
+// a hardcoded rule, and any role can be granted manage_roster via a
+// per-member override without a code change.
 
 const router = express.Router();
 
-router.post("/", protect, validate(createRosterSchema), createRosterController);
-router.get("/", protect, getAllRostersController);
-router.get("/:id", protect, getRosterController);
+router.post("/", protect, requirePermission("manage_roster"), validate(createRosterSchema), createRosterController);
+router.get("/", protect, requirePermission("view_roster"), getAllRostersController);
+router.get("/:id", protect, requirePermission("view_roster"), getRosterController);
 router.post(
   "/:id/publish",
   protect,
+  requirePermission("manage_roster"),
   publishRosterController,
 );
 
 router.post(
   "/:id/assignments",
   protect,
+  requirePermission("manage_roster"),
   validate(createDutyAssignmentSchema),
   addDutyAssignmentController,
 );
@@ -50,6 +55,7 @@ router.post(
 router.patch(
   "/assignments/:assignmentId",
   protect,
+  requirePermission("manage_roster"),
   validate(updateDutyAssignmentSchema),
   updateDutyAssignmentController,
 );
@@ -57,10 +63,16 @@ router.patch(
 router.patch(
   "/assignments/:assignmentId/cancel",
   protect,
+  requirePermission("manage_roster"),
   validate(cancelDutyAssignmentSchema),
   cancelDutyAssignmentController,
 );
 
+// Check-in/check-out are deliberately NOT gated on manage_roster — see
+// the self-service ownership check inside checkInDutyAssignmentService
+// / checkOutDutyAssignmentService. Any staff member needs to be able
+// to check themselves in for their own assigned duty regardless of
+// whether they can edit the roster itself.
 router.post(
   "/assignments/:assignmentId/check-in",
   protect,
