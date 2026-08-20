@@ -67,7 +67,7 @@ export const getMyInvoicesController = async (req, res, next) => {
   try {
     const { status } = getInvoicesQuerySchema.parse(req.query);
     const result = await getMyInvoicesService({
-      patientId: req.user?.sub,
+      authUser: req.user,
       status,
     });
     return res.status(200).json({ success: true, data: result });

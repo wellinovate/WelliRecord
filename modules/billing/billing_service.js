@@ -326,8 +326,41 @@ export const getInvoicesService = async ({ authUser, status, page = 1, limit = 2
   };
 };
 
-export const getMyInvoicesService = async ({ patientId, status }) => {
-  const filter = { patientId };
+export const getMyInvoicesService = async ({ authUser, patientId, status }) => {
+  const accountId = authUser?.sub;
+  const profileId = authUser?.profileId;
+
+  // Resolve user profile
+  let userProfile = null;
+  if (profileId) {
+    userProfile = await UserProfile.findById(profileId).lean();
+  }
+  if (!userProfile && accountId) {
+    userProfile = await UserProfile.findOne({ accountId }).lean();
+  }
+  if (!userProfile && patientId) {
+    userProfile = (await UserProfile.findById(patientId).lean()) || (await UserProfile.findOne({ accountId: patientId }).lean());
+  }
+
+  const patientIds = new Set();
+  if (profileId) patientIds.add(String(profileId));
+  if (userProfile?._id) patientIds.add(String(userProfile._id));
+  if (accountId) patientIds.add(String(accountId));
+  if (patientId) patientIds.add(String(patientId));
+
+  // Also include any PatientIdentity records linked to this user or matching their phone/email
+  const identityFilters = [];
+  if (userProfile?._id) identityFilters.push({ userId: userProfile._id });
+  if (userProfile?.wrId) identityFilters.push({ wrId: userProfile.wrId });
+  if (userProfile?.email) identityFilters.push({ email: userProfile.email });
+  if (userProfile?.phone) identityFilters.push({ phone: userProfile.phone });
+
+  if (identityFilters.length > 0) {
+    const linkedIdentities = await PatientIdentity.find({ $or: identityFilters }).select("_id").lean();
+    linkedIdentities.forEach((li) => patientIds.add(String(li._id)));
+  }
+
+  const filter = { patientId: { $in: Array.from(patientIds) } };
   if (status) filter.status = status;
 
   const items = await invoiceModel
@@ -336,7 +369,12 @@ export const getMyInvoicesService = async ({ patientId, status }) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  return { items: items.map((item, i) => ({ ...serializeInvoice(item), organizationId: items[i].organizationId })) };
+  return {
+    items: items.map((item, i) => ({
+      ...serializeInvoice(item),
+      organizationId: items[i].organizationId,
+    })),
+  };
 };
 
 // Public, unauthenticated — the endpoint a scanned invoice QR code
@@ -406,7 +444,36 @@ export const getInvoiceByIdService = async ({ id, authUser }) => {
   // already applied at the route level, which implies org membership —
   // but we still confirm the invoice actually belongs to their org so
   // one org can't view another org's invoice by guessing an id.
-  const isOwningPatient = String(invoice.patientId?._id) === String(authUser?.profileId);
+  const invoicePid = String(invoice.patientId?._id || invoice.patientId);
+  const accountId = authUser?.sub;
+  const profileId = authUser?.profileId;
+
+  let isOwningPatient = Boolean(
+    (profileId && invoicePid === String(profileId)) ||
+    (accountId && invoicePid === String(accountId))
+  );
+
+  if (!isOwningPatient && (profileId || accountId)) {
+    const userProfile = (profileId && (await UserProfile.findById(profileId).lean())) ||
+                        (accountId && (await UserProfile.findOne({ accountId }).lean()));
+    if (userProfile) {
+      if (invoicePid === String(userProfile._id)) {
+        isOwningPatient = true;
+      } else {
+        const isLinkedIdentity = await PatientIdentity.exists({
+          _id: invoicePid,
+          $or: [
+            { userId: userProfile._id },
+            ...(userProfile.wrId ? [{ wrId: userProfile.wrId }] : []),
+            ...(userProfile.email ? [{ email: userProfile.email }] : []),
+            ...(userProfile.phone ? [{ phone: userProfile.phone }] : []),
+          ],
+        });
+        if (isLinkedIdentity) isOwningPatient = true;
+      }
+    }
+  }
+
   const isSameOrgProvider =
     authUser?.wrOrgId &&
     String(invoice.organizationId?._id) &&
