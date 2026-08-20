@@ -406,7 +406,7 @@ export const getInvoiceByIdService = async ({ id, authUser }) => {
   // already applied at the route level, which implies org membership —
   // but we still confirm the invoice actually belongs to their org so
   // one org can't view another org's invoice by guessing an id.
-  const isOwningPatient = String(invoice.patientId?._id) === String(authUser?.sub);
+  const isOwningPatient = String(invoice.patientId?._id) === String(authUser?.profileId);
   const isSameOrgProvider =
     authUser?.wrOrgId &&
     String(invoice.organizationId?._id) &&
