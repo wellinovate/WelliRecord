@@ -2,17 +2,44 @@ import mongoose from "mongoose";
 
 const { Schema } = mongoose;
 
+// Matches the shape lab_delivery_service.js actually builds
+// (url/name/fileType/size/uploadedAt) — this previously still had the
+// old fileId/label shape (fileId required, referencing a "File" model
+// that has never existed in this codebase) while the delivery service
+// had already been changed to write the new shape. Every release with
+// an attached file was throwing "attachments.0.fileId: Path `fileId`
+// is required" and failing outright — confirmed by constructing a
+// labResultModel document with the exact object the service builds
+// and running validateSync() against it.
 export const attachmentSubSchema = new Schema(
   {
-    fileId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "File",
+    url: {
+      type: String,
       required: true,
+    },
+    name: {
+      type: String,
+      trim: true,
+      maxlength: 255,
+      default: null,
+    },
+    fileType: {
+      type: String,
+      default: null,
+    },
+    size: {
+      type: Number,
+      default: null,
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
     },
     label: {
       type: String,
       trim: true,
       maxlength: 100,
+      default: null,
     },
   },
   { _id: false },

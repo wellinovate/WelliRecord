@@ -68,7 +68,11 @@ export const createLabResultSchema = z.object({
   attachments: z
     .array(
       z.object({
-        fileId: objectIdSchema,
+        url: z.string().trim().min(1),
+        name: z.string().trim().max(255).optional(),
+        fileType: z.string().trim().optional(),
+        size: z.number().optional(),
+        uploadedAt: z.coerce.date().optional(),
         label: z.string().trim().max(100).optional(),
       }),
     )
