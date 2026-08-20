@@ -51,8 +51,17 @@ export const sendSms = async ({ phoneNumber, message }) => {
   // balance, invalid sender ID, undelivered route) — axios only throws on
   // non-2xx, so that failure has to be checked explicitly or it silently
   // looks like success.
+  // The message-check clause below already guards against a false
+  // positive when Termii still returns a message_id (proof the send
+  // was actually accepted) — the balance check didn't have that same
+  // guard, so a response like "balance: 0, message_id: <real id>"
+  // (this send used the account's last credit and succeeded) still
+  // got thrown as a failure. That's a false negative: the SMS above
+  // this fix was reported "failed" and retried/logged as such despite
+  // actually being delivered — confirmed against a real Termii
+  // response shape where message_id is present on success.
   const looksFailed =
-    data?.balance === 0 ||
+    (data?.balance === 0 && !data?.message_id) ||
     (typeof data?.code === "string" && data.code.toLowerCase() !== "ok") ||
     (typeof data?.message === "string" &&
       /balance|insufficient|invalid|fail|error|reject/i.test(data.message) &&

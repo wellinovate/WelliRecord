@@ -212,6 +212,8 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
     throw err;
   }
 
+  const organization = await getOrganizationForActor(authUser);
+
   // Upload attached report files to Cloudinary if present
   const attachments = [];
   if (Array.isArray(files) && files.length > 0) {
@@ -323,7 +325,7 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
         const resolved = await resolveTemplatedMessage({
           name: "Critical Lab Alert",
           channel: "sms",
-          variables: { link: VAULT_LINK },
+          variables: { link: VAULT_LINK, org_name: organization.organizationName },
           // Patient safety-relevant — a missing (not deactivated)
           // template row shouldn't mean this alert silently never
           // sends, so this keeps a known-good message as a floor.
@@ -350,7 +352,14 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
         const resolved = await resolveTemplatedMessage({
           name: "Lab Result Ready",
           channel: "sms",
-          variables: { link: VAULT_LINK },
+          // Was { link: VAULT_LINK } only — the "Lab Result Ready"
+          // template's body includes {{org_name}}, and
+          // renderPlaceholders leaves an unmatched {{key}} as literal
+          // text on purpose (see its comment) rather than silently
+          // blanking it, so every one of these went out with the raw
+          // "{{org_name}}" string in the message a patient actually
+          // received.
+          variables: { link: VAULT_LINK, org_name: organization.organizationName },
         });
 
         if (resolved.send) {
