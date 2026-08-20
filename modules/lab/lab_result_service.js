@@ -1,3 +1,4 @@
+import { normalizeLabResultData } from "./lab_normalizer.js";
 import mongoose from "mongoose";
 import { labResultModel } from "./lab_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
@@ -38,6 +39,54 @@ export const createLabResultService = async ({ payload, authUser }) => {
       throw error;
     }
 
+    const normalized = normalizeLabResultData({
+      testName: payload.testName,
+      category: payload.category,
+      unit: payload.unit,
+      specimen: payload.specimen,
+    });
+
+    // Deduplication check: check if the exact same active test result already exists for this patient on this date
+    const resultedAt = payload.resultedAt ? new Date(payload.resultedAt) : new Date();
+    const startOfDay = new Date(resultedAt);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(resultedAt);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingDuplicate = await labResultModel.findOne({
+      patientId: { $in: Array.isArray(patientIds) ? patientIds : [patientIds] },
+      testName: { $regex: new RegExp(`^${normalized.testName}$`, "i") },
+      resultedAt: { $gte: startOfDay, $lte: endOfDay },
+      recordStatus: "active",
+    });
+
+    if (existingDuplicate) {
+      if (!existingDuplicate.attachments?.length && payload.attachments?.length) {
+        existingDuplicate.attachments = payload.attachments;
+        await existingDuplicate.save();
+      }
+      await session.abortTransaction();
+      session.endSession();
+      return {
+        id: existingDuplicate._id,
+        patientId: existingDuplicate.patientId,
+        testName: existingDuplicate.testName,
+        category: existingDuplicate.category,
+        specimen: existingDuplicate.specimen,
+        resultValue: existingDuplicate.resultValue,
+        unit: existingDuplicate.unit,
+        referenceRange: existingDuplicate.referenceRange,
+        interpretation: existingDuplicate.interpretation,
+        collectedAt: existingDuplicate.collectedAt,
+        resultedAt: existingDuplicate.resultedAt,
+        verificationStatus: existingDuplicate.verificationStatus,
+        attachments: existingDuplicate.attachments || [],
+        notes: existingDuplicate.notes,
+        createdAt: existingDuplicate.createdAt,
+        updatedAt: existingDuplicate.updatedAt,
+      };
+    }
+
     const docs = await labResultModel.create(
       [
         {
@@ -57,11 +106,11 @@ export const createLabResultService = async ({ payload, authUser }) => {
               ? payload.patientVisible
               : true,
 
-          testName: payload.testName,
-          category: payload.category || "other",
-          specimen: payload.specimen || undefined,
+          testName: normalized.testName,
+          category: normalized.category,
+          specimen: normalized.specimen || undefined,
           resultValue: payload.resultValue || undefined,
-          unit: payload.unit || undefined,
+          unit: normalized.unit || undefined,
           referenceRange: payload.referenceRange || undefined,
           interpretation: payload.interpretation || "unknown",
 
