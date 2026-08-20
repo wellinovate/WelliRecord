@@ -1,4 +1,5 @@
 import cloudinary from "../../shared/config/cloudinary.js";
+import { IMAGE_MIME_TYPES } from "../../shared/middlewares/upload.js";
 import crypto from "crypto";
 import { UserProfile } from "../users/user_profile_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
@@ -216,11 +217,22 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
   if (Array.isArray(files) && files.length > 0) {
     for (const file of files) {
       try {
+        // Was resource_type: "auto" — for a PDF, Cloudinary's
+        // auto-detection classifies it under "image" delivery (visible
+        // in the resulting URL: /image/upload/...), and Cloudinary
+        // blocks unauthenticated delivery of PDF/ZIP files uploaded
+        // that way by default, as a security measure. That's exactly
+        // what the 401 on "View Document" was — confirmed by checking
+        // the failing URL's path directly. "raw" delivery isn't
+        // subject to that restriction; same branch radiology_order_
+        // service.js already uses correctly for its own non-image
+        // (DICOM) uploads.
+        const resourceType = IMAGE_MIME_TYPES.includes(file.mimetype) ? "image" : "raw";
         const result = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
             {
               folder: "lab_reports",
-              resource_type: "auto",
+              resource_type: resourceType,
             },
             (err, res) => (err ? reject(err) : resolve(res))
           );
