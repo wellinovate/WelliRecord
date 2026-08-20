@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import helmet from "helmet";
 import morgan from "morgan";
 import connectDB from "./config/db.js";
 import authRouter from "./modules/auth/auth_routes.js";
@@ -62,6 +63,12 @@ const httpServer = http.createServer(app);
 initSocket(httpServer);
 // app.use(bodyParser.json());
 
+// Render (and any single-hop reverse proxy in front of this app) sits
+// between the client and this process, so without this, req.ip and
+// req.secure reflect the proxy, not the real client — which is what
+// the rate limiters below key on. "1" means trust exactly one hop.
+app.set("trust proxy", 1);
+
 connectDB();
 // connectRedis();
 
@@ -80,13 +87,12 @@ const corsOptions = {
 };
 
 // app use
+app.use(helmet());
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
 app.use(cors(corsOptions));
 app.use(bodyParse.json({ limit: "10mb" }));
 app.use(cookieParser());
-
-// app.set("trust proxy", 1);
 
 app.use(requestIdMiddleware);
 
