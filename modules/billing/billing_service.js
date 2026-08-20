@@ -348,12 +348,22 @@ export const getMyInvoicesService = async ({ authUser, patientId, status }) => {
   if (accountId) patientIds.add(String(accountId));
   if (patientId) patientIds.add(String(patientId));
 
-  // Also include any PatientIdentity records linked to this user or matching their phone/email
+  // Deliberately NOT matching on phone or email here. This platform is
+  // built around family enrollment where dependents commonly share a
+  // parent's phone number or email for contact/OTP purposes — matching
+  // PatientIdentity records by shared contact info would mean any two
+  // people sharing a household phone (or a data-entry coincidence) can
+  // see each other's invoices, which is a real cross-patient exposure
+  // given how common that sharing is for this user base. userId is a
+  // direct, unambiguous link to this exact profile; wrId is a unique
+  // per-person identifier that isn't shared even within a family
+  // enrollment. If family members genuinely need to see each other's
+  // invoices, that should go through the existing managedBy dependant
+  // relationship (see dependants_services.js's assertOwnership) — an
+  // explicit, auditable link — not implicit contact-info matching.
   const identityFilters = [];
   if (userProfile?._id) identityFilters.push({ userId: userProfile._id });
   if (userProfile?.wrId) identityFilters.push({ wrId: userProfile.wrId });
-  if (userProfile?.email) identityFilters.push({ email: userProfile.email });
-  if (userProfile?.phone) identityFilters.push({ phone: userProfile.phone });
 
   if (identityFilters.length > 0) {
     const linkedIdentities = await PatientIdentity.find({ $or: identityFilters }).select("_id").lean();
@@ -460,13 +470,15 @@ export const getInvoiceByIdService = async ({ id, authUser }) => {
       if (invoicePid === String(userProfile._id)) {
         isOwningPatient = true;
       } else {
+        // Same reasoning as getMyInvoicesService above — no email/phone
+        // matching, since that would let anyone sharing a household
+        // contact detail claim ownership of another patient's invoice
+        // by guessing/knowing its id.
         const isLinkedIdentity = await PatientIdentity.exists({
           _id: invoicePid,
           $or: [
             { userId: userProfile._id },
             ...(userProfile.wrId ? [{ wrId: userProfile.wrId }] : []),
-            ...(userProfile.email ? [{ email: userProfile.email }] : []),
-            ...(userProfile.phone ? [{ phone: userProfile.phone }] : []),
           ],
         });
         if (isLinkedIdentity) isOwningPatient = true;
