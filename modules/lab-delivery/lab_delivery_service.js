@@ -296,7 +296,14 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
     try {
       await createNotification({
         recipientAccountId: account._id,
-        type: "lab_result_ready",
+        // Was "lab_result_ready" — the Notification model's type enum
+        // only allows "lab_result" (notification_model.js), so every
+        // call here threw a Mongoose enum validation error and the
+        // push notification never actually got created. Confirmed by
+        // constructing a Notification with this exact object and
+        // running validateSync() against it — this is the "push:
+        // failed" on every release, not a delivery/config issue.
+        type: "lab_result",
         title: isCritical ? "Urgent: new lab result available" : "New lab result available",
         body: isCritical
           ? "A critical laboratory result has been added to your WelliRecord."
