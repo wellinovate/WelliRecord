@@ -54,8 +54,17 @@ export const inviteUnregisteredPatientController = async (req, res, next) => {
 
 export const releaseLabDeliveryController = async (req, res, next) => {
   try {
+    let payload = req.body;
+    if (typeof req.body?.payload === "string") {
+      try {
+        payload = JSON.parse(req.body.payload);
+      } catch (e) {
+        // use req.body directly if not valid JSON
+      }
+    }
     const data = await releaseLabDeliveryService({
-      payload: req.body,
+      payload,
+      files: req.files || [],
       authUser: req.user,
     });
     return res.status(200).json({

@@ -1,3 +1,4 @@
+import cloudinary from "../../shared/config/cloudinary.js";
 import crypto from "crypto";
 import { UserProfile } from "../users/user_profile_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
@@ -190,7 +191,7 @@ export const inviteUnregisteredPatientService = async ({
 };
 
 // ─── Step 4: Release verified results and dispatch notifications ────────────
-export const releaseLabDeliveryService = async ({ payload, authUser }) => {
+export const releaseLabDeliveryService = async ({ payload, files = [], authUser }) => {
   const {
     patientId,
     reportMetadata = {},
@@ -208,6 +209,34 @@ export const releaseLabDeliveryService = async ({ payload, authUser }) => {
     const err = new Error("At least one result observation row is required");
     err.statusCode = 400;
     throw err;
+  }
+
+  // Upload attached report files to Cloudinary if present
+  const attachments = [];
+  if (Array.isArray(files) && files.length > 0) {
+    for (const file of files) {
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: "lab_reports",
+              resource_type: "auto",
+            },
+            (err, res) => (err ? reject(err) : resolve(res))
+          );
+          uploadStream.end(file.buffer);
+        });
+        attachments.push({
+          url: result.secure_url,
+          name: file.originalname || "lab_report.pdf",
+          fileType: file.mimetype || "application/pdf",
+          size: file.size,
+          uploadedAt: new Date(),
+        });
+      } catch (err) {
+        console.error("[releaseLabDeliveryService] Cloudinary upload error:", err.message);
+      }
+    }
   }
 
   const created = [];
@@ -229,6 +258,7 @@ export const releaseLabDeliveryService = async ({ payload, authUser }) => {
         resultedAt: reportMetadata.resultDate || new Date(),
         verificationStatus: "lab-verified",
         notes: reportMetadata.notes || undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
         source: "lab",
       },
       authUser,
