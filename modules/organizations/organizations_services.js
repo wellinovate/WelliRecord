@@ -1,3 +1,4 @@
+import { escapeRegexInput } from "../../shared/utils/escapeRegexInput.js";
 import mongoose from "mongoose";
 import { PatientIdentity } from "./patient/patient_identity_model.js";
 import { OrganizationProfile } from "./organizations_model.js";
@@ -54,7 +55,7 @@ export const registerPatientService = async ({
       { phone: phone || null },
       { email: email || null },
       {
-        fullName: new RegExp(`^${fullName}$`, "i"),
+        fullName: new RegExp(`^${escapeRegexInput(fullName)}$`, "i"),
       },
     ],
     isMerged: false,
@@ -139,7 +140,7 @@ export const registerNewPatientService = async ({
       { phone: phone || null },
       { email: email || null },
       {
-        fullName: new RegExp(`^${fullName}$`, "i"),
+        fullName: new RegExp(`^${escapeRegexInput(fullName)}$`, "i"),
         dateOfBirth,
       },
     ],

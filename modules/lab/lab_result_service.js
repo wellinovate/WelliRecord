@@ -1,3 +1,4 @@
+import { escapeRegexInput } from "../../shared/utils/escapeRegexInput.js";
 import { normalizeLabResultData } from "./lab_normalizer.js";
 import mongoose from "mongoose";
 import { labResultModel } from "./lab_model.js";
@@ -55,7 +56,7 @@ export const createLabResultService = async ({ payload, authUser }) => {
 
     const existingDuplicate = await labResultModel.findOne({
       patientId: { $in: Array.isArray(patientIds) ? patientIds : [patientIds] },
-      testName: { $regex: new RegExp(`^${normalized.testName}$`, "i") },
+      testName: { $regex: new RegExp(`^${escapeRegexInput(normalized.testName)}$`, "i") },
       resultedAt: { $gte: startOfDay, $lte: endOfDay },
       recordStatus: "active",
     });

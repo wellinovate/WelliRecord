@@ -1,3 +1,4 @@
+import { escapeRegexInput } from "../../../shared/utils/escapeRegexInput.js";
 import mongoose from "mongoose";
 import {
   maskEmail,
@@ -26,9 +27,9 @@ export const getPatientsService = async ({
   if (search) {
     patientFilter = {
       $or: [
-        { fullName: new RegExp(search, "i") },
-        { phone: new RegExp(search, "i") },
-        { email: new RegExp(search, "i") },
+        { fullName: new RegExp(escapeRegexInput(search), "i") },
+        { phone: new RegExp(escapeRegexInput(search), "i") },
+        { email: new RegExp(escapeRegexInput(search), "i") },
       ],
     };
   }

@@ -1,3 +1,4 @@
+import { escapeRegexInput } from "../../shared/utils/escapeRegexInput.js";
 import crypto from "crypto";
 import { LocalCustomer } from "./local_customer_model.js";
 import { matchCustomer } from "./local_customer_matching_service.js";
@@ -219,9 +220,9 @@ export async function getLocalCustomersService({ page = 1, limit = 20, matchStat
   if (invitationStatus) filter.invitationStatus = invitationStatus;
   if (search) {
     filter.$or = [
-      { fullName: new RegExp(search, "i") },
-      { phone:    new RegExp(search, "i") },
-      { email:    new RegExp(search, "i") },
+      { fullName: new RegExp(escapeRegexInput(search), "i") },
+      { phone:    new RegExp(escapeRegexInput(search), "i") },
+      { email:    new RegExp(escapeRegexInput(search), "i") },
     ];
   }
 
