@@ -69,7 +69,13 @@ export const registerUserAccount = async (payload) => {
     const account = await createAccount(
       {
         accountType: "user",
-        role: payload.role || "patient",
+        // Self-registration only ever creates a patient account.
+        // Account.role's enum includes "admin"/"provider_admin"/
+        // "staff" for accounts created through other paths (invite
+        // acceptance, org registration), but this is the public,
+        // unauthenticated POST /auth/register endpoint — it must never
+        // take the role from client input, hardcoded intentionally.
+        role: "patient",
         email: payload.email,
         password: payload.password,
         phone: payload.phone,

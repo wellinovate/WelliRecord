@@ -98,7 +98,12 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const googleLoginController = async (req, res) => {
   try {
-    const { credential, profileType, phone, role } = req.body;
+    // "role" used to be read from req.body here and passed straight
+    // into Account.create below — same hole as the local /register
+    // endpoint (see auth_validator.js/registerUserAccount for the
+    // matching fix): Google-authenticated signup only ever creates a
+    // patient account, so client input is never trusted for this.
+    const { credential, profileType, phone } = req.body;
     let account;
     if (!credential) {
       console.log("🚀 ~ googleLoginController ~ credential:", credential);
@@ -204,7 +209,7 @@ export const googleLoginController = async (req, res) => {
 
         account = await Account.create({
           accountType: "user",
-          role: role || payload.role || "patient",
+          role: "patient",
           email: normalizedEmail,
           password: sub, // Use Google sub as placeholder password
           phone: phone || null,

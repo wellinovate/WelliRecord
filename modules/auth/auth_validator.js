@@ -24,7 +24,6 @@ const personalRegisterSchema = z.object({
     ),
   gender: z.string().trim().min(2, "Gender is required"),
   address: optionalString,
-  role: z.string().optional(),
   authProvider: z.literal("local").optional(),
 });
 
