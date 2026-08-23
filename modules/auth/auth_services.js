@@ -21,7 +21,7 @@ import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { createOrganizationProfile } from "../organizations/organizations_services.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { createUserProfile } from "../users/users_services.js";
-import { sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail } from "../../shared/utils/resend.js";
+import { sendVerificationEmail, sendPasswordResetEmail, sendLoginOtpEmail, sendNewProviderSignupNotificationEmail } from "../../shared/utils/resend.js";
 import bcrypt from "bcryptjs";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import { sendLoginOtp, verifyLoginOtp, sendEmailOtp, generateOtpCode } from "../../shared/utils/termii.js";
@@ -195,6 +195,23 @@ export const registerOrganizationAccount = async (payload) => {
       });
     } catch (err) {
       console.error("Signup succeeded but verification email failed to send:", err);
+    }
+
+    try {
+      await sendNewProviderSignupNotificationEmail({
+        organizationName: payload.organizationName,
+        organizationType: payload.organizationType,
+        contactPersonName: payload.contactPersonName,
+        contactPersonRole: payload.contactPersonRole,
+        email: payload.email,
+        phone: payload.phone,
+        registrationNumber: payload.registrationNumber,
+        licenseNumber: payload.licenseNumber,
+      });
+    } catch (err) {
+      // Never let a failed internal notification block the actual
+      // signup — the org account is already created at this point.
+      console.error("Signup succeeded but admin notification email failed to send:", err);
     }
 
     return {

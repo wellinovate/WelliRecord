@@ -520,3 +520,100 @@ export const sendLoginOtpEmail = async ({ email, code, fullName, userName }) => 
     throw new Error("EMAIL_SEND_FAILED");
   }
 };
+
+// Notifies WelliRecord's own admin inbox — not the provider — when a new
+// organization registers, so someone actually knows to go review and
+// approve/decline their identity & licence verification. Before this,
+// a new signup sat in the admin queue with nobody notified; the only
+// way to find it was to happen to check /admin/verifications.
+export const sendNewProviderSignupNotificationEmail = async ({
+  organizationName,
+  organizationType,
+  contactPersonName,
+  contactPersonRole,
+  email,
+  phone,
+  registrationNumber,
+  licenseNumber,
+}) => {
+  const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || "inquiry@wellirecord.com";
+  const reviewUrl = `${process.env.FRONTEND_URL}/admin/verifications`;
+
+  const detailRow = (label, value) =>
+    value
+      ? `
+        <tr>
+          <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600; width: 160px; vertical-align: top;">${label}</td>
+          <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 600;">${value}</td>
+        </tr>
+      `
+      : "";
+
+  try {
+    const response = await resend.emails.send({
+      from: "WelliRecord <noreply@send.wellirecord.com>",
+      to: recipient,
+      subject: `New provider signup — ${organizationName || "Unnamed organization"} needs review`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; color: #1e293b;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+
+            <!-- Brand Header -->
+            <div style="background-color: #0b2447; padding: 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">WelliRecord<span style="color: #38bdf8;">™</span></h1>
+              <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0; font-weight: 500;">Admin notification</p>
+            </div>
+
+            <!-- Main Content -->
+            <div style="padding: 36px 32px;">
+              <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">
+                New provider signup needs review
+              </h2>
+
+              <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px;">
+                A new organization registered on WelliRecord. Their identity & licence verification is not submitted yet — this is just to flag the new account. You'll see it move to "Pending" in the admin queue once they upload a document.
+              </p>
+
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+                ${detailRow("Organization", organizationName)}
+                ${detailRow("Type", organizationType)}
+                ${detailRow("Contact person", contactPersonName ? `${contactPersonName}${contactPersonRole ? ` (${contactPersonRole})` : ""}` : null)}
+                ${detailRow("Email", email)}
+                ${detailRow("Phone", phone)}
+                ${detailRow("Registration No.", registrationNumber)}
+                ${detailRow("Licence No.", licenseNumber)}
+              </table>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${reviewUrl}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);">
+                  Open Admin Verification Queue
+                </a>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f1f5f9; padding: 28px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 14px; font-weight: 800; color: #071B3F; margin: 0 0 4px 0;">WelliRecord™</p>
+              <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+                © 2026 WelliRecord™. All rights reserved.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      `,
+    });
+
+    if (response.error) {
+      console.error("Resend rejected the new-provider-signup admin notification:", response.error);
+      throw new Error("EMAIL_SEND_FAILED");
+    }
+
+    return response;
+  } catch (error) {
+    console.error("New-provider-signup admin notification failed:", error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+};
+
