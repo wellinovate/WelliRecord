@@ -19,6 +19,8 @@ const notificationSchema = new Schema(
         "lab_result",
         "team_invite_accepted",
         "critical_alert",
+        "referral",
+        "radiology_report_ready",
         "system",
       ],
       required: true,

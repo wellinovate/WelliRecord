@@ -4,6 +4,25 @@ import { UserProfile } from "../users/user_profile_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { getMyOrganizationService } from "../organizations/verification_services.js";
 import { AppError } from "../../shared/errors/AppError.js";
+import { createNotification } from "../notifications/notification_services.js";
+
+// Best-effort — a referral must still succeed even if the in-app
+// notification fails to write (matches the pattern used elsewhere,
+// e.g. lab_delivery_service.js).
+const notifyOrgOwner = async ({ accountId, title, body, link }) => {
+  if (!accountId) return;
+  try {
+    await createNotification({
+      recipientAccountId: accountId,
+      type: "referral",
+      title,
+      body,
+      link,
+    });
+  } catch (err) {
+    console.error("[referral_service] notification failed:", err.message);
+  }
+};
 
 const resolveActingOrg = async (authUser) => {
   const profile = await getMyOrganizationService({
@@ -39,7 +58,7 @@ export const createReferralService = async ({
 
   const [patient, receivingOrg, referringOrg] = await Promise.all([
     UserProfile.findById(patientId).select("fullName").lean(),
-    OrganizationProfile.findById(receivingOrganizationId).select("organizationName").lean(),
+    OrganizationProfile.findById(receivingOrganizationId).select("organizationName accountId").lean(),
     resolveActingOrg(authUser),
   ]);
 
@@ -67,6 +86,13 @@ export const createReferralService = async ({
     urgency: urgency || "routine",
     reason: reason.trim(),
     clinicalSummary: clinicalSummary?.trim() || null,
+  });
+
+  await notifyOrgOwner({
+    accountId: receivingOrg.accountId,
+    title: "New referral received",
+    body: `${referringOrg.organizationName} referred ${patient.fullName} to your organization${specialty ? ` (${specialty.trim()})` : ""}.`,
+    link: `/provider/referrals/${referral._id}`,
   });
 
   return referral;
@@ -154,5 +180,24 @@ export const updateReferralStatusService = async ({
   referral.respondedByName = authUser.fullName || "Unknown";
 
   await referral.save();
+
+  // Notify whichever side didn't just make this change.
+  const otherOrgId = isReceiver
+    ? referral.referringOrganizationId
+    : referral.receivingOrganizationId;
+  const otherOrg = await OrganizationProfile.findById(otherOrgId)
+    .select("accountId")
+    .lean();
+  const actingOrgName = isReceiver
+    ? referral.receivingOrganizationName
+    : referral.referringOrganizationName;
+
+  await notifyOrgOwner({
+    accountId: otherOrg?.accountId,
+    title: `Referral ${status}`,
+    body: `${actingOrgName} marked the referral for ${referral.patientName} as ${status}.`,
+    link: `/provider/referrals/${referral._id}`,
+  });
+
   return referral;
 };
