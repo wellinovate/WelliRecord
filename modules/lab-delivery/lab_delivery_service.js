@@ -219,22 +219,25 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
   if (Array.isArray(files) && files.length > 0) {
     for (const file of files) {
       try {
-        // Was resource_type: "auto" — for a PDF, Cloudinary's
-        // auto-detection classifies it under "image" delivery (visible
-        // in the resulting URL: /image/upload/...), and Cloudinary
-        // blocks unauthenticated delivery of PDF/ZIP files uploaded
-        // that way by default, as a security measure. That's exactly
-        // what the 401 on "View Document" was — confirmed by checking
-        // the failing URL's path directly. "raw" delivery isn't
-        // subject to that restriction; same branch radiology_order_
-        // service.js already uses correctly for its own non-image
-        // (DICOM) uploads.
-        const resourceType = IMAGE_MIME_TYPES.includes(file.mimetype) ? "image" : "raw";
+        // resource_type: "auto" with explicit type: "upload" and content-type detection
+        // ensures files (PDFs and images) get proper MIME-types and inline-friendly headers
+        // on Cloudinary without forcing "raw" attachments.
+        const isPdf =
+          file.mimetype === "application/pdf" ||
+          (file.originalname && file.originalname.toLowerCase().endsWith(".pdf"));
+        const detectedContentType = isPdf
+          ? "application/pdf"
+          : file.mimetype || "application/octet-stream";
+
         const result = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
             {
               folder: "lab_reports",
-              resource_type: resourceType,
+              resource_type: "auto",
+              type: "upload",
+              filename_override: file.originalname || undefined,
+              use_filename: true,
+              unique_filename: true,
             },
             (err, res) => (err ? reject(err) : resolve(res))
           );
@@ -243,7 +246,7 @@ export const releaseLabDeliveryService = async ({ payload, files = [], authUser 
         attachments.push({
           url: result.secure_url,
           name: file.originalname || "lab_report.pdf",
-          fileType: file.mimetype || "application/pdf",
+          fileType: detectedContentType,
           size: file.size,
           uploadedAt: new Date(),
         });
