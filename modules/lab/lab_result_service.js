@@ -5,6 +5,7 @@ import { labResultModel } from "./lab_model.js";
 import { PatientIdentity } from "../organizations/patient/patient_identity_model.js";
 import { resolvePatientAccessContext, resolveActorContext } from "../vitals/vital_service.js";
 import { resolveConsentAccess } from "../access/access_grant_service.js";
+import { notifyLabResultReady } from "./lab_notifications.js";
 
 export const createLabResultService = async ({ payload, authUser }) => {
   const session = await mongoose.startSession();
@@ -132,6 +133,8 @@ export const createLabResultService = async ({ payload, authUser }) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    notifyLabResultReady(created._id); // deliberately not awaited
 
     return {
       id: created._id,
