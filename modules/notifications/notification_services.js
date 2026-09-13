@@ -153,6 +153,30 @@ const DEFAULT_TEMPLATES = [
     body: "Urgent: a critical lab result has been released to your WelliRecord. Log in now: {{link}}",
     variables: ["link"],
   },
+  {
+    name: "Follow-up Info",
+    channel: "sms",
+    body: "Here is your follow-up information from your recent visit to {{org_name}}. Log in to WelliRecord to view details: {{link}}",
+    variables: ["org_name", "link"],
+  },
+  {
+    name: "Follow-up Due",
+    channel: "sms",
+    body: "Your provider at {{org_name}} recommended a follow-up around this time. Log in to WelliRecord for details: {{link}}",
+    variables: ["org_name", "link"],
+  },
+  {
+    name: "Follow-up Schedule Prompt",
+    channel: "sms",
+    body: "Would you like to schedule your follow-up appointment at {{org_name}}? Log in to WelliRecord to book: {{link}}",
+    variables: ["org_name", "link"],
+  },
+  {
+    name: "Preventive Care Reminder",
+    channel: "sms",
+    body: "It may be time for your {{care_label}}. Log in to WelliRecord to learn more or schedule: {{link}}",
+    variables: ["care_label", "link"],
+  },
 ];
 
 export const seedDefaultTemplates = async () => {

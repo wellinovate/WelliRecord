@@ -446,6 +446,9 @@ export const completeQueueVisitService = async ({
   queueId,
   completedBy = null,
   authUser,
+  followUpRecommended,
+  followUpDate,
+  notes,
 }) => {
   if (!isValidObjectId(queueId)) throw new Error("Invalid queueId");
 
@@ -473,6 +476,15 @@ export const completeQueueVisitService = async ({
 
       encounter.status = "completed";
       encounter.endedAt = new Date();
+      if (followUpRecommended !== undefined) {
+        encounter.followUpRecommended = Boolean(followUpRecommended);
+      }
+      if (followUpDate !== undefined) {
+        encounter.followUpDate = followUpDate ? new Date(followUpDate) : null;
+      }
+      if (notes) {
+        encounter.notes = encounter.notes ? `${encounter.notes}\n${notes}` : notes;
+      }
 
       await Promise.all([
         queueItem.save({ session }),

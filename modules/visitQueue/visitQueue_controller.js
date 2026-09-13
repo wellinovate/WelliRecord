@@ -115,6 +115,9 @@ export const completeQueueVisitController = async (req, res, next) => {
       queueId: req.params.queueId,
       completedBy: req.user?.sub || null,
       authUser: req.user,
+      followUpRecommended: req.body?.followUpRecommended,
+      followUpDate: req.body?.followUpDate,
+      notes: req.body?.notes,
     });
 
     return res.status(200).json({

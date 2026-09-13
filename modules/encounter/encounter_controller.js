@@ -1,5 +1,6 @@
 import {
   createEncounterService,
+  updateEncounterService,
   getPatientEncountersDetailService,
   getPatientEncountersService,
 } from "./encounter_services.js";
@@ -143,6 +144,28 @@ export const getUserEncounterDetailControllerByOrganization = async (req, res, n
     return res.status(200).json({
       success: true,
       message: "Patient encounters fetched successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateEncounterController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const payload = req.validated;
+    const authUser = req.user;
+
+    const result = await updateEncounterService({
+      id,
+      payload,
+      authUser,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Encounter updated successfully",
       data: result,
     });
   } catch (error) {

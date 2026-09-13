@@ -19,6 +19,7 @@ const notificationPreferencesSchema = new Schema(
     emergencyModeAlerts: { type: Boolean, default: true },
     medicationReminders: { type: Boolean, default: false },
     accessAuditLog: { type: Boolean, default: false },
+    preventiveCareReminders: { type: Boolean, default: false },
   },
   { _id: false },
 );

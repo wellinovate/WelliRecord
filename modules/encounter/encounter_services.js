@@ -11,6 +11,8 @@ import { allergyModel } from "../allergies/allergies_model.js";
 import { immunizationModel } from "../immunizations/immunizations_model.js";
 import { generateEncounterCode } from "../../shared/utils/helper.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { OrganizationMembership } from "../memberships/organization_membership_model.js";
+import { getMyOrganizationService } from "../organizations/verification_services.js";
 import { Account } from "../accounts/account_model.js";
 
 export const createEncounterService = async ({ payload, authUser }) => {
@@ -83,6 +85,8 @@ export const createEncounterService = async ({ payload, authUser }) => {
           source: payload.providerId || "provider",
           status: payload.status || "scheduled",
           notes: payload.notes || null,
+          followUpRecommended: payload.followUpRecommended || false,
+          followUpDate: payload.followUpDate || null,
 
           //       recordStatus: payload.recordStatus || "active",
         },
@@ -110,6 +114,9 @@ export const createEncounterService = async ({ payload, authUser }) => {
       source: created.source,
       status: created.status,
       notes: created.notes,
+      followUpRecommended: created.followUpRecommended,
+      followUpDate: created.followUpDate,
+      followUpReminderStage: created.followUpReminderStage,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
     };
@@ -201,6 +208,9 @@ export const getPatientEncountersService = async ({
       patientAccess: item.patientAccess || null,
       recordStatus: item.recordStatus || null,
       notes: item.notes || null,
+      followUpRecommended: item.followUpRecommended || false,
+      followUpDate: item.followUpDate || null,
+      followUpReminderStage: item.followUpReminderStage || "none",
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     })),
@@ -341,6 +351,9 @@ export const getPatientEncountersDetailService = async ({
       patientAccess: encounter.patientAccess || null,
       recordStatus: encounter.recordStatus || null,
       notes: encounter.notes || null,
+      followUpRecommended: encounter.followUpRecommended || false,
+      followUpDate: encounter.followUpDate || null,
+      followUpReminderStage: encounter.followUpReminderStage || "none",
       createdAt: encounter.createdAt,
       updatedAt: encounter.updatedAt,
     },
@@ -373,4 +386,82 @@ export const getEncounterDisplayTitle = (encounter) => {
   }
 
   return typeLabel;
+};
+
+export const assertEncounterOwnership = async (encounter, authUser) => {
+  // Ownership check — restrictClinicalScope/requirePermission only
+  // check category access and permission level, not which encounter.
+  // Without this, any provider with write_clinical_records at any
+  // organization could edit any encounter system-wide.
+  // We resolve the acting organization profile using getMyOrganizationService
+  // (the established helper used in assertQueueItemOwnership / assertClaimOwnership).
+  // Note: encounter.organizationId references OrganizationProfile._id,
+  // while OrganizationMembership.organizationId references Account._id.
+  // We check against both org._id and org.accountId to guarantee matching.
+  let org = null;
+  try {
+    org = await getMyOrganizationService({
+      accountId: authUser?.sub,
+      profileId: authUser?.profileId,
+    });
+  } catch {
+    if (authUser?.profileId) {
+      const membership = await OrganizationMembership.findOne({
+        userId: authUser.profileId,
+        isActive: true,
+      }).select("organizationId").lean();
+
+      if (membership) {
+        org = await OrganizationProfile.findOne({ accountId: membership.organizationId }).lean();
+      }
+    } else if (authUser?.sub) {
+      org = await OrganizationProfile.findOne({ accountId: authUser.sub }).lean();
+    }
+  }
+
+  const isMatchingOrg =
+    org &&
+    (String(encounter.organizationId) === String(org._id) ||
+      String(encounter.organizationId) === String(org.accountId));
+
+  if (!isMatchingOrg) {
+    const error = new Error("You don't have access to this encounter");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return org;
+};
+
+export const updateEncounterService = async ({ id, payload, authUser }) => {
+  const encounter = await Encounter.findById(id);
+  if (!encounter) {
+    const error = new Error("Encounter not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Ownership check — restrictClinicalScope/requirePermission only
+  // check category access and permission level, not which encounter.
+  await assertEncounterOwnership(encounter, authUser);
+
+  if (payload.status) {
+    encounter.status = payload.status;
+    if (payload.status === "completed" && !encounter.endedAt) {
+      encounter.endedAt = payload.endedAt || new Date();
+    }
+  }
+  if (payload.endedAt !== undefined) encounter.endedAt = payload.endedAt;
+  if (payload.notes !== undefined) encounter.notes = payload.notes;
+  if (payload.reasonForVisit !== undefined) encounter.reasonForVisit = payload.reasonForVisit;
+  if (payload.chiefComplaint !== undefined) encounter.chiefComplaint = payload.chiefComplaint;
+  if (payload.followUpRecommended !== undefined) {
+    encounter.followUpRecommended = Boolean(payload.followUpRecommended);
+  }
+  if (payload.followUpDate !== undefined) {
+    encounter.followUpDate = payload.followUpDate;
+  }
+
+  await encounter.save();
+  return encounter;
 };

@@ -26,6 +26,30 @@ export const createEncounterSchema = z.object({
     .optional(),
   recordStatus: z.enum(["active", "archived", "entered-in-error"]).optional(),
   notes: z.string().trim().max(2000).optional(),
+  followUpRecommended: z.boolean().optional(),
+  followUpDate: z.coerce.date().optional().nullable(),
+});
+
+export const updateEncounterSchema = z.object({
+  status: z
+    .enum([
+      "active",
+      "in-progress",
+      "completed",
+      "cancelled",
+      "no-show",
+    ])
+    .optional(),
+  endedAt: z.coerce.date().optional().nullable(),
+  reasonForVisit: z.string().trim().max(500).optional(),
+  chiefComplaint: z.string().trim().max(1000).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  followUpRecommended: z.boolean().optional(),
+  followUpDate: z.coerce.date().optional().nullable(),
+});
+
+export const getEncounterByIdParamsSchema = z.object({
+  id: objectIdSchema,
 });
 
 export const getPatientEncountersParamsSchema = z.object({

@@ -6,9 +6,12 @@ import { validate } from "../../shared/middlewares/validator.js";
 import {
   createEncounterController,
   getPatientEncountersController,
+  updateEncounterController,
 } from "./encounter_controller.js";
 import {
   createEncounterSchema,
+  updateEncounterSchema,
+  getEncounterByIdParamsSchema,
   getPatientEncountersParamsSchema,
 } from "./encounter_validation.js";
 
@@ -36,6 +39,16 @@ router.get(
   requirePermission("view_clinical_records"),
   validate(getPatientEncountersParamsSchema, "params"),
   getPatientEncountersController,
+);
+
+router.patch(
+  "/:id",
+  protect,
+  restrictClinicalScope("encounters"),
+  requirePermission("write_clinical_records"),
+  validate(getEncounterByIdParamsSchema, "params"),
+  validate(updateEncounterSchema),
+  updateEncounterController,
 );
 
 export default router;

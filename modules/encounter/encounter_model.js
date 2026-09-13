@@ -6,7 +6,7 @@ const encounterSchema = new Schema(
   {
     patientId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Patient",
+      ref: "UserProfile",
       required: true,
       index: true,
     },
@@ -169,6 +169,30 @@ const encounterSchema = new Schema(
       maxlength: 2000,
       default: null,
     },
+
+    followUpRecommended: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    followUpDate: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    followUpReminderStage: {
+      // Tracks which reminder in the day 1 / day 7 / day 30 cadence has
+      // already fired, so the sweep never sends the same stage twice and
+      // always knows what's next — mirrors reminderSentAt's role on
+      // Appointment, but needs a stage rather than a single timestamp
+      // since there are three reminders, not one.
+      type: String,
+      enum: ["none", "day1_sent", "day7_sent", "day30_sent"],
+      default: "none",
+      index: true,
+    },
   },
   { timestamps: true },
 );
@@ -189,5 +213,6 @@ encounterSchema.pre("save", function () {
 encounterSchema.index({ organizationId: 1, scheduledAt: 1, status: 1 });
 encounterSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
 encounterSchema.index({ patientId: 1, startedAt: -1 });
+encounterSchema.index({ followUpRecommended: 1, followUpDate: 1, followUpReminderStage: 1 });
 
 export const Encounter = mongoose.model("Encounter", encounterSchema);
