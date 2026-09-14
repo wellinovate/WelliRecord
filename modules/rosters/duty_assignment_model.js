@@ -122,7 +122,6 @@ const dutyAssignmentSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Roster",
       required: true,
-      index: true,
     },
 
     staffId: {
