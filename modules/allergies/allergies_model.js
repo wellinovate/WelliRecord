@@ -123,7 +123,6 @@ allergyEntrySchema.index({
 });
 
 allergyEntrySchema.index({ patientId: 1, updatedAt: -1 });
-allergyEntrySchema.index({ patientId: 1, createdAt: -1 });
 allergyEntrySchema.index({ patientId: 1, recordedAt: -1 });
 
 export const allergyModel = mongoose.model("Allergy", allergyEntrySchema);
