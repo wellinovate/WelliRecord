@@ -41,6 +41,7 @@ import { seedDefaultLabTestCatalog } from "./modules/lab-tests-catalog/lab_test_
 import { startAppointmentReminderScheduler } from "./modules/appointments/appointment_notifications.js";
 import { startFollowUpReminderScheduler } from "./modules/encounter/encounter_notifications.js";
 import { startPreventiveCareScheduler } from "./modules/preventive-care/preventive_care_notifications.js";
+import { startMedicationReminderScheduler } from "./modules/medications/medication_notifications.js";
 import http from "http";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import radiologyOrderRoutes from "./modules/radiology-orders/radiology_order_routes.js";
@@ -234,4 +235,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   startAppointmentReminderScheduler();
   startFollowUpReminderScheduler();
   startPreventiveCareScheduler();
+  startMedicationReminderScheduler();
 });

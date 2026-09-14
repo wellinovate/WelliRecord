@@ -81,6 +81,10 @@ export const createMedicationSchema = z.object({
   adherence: z.enum(["unknown", "good", "partial", "poor"]).optional(),
 
   notes: z.string().trim().max(1500).optional(),
+  scheduleTimes: z
+    .array(z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Must be in HH:MM 24-hour format"))
+    .optional(),
+  reminderEnabled: z.boolean().optional(),
 });
 
 export const getPatientMedicationsParamsSchema = z.object({

@@ -140,6 +140,27 @@ const medicationEntrySchema = new Schema(
       default: "unknown",
       index: true,
     },
+
+    scheduleTimes: {
+      // 24h "HH:MM" local clock times this dose should be taken, e.g.
+      // ["08:00", "20:00"]. dosage/frequency stay free text for the
+      // clinical record; this is the machine-readable anchor the
+      // reminder sweep fires against.
+      type: [String],
+      default: [],
+      validate: {
+        validator: (arr) => arr.every((t) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(t)),
+        message: "scheduleTimes must be in HH:MM 24-hour format",
+      },
+    },
+
+    reminderEnabled: {
+      // Opt-in per medication, on top of the account-level
+      // UserProfile.notificationPreferences.medicationReminders toggle —
+      // both must be true for a reminder to fire.
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

@@ -177,6 +177,12 @@ const DEFAULT_TEMPLATES = [
     body: "It may be time for your {{care_label}}. Log in to WelliRecord to learn more or schedule: {{link}}",
     variables: ["care_label", "link"],
   },
+  {
+    name: "Medication Reminder",
+    channel: "sms",
+    body: "It's time for your {{medication_name}} ({{dosage}}). Log in to WelliRecord for details: {{link}}",
+    variables: ["medication_name", "dosage", "link"],
+  },
 ];
 
 export const seedDefaultTemplates = async () => {
