@@ -8,6 +8,8 @@ import {
   buildClinicalAccessFilter,
   findActiveAccessGrant,
   resolveConsentAccess,
+  resolvePatientRecordAccess,
+  logPatientRecordAccess,
 } from "../access/access_grant_service.js";
 import { redis } from "../../shared/config/upstash_redis.js";
 
@@ -418,7 +420,29 @@ export const resolveActorContext = async (authUser) => {
   };
 };
 
-export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
+// `intent` gates how strictly the ORGANIZATION ACTOR branch below checks
+// the caller's relationship to the patient:
+//   - 'read'  — used for endpoints that return existing clinical history
+//     (vitals, diagnoses, procedures, immunizations, lab results,
+//     allergies, medical-history summaries). This is where the real
+//     vulnerability was: any authenticated organization account could
+//     read any patient's full medical history with no check at all.
+//     Now requires resolvePatientRecordAccess to actually allow it
+//     (org owner/admin, an active encounter between this provider and
+//     the patient, an active consent grant, or explicit emergency
+//     access) before returning the patient.
+//   - 'write' (default, unchanged) — preserves the existing permissive
+//     behavior for the ~14 other call sites (appointments, lab orders,
+//     pharmacy orders, billing, encounter creation, ...), several of
+//     which legitimately need to create the *first* record for a
+//     patient before any encounter or grant can exist. Tightening
+//     those requires module-by-module review of each workflow, not a
+//     blanket change here.
+export const resolvePatientAccessContext = async ({
+  patientId,
+  authUser,
+  intent = "write",
+}) => {
   const actor = await resolveActorContext(authUser);
 
   // const cacheKey = `patient-access:${patientId}:${actor.userId}:${actor.role}`;
@@ -442,6 +466,20 @@ export const resolvePatientAccessContext = async ({ patientId, authUser }) => {
       const error = new Error("Patient not found");
       error.statusCode = 404;
       throw error;
+    }
+
+    if (intent === "read") {
+      const decision = await resolvePatientRecordAccess({ actor, patientId });
+
+      if (!decision.allowed) {
+        const error = new Error(
+          "You don't have an active encounter or consent grant for this patient",
+        );
+        error.statusCode = 403;
+        throw error;
+      }
+
+      await logPatientRecordAccess({ actor, patientId, decision });
     }
 
     const result = {

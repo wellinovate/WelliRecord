@@ -72,6 +72,7 @@ export async function getMedicalHistorySummaryByProviders(req, res, next) {
     } = await resolvePatientAccessContext({
       patientId: patientId,
       authUser,
+      intent: "read",
     });
 
     const data = await medicalHistoryService.getMedicalHistorySummary(
@@ -96,6 +97,7 @@ export async function getPatientVitals(req, res, next) {
     const { patientId } = await resolvePatientAccessContext({
       patientId: rawPatientId,
       authUser,
+      intent: "read",
     });
     const { page, limit, skip } = getPagination(req.query);
 
@@ -123,6 +125,7 @@ export async function getPatientDiagnoses(req, res, next) {
     const { patientId } = await resolvePatientAccessContext({
       patientId: rawPatientId,
       authUser,
+      intent: "read",
     });
     const { page, limit, skip } = getPagination(req.query);
 
@@ -177,6 +180,7 @@ export async function getPatientProcedures(req, res, next) {
     const { patientId } = await resolvePatientAccessContext({
       patientId: rawPatientId,
       authUser,
+      intent: "read",
     });
     const { page, limit, skip } = getPagination(req.query);
 
@@ -204,6 +208,7 @@ export async function getPatientImmunizations(req, res, next) {
     const { patientId } = await resolvePatientAccessContext({
       patientId: rawPatientId,
       authUser,
+      intent: "read",
     });
     const { page, limit, skip } = getPagination(req.query);
 
@@ -234,6 +239,7 @@ export async function getPatientLabResults(req, res, next) {
     const { patientId } = await resolvePatientAccessContext({
       patientId: rawPatientId,
       authUser,
+      intent: "read",
     });
     const { page, limit, skip } = getPagination(req.query);
 
@@ -261,6 +267,7 @@ export async function getPatientAllergies(req, res, next) {
     const { patientId } = await resolvePatientAccessContext({
       patientId: rawPatientId,
       authUser,
+      intent: "read",
     });
     const { page, limit, skip } = getPagination(req.query);
 
