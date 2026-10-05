@@ -49,7 +49,9 @@ export const sendEmailOtp = async (accountId) => {
     identity = await Identity.create({ accountId, verifications: [] });
   }
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  // crypto.randomInt, not Math.random() — see termii.js generateOtpCode for
+  // why: this is an auth-verification code and needs a real CSPRNG.
+  const otp = crypto.randomInt(100000, 1000000).toString();
   const hashedOtp = await bcrypt.hash(otp, 10);
 
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);

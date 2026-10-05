@@ -91,7 +91,12 @@ export async function getMedicalHistorySummaryByProviders(req, res, next) {
 
 export async function getPatientVitals(req, res, next) {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawPatientId } = req.params;
+    const authUser = req.user;
+    const { patientId } = await resolvePatientAccessContext({
+      patientId: rawPatientId,
+      authUser,
+    });
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientVitals(patientId, {
@@ -113,7 +118,12 @@ export async function getPatientVitals(req, res, next) {
 
 export async function getPatientDiagnoses(req, res, next) {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawPatientId } = req.params;
+    const authUser = req.user;
+    const { patientId } = await resolvePatientAccessContext({
+      patientId: rawPatientId,
+      authUser,
+    });
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientDiagnoses(patientId, {
@@ -162,7 +172,12 @@ export async function getPatientMedications(req, res, next) {
 
 export async function getPatientProcedures(req, res, next) {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawPatientId } = req.params;
+    const authUser = req.user;
+    const { patientId } = await resolvePatientAccessContext({
+      patientId: rawPatientId,
+      authUser,
+    });
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientProcedures(patientId, {
@@ -184,7 +199,12 @@ export async function getPatientProcedures(req, res, next) {
 
 export async function getPatientImmunizations(req, res, next) {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawPatientId } = req.params;
+    const authUser = req.user;
+    const { patientId } = await resolvePatientAccessContext({
+      patientId: rawPatientId,
+      authUser,
+    });
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientImmunizations(
@@ -209,7 +229,12 @@ export async function getPatientImmunizations(req, res, next) {
 
 export async function getPatientLabResults(req, res, next) {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawPatientId } = req.params;
+    const authUser = req.user;
+    const { patientId } = await resolvePatientAccessContext({
+      patientId: rawPatientId,
+      authUser,
+    });
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientLabResults(patientId, {
@@ -231,7 +256,12 @@ export async function getPatientLabResults(req, res, next) {
 
 export async function getPatientAllergies(req, res, next) {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawPatientId } = req.params;
+    const authUser = req.user;
+    const { patientId } = await resolvePatientAccessContext({
+      patientId: rawPatientId,
+      authUser,
+    });
     const { page, limit, skip } = getPagination(req.query);
 
     const data = await medicalHistoryService.getPatientAllergies(patientId, {

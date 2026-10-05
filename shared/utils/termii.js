@@ -1,4 +1,5 @@
 import axios from "axios";
+import crypto from "crypto";
 import { AppError } from "../errors/AppError.js";
 import dotenv from "dotenv";
 dotenv.config();
@@ -177,12 +178,13 @@ export const verifyLoginOtp = async ({ pinId, pin }) => {
 };
 
 export const generateOtpCode = (length = 6) => {
-  const digits = "0123456789";
-  let code = "";
-  for (let i = 0; i < length; i++) {
-    code += digits[Math.floor(Math.random() * digits.length)];
-  }
-  return code;
+  // crypto.randomInt, not Math.random() — Math.random() is not a CSPRNG and
+  // its internal state can be reconstructed from a handful of observed
+  // outputs, making login OTP codes predictable. This generates the actual
+  // code used to authenticate a session, so it needs a real RNG.
+  const min = 10 ** (length - 1);
+  const max = 10 ** length;
+  return crypto.randomInt(min, max).toString();
 };
 
 // Termii's email OTP endpoint only delivers a code we supply — it does not

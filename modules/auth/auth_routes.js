@@ -6,7 +6,7 @@ import {
   validateRegisterRequest,
 } from "./auth_validator.js";
 import { forgotPasswordController, googleLoginController, login, loginController, register, resendLoginOtpController, resendVerificationEmailController, resetPasswordController, verifyEmailController } from "./auth_controller.js";
-import { authRegisterLimiter, forgotPasswordLimiter, loginLimiter, resendVerificationLimiter, resetPasswordLimiter, verifyEmailLimiter } from "../../shared/utils/authRegisterLimiter.js";
+import { authRegisterLimiter, forgotPasswordLimiter, loginLimiter, resendLoginOtpLimiter, resendVerificationLimiter, resetPasswordLimiter, verifyEmailLimiter, verifyLoginCodeLimiter } from "../../shared/utils/authRegisterLimiter.js";
 
 // The `upload` instance that used to live here had no size/type
 // limits and nothing in this router actually uses it (the one call
@@ -18,8 +18,8 @@ const router = express.Router();
 
 router.post("/register", validateRegisterRequest,  register);
 router.post("/login", loginLimiter, validateLoginRequest,  loginController);
-router.post("/login/verify-code", login);
-router.post("/resend-verify-code", resendLoginOtpController);
+router.post("/login/verify-code", verifyLoginCodeLimiter, login);
+router.post("/resend-verify-code", resendLoginOtpLimiter, resendLoginOtpController);
 router.post("/google/login", googleLoginController);
 router.post("/forgot-password", forgotPasswordLimiter, forgotPasswordController);
 router.post("/reset-password", resetPasswordLimiter, resetPasswordController);
