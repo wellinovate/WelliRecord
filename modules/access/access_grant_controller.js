@@ -1,6 +1,8 @@
 import { vitalModel } from "../vitals/vitals_model.js";
 import { accessGrantModel } from "./access_grant_model.js";
 import { resolveActorContext } from "../vitals/vital_service.js";
+import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { UserProfile } from "../users/user_profile_model.js";
 // import { accessAuditModel } from "./access_audit_model.js";
 
 import {
@@ -352,4 +354,98 @@ export const expireOldAccessGrants = async () => {
       },
     },
   );
+};
+
+const REQUEST_CATEGORIES = [
+  "vitals", "medications", "allergies", "diagnoses", "lab-results",
+  "radiology", "procedures", "immunizations", "vision",
+];
+
+// Provider-side: ask a patient for view access. Creates a `pending` grant
+// that gives no access until the patient approves it (the mobile app's
+// Consent screen lists pending grants and lets the patient approve or
+// reject). findActiveAccessGrant only matches status "active", so a
+// pending request cannot be used to read anything.
+export const requestPatientAccess = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+    const actor = await resolveActorContext(req.user);
+
+    if (!actor.isOrganizationActor || !actor.organizationId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only provider accounts can request patient access.",
+      });
+    }
+
+    const { accessScope, category, durationDays, purpose } = req.body || {};
+    if (!["full-record", "category"].includes(accessScope)) {
+      return res.status(400).json({
+        success: false,
+        message: "accessScope must be full-record or category.",
+      });
+    }
+    if (accessScope === "category" && !REQUEST_CATEGORIES.includes(category)) {
+      return res.status(400).json({
+        success: false,
+        message: "Choose a valid record category.",
+      });
+    }
+    const days = durationDays === undefined ? 30 : Number(durationDays);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      return res.status(400).json({
+        success: false,
+        message: "durationDays must be between 1 and 365.",
+      });
+    }
+
+    const patient = await UserProfile.findById(patientId).lean();
+    if (!patient || !patient.accountId) {
+      return res.status(404).json({ success: false, message: "Patient not found." });
+    }
+
+    const organization = await OrganizationProfile.findOne({
+      accountId: actor.organizationId,
+    }).lean();
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        message: "Organization profile not found.",
+      });
+    }
+
+    const duplicate = await accessGrantModel.exists({
+      patientId: patient._id,
+      granteeOrganizationId: organization._id,
+      accessScope,
+      category: accessScope === "category" ? category : null,
+      status: { $in: ["pending", "active"] },
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        message: "A request or active grant already exists for this scope.",
+      });
+    }
+
+    const now = new Date();
+    const grant = await accessGrantModel.create({
+      patientId: patient._id,
+      grantedBy: patient.accountId,
+      requestedBy: organization._id,
+      granteeType: "organization",
+      granteeOrganizationId: organization._id,
+      accessScope,
+      category: accessScope === "category" ? category : null,
+      startsAt: now,
+      expiresAt: new Date(now.getTime() + days * 24 * 60 * 60 * 1000),
+      permissions: { view: true, download: false, reshare: false, write: false },
+      purpose: typeof purpose === "string" ? purpose.slice(0, 300) : null,
+      status: "pending",
+    });
+
+    return res.status(201).json({ success: true, data: grant });
+  } catch (error) {
+    next(error);
+  }
 };

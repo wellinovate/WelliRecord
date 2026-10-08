@@ -4,6 +4,7 @@ import {
   getMyGrantedAccess,
   getMyGrantedAccessAsProvider,
   getPatientVitalsForProvider,
+  requestPatientAccess,
   revokeAccessGrant
 } from "./access_grant_controller.js";
 import { createShareLinkController } from "./bridge_controller.js";
@@ -18,6 +19,9 @@ router.post("/patients/:patientId/access-grants", createAccessGrant);
 router.post("/patients/:patientId/access-grants/share-link", createShareLinkController);
 
 router.get("/patients/:patientId/access-grants", getMyGrantedAccess);
+
+// Provider asks the patient for view access (creates a pending grant).
+router.post("/patients/:patientId/access-requests", requestPatientAccess);
 
 // Provider-side: grants where the current provider (or their org) is
 // the grantee, not the patient. Distinct from the route above, which
