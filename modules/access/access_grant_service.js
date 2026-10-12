@@ -184,6 +184,39 @@ export const grantRecentHistoryAccess = async ({
   });
 };
 
+// Grants name their grantee by OrganizationProfile._id (see
+// validateGranteeExists and the model's `ref: "OrganizationProfile"`), but
+// the actor resolved from the login token carries the owning ACCOUNT id
+// (OrganizationProfile.accountId). Comparing the two directly never matched,
+// so a provider with a valid consent grant was treated as having none.
+// This returns both forms for each id so either storage convention matches.
+export const resolveGranteeIds = async ({ userId = null, organizationId = null }) => {
+  const accountIds = [userId, organizationId].filter(Boolean);
+  const profiles = accountIds.length
+    ? await OrganizationProfile.find({ accountId: { $in: accountIds } })
+        .select("_id accountId")
+        .lean()
+    : [];
+
+  const profileIdFor = (accountId) =>
+    profiles
+      .filter((p) => String(p.accountId) === String(accountId))
+      .map((p) => p._id);
+
+  return {
+    userIds: [userId, ...profileIdFor(userId)].filter(Boolean),
+    organizationIds: [organizationId, ...profileIdFor(organizationId)].filter(Boolean),
+  };
+};
+
+export const buildGranteeConditions = ({ userIds, organizationIds }) => {
+  const conditions = [{ granteeUserId: { $in: userIds } }];
+  if (organizationIds.length) {
+    conditions.push({ granteeOrganizationId: { $in: organizationIds } });
+  }
+  return conditions;
+};
+
 export const findActiveAccessGrant = async ({
   patientId,
   userId,
@@ -194,17 +227,9 @@ export const findActiveAccessGrant = async ({
 }) => {
   const now = new Date();
 
-  const granteeConditions = [
-    {
-      granteeUserId: userId,
-    },
-  ];
-
-  if (organizationId) {
-    granteeConditions.push({
-      granteeOrganizationId: organizationId,
-    });
-  }
+  const granteeConditions = buildGranteeConditions(
+    await resolveGranteeIds({ userId, organizationId }),
+  );
 
   const scopeConditions = [
     {

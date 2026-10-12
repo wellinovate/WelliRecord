@@ -7,6 +7,8 @@ import {
   grantPatientAccess,
   findActiveAccessGrant,
   buildClinicalAccessFilter,
+  resolveGranteeIds,
+  buildGranteeConditions,
 } from "./access_grant_service.js";
 
 import { validateCreateAccessGrant } from "./access_grant_validation.js";
@@ -253,10 +255,12 @@ export const getMyGrantedAccessAsProvider = async (req, res, next) => {
     // Matches how findActiveAccessGrant checks granteeship elsewhere:
     // either this specific staff member, or (if they belong to one)
     // their organization was named as grantee.
-    const granteeConditions = [{ granteeUserId: actor.userId }];
-    if (actor.organizationId) {
-      granteeConditions.push({ granteeOrganizationId: actor.organizationId });
-    }
+    const granteeConditions = buildGranteeConditions(
+      await resolveGranteeIds({
+        userId: actor.userId,
+        organizationId: actor.organizationId,
+      }),
+    );
 
     const grants = await accessGrantModel
       .find({
