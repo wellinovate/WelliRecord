@@ -16,7 +16,7 @@ Both calls are `POST` with JSON and these headers:
 
 `POST /wellipay/v1/verifications` with `{ "requestId": "...", "reference": "WR-2291-ABCD" }`
 
-Always answers `202`. If the WR-ID belongs to a patient with a phone number, an SMS code (6 digits) is sent. Nothing in the answer says whether the WR-ID exists. At most 3 codes go to one WR-ID in 10 minutes.
+Always answers `202`. If the WR-ID belongs to a patient, a 6-digit code is sent by SMS, or by email when the patient has no phone number. Nothing in the answer says whether the WR-ID exists. At most 3 codes go to one WR-ID in 10 minutes.
 
 ### Confirm
 
@@ -29,4 +29,4 @@ A code lasts 10 minutes, allows 5 tries and works once. Only a hash of it is sto
 
 ## Not covered
 
-A patient with no phone number on file gets no code. An email fallback is not built.
+A patient with neither a phone number nor an email on file gets no code.

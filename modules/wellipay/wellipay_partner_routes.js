@@ -13,6 +13,7 @@ import rateLimit from "express-rate-limit";
 import { UserProfile } from "../users/user_profile_model.js";
 import WellipayVerification from "./wellipay_verification_model.js";
 import { sendSms } from "../../shared/utils/termii.js";
+import { sendWellipayCodeEmail } from "../../shared/utils/resend.js";
 import {
   CODE_TTL_MS,
   MAX_ATTEMPTS,
@@ -73,13 +74,17 @@ async function findPatient(reference) {
   return profile;
 }
 
+// SMS when the patient has a phone number, email otherwise.
 async function sendCode(profile, code) {
   if (profile.phone) {
     await sendSms({ phoneNumber: profile.phone, message: smsText(code) });
     return;
   }
-  // No phone on file. Without a second channel the patient cannot be reached.
-  console.warn(`WelliPay verification: ${profile.wrId} has no phone number; no code sent.`);
+  if (profile.email) {
+    await sendWellipayCodeEmail({ email: profile.email, text: smsText(code) });
+    return;
+  }
+  console.warn(`WelliPay verification: ${profile.wrId} has no phone or email; no code sent.`);
 }
 
 router.post("/verifications", async (req, res) => {
