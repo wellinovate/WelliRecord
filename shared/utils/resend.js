@@ -617,3 +617,19 @@ export const sendNewProviderSignupNotificationEmail = async ({
   }
 };
 
+
+// Code for connecting a WelliRecord ID to WelliPay. Plain on purpose: it is a security code.
+export const sendWellipayCodeEmail = async ({ email, text }) => {
+  const response = await resend.emails.send({
+    from: "WelliRecord <noreply@send.wellirecord.com>",
+    to: email,
+    subject: "Your WelliRecord code to connect WelliPay",
+    text,
+    html: `<p>${text}</p><p>Never share this code.</p>`,
+  });
+  if (response.error) {
+    console.error("Resend rejected the WelliPay code email:", response.error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+  return response;
+};
