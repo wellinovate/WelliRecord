@@ -10,7 +10,7 @@
 // be used to find out which WR-IDs exist.
 import express from "express";
 import rateLimit from "express-rate-limit";
-import UserProfile from "../users/user_profile_model.js";
+import { UserProfile } from "../users/user_profile_model.js";
 import WellipayVerification from "./wellipay_verification_model.js";
 import { sendSms } from "../../shared/utils/termii.js";
 import {
