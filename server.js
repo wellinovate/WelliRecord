@@ -52,6 +52,7 @@ import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes
 import pharmacyInventoryRoutes from "./modules/pharmacy-inventory/pharmacy_inventory_routes.js";
 import localCustomerRoutes from "./modules/local-customers/local_customer_routes.js";
 import rosterRoutes from "./modules/rosters/roster_routes.js";
+import wellipayPartnerRoutes from "./modules/wellipay/wellipay_partner_routes.js";
 import { initSocket } from "./shared/realtime/socket.js";
 // import { connectRedis } from "./shared/config/redis.js";
 import {
@@ -89,6 +90,10 @@ const corsOptions = {
   credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
 };
+
+// WelliPay partner API. Mounted first: it needs the raw body for signature checks
+// and is called server to server, so browser CORS rules do not apply.
+app.use("/wellipay/v1", wellipayPartnerRoutes);
 
 // app use
 app.use(helmet());
