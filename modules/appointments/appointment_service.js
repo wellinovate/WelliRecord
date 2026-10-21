@@ -3,6 +3,7 @@ import { Appointment } from "./appointment_model.js";
 import { VisitQueue } from "../visitQueue/visitQueue_model.js";
 import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import { notifyAppointmentBooked } from "./appointment_notifications.js";
+import { cleanVisitFields } from "../telehealth/telehealth_logic.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
@@ -40,6 +41,8 @@ export const createAppointmentService = async ({
   providerId = null,
   scheduledFor,
   reasonForVisit = null,
+  visitType,
+  durationMin,
   authUser,
   createdBy = null,
 }) => {
@@ -68,12 +71,16 @@ export const createAppointmentService = async ({
     throw new Error("Invalid createdBy");
   }
 
+  const visit = cleanVisitFields({ visitType, durationMin });
+  if (!visit.ok) throw new Error(visit.message);
+
   const appointment = await Appointment.create({
     patientId: resolvedPatientId,
     organizationId,
     providerId: providerId || null,
     scheduledFor,
     reasonForVisit,
+    ...visit.value,
     createdBy: createdBy || null,
   });
 
@@ -142,7 +149,7 @@ export const getAppointmentsService = async ({ authUser, params = {} }) => {
   }
 
   const appointmentSelect =
-    "patientId organizationId providerId scheduledFor reasonForVisit status createdBy createdAt updatedAt";
+    "patientId organizationId providerId scheduledFor reasonForVisit visitType durationMin status createdBy createdAt updatedAt";
 
   const patientSelect = "fullName wrId phone";
   const providerSelect = "fullName email phone";

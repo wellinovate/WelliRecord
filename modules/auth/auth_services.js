@@ -375,6 +375,10 @@ export const loginAccount = async ({ email, password, channel }) => {
   if (!account.isActive || account.status !== "active") {
     throw new AppError("Account is not active", 403, "ACCOUNT_INACTIVE");
   }
+  // A practice account is reached by switching from the patient login, never by signing in.
+  if (account.practiceOf) {
+    throw new AppError("Invalid email or password", 401, "INVALID_CREDENTIALS");
+  }
   if (!account.isVerified) {
     throw new AppError(
       "Please verify your email before logging in. Check your inbox for the verification link.",

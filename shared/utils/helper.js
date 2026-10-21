@@ -27,6 +27,10 @@ export const signAccessToken = async (results) => {
       : null,
   };
 
+  // A practitioner working from their patient login: the token says whose practice it is,
+  // so the app can offer a way back to the patient view.
+  if (account.practiceOf) payload.practiceOf = String(account.practiceOf);
+
   if (account.accountType === "organization") {
     payload.organizationId = profile?._id
       ? String(profile._id)

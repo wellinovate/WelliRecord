@@ -85,6 +85,12 @@ const organizationProfileSchema = new Schema(
       trim: true,
       default: null,
     },
+    // Independent practitioners (organizationType "individaul_provider").
+    profession: { type: String, trim: true, default: null, index: true },
+    specialty: { type: String, trim: true, default: null },
+    licenseBody: { type: String, trim: true, default: null },
+    yearsExperience: { type: Number, default: null },
+    bio: { type: String, trim: true, default: null, maxlength: 1000 },
     contactPersonName: {
       type: String,
       trim: true,

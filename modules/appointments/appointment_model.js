@@ -39,6 +39,19 @@ const appointmentSchema = new Schema(
       default: null,
     },
 
+    visitType: {
+      type: String,
+      enum: ["in_person", "virtual"],
+      default: "in_person",
+    },
+
+    durationMin: {
+      type: Number,
+      min: 5,
+      max: 240,
+      default: 30,
+    },
+
     status: {
       type: String,
       enum: ["booked", "checked-in", "cancelled", "no-show", "completed"],
