@@ -4,6 +4,8 @@ import { escapeRegexInput } from "../../shared/utils/escapeRegexInput.js";
 import { sendSms } from "../../shared/utils/termii.js";
 import { LocalCustomer } from "../local-customers/local_customer_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { OrganizationMembership } from "../memberships/organization_membership_model.js";
+import { getEffectivePermissions } from "../team/permission_registry.js";
 import { PatientOrganization } from "../organizations/patient_organization_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
 import { allergyModel } from "../allergies/allergies_model.js";
@@ -93,14 +95,31 @@ async function tell(link, title, body) {
   }
 }
 
-async function orgOf(authUser) {
-  const org = authUser?.wrOrgId ? await OrganizationProfile.findOne({ wrOrgId: authUser.wrOrgId }) : null;
+/**
+ * Resolves the caller's organization and checks they hold the permission. Unlike the
+ * route middleware, this fails closed: no active membership in this organization, no access.
+ * The organization's own owner account always passes.
+ */
+async function orgOf(authUser, permission) {
+  const owner = authUser?.accountType === "organization";
+  // The owner's token carries wrOrgId. A team member's token carries the organization's
+  // Account id as organizationId (see signAccessToken), never wrOrgId.
+  let org = null;
+  if (owner && authUser.wrOrgId) org = await OrganizationProfile.findOne({ wrOrgId: authUser.wrOrgId });
+  else if (!owner && mongoose.isValidObjectId(authUser?.organizationId)) org = await OrganizationProfile.findOne({ accountId: authUser.organizationId });
   if (!org) fail("This account is not linked to an organization.", 403, "NO_ORGANIZATION");
+  if (owner) return org;
+  const membership = mongoose.isValidObjectId(authUser.profileId)
+    ? await OrganizationMembership.findOne({ userId: authUser.profileId, organizationId: org.accountId, isActive: true }).select("membershipRole permissionOverrides")
+    : null;
+  if (!membership) fail("You are not an active member of this organization.", 403, "NOT_A_MEMBER");
+  const allowed = getEffectivePermissions(membership.membershipRole, membership.permissionOverrides);
+  if (!allowed.includes(permission)) fail("Your role doesn't have access to this action.", 403, "PERMISSION_DENIED");
   return org;
 }
 
-async function ownLink(id, authUser) {
-  const org = await orgOf(authUser);
+async function ownLink(id, authUser, permission = "manage_record_links") {
+  const org = await orgOf(authUser, permission);
   const _id = oid(id);
   const link = _id ? await RecordLink.findOne({ _id, organizationId: org._id }) : null;
   if (!link) fail("Link not found.", 404, "NOT_FOUND");
@@ -136,7 +155,7 @@ const summary = (l) => ({
 // ----- hospital staff -----
 
 export async function initiateLink({ authUser, localCustomerId, ip }) {
-  const org = await orgOf(authUser);
+  const org = await orgOf(authUser, "manage_record_links");
   const cid = oid(localCustomerId);
   const customer = cid ? await LocalCustomer.findOne({ _id: cid, organizationId: org._id }) : null;
   if (!customer) fail("Patient record not found.", 404, "NOT_FOUND");
@@ -164,7 +183,7 @@ export async function initiateLink({ authUser, localCustomerId, ip }) {
 }
 
 export async function listLinks({ authUser, status, page = 1, limit = 20 }) {
-  const org = await orgOf(authUser);
+  const org = await orgOf(authUser, "manage_record_links");
   const q = { organizationId: org._id };
   if (status) q.status = String(status);
   const [rows, total] = await Promise.all([
@@ -242,7 +261,7 @@ export async function cancelLink({ authUser, id, ip }) {
 
 /** The hospital's release authorization. Only now does staged data reach the patient's record. */
 export async function approveLink({ authUser, id, note, ip }) {
-  const { link, org } = await ownLink(id, authUser);
+  const { link, org } = await ownLink(id, authUser, "approve_record_links");
   if (link.status !== "under_hospital_review") fail("This link is not waiting for review.", 409, "BAD_TRANSITION");
   if (!link.patientProfileId || !link.consentAt || !link.consentScopes.includes("demographics")) fail("The patient has not verified and consented yet.", 409, "NOT_READY");
   if (linkExpired(link)) fail("This link has expired. Reopen it first.", 410, "EXPIRED");

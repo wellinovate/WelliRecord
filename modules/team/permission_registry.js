@@ -78,6 +78,9 @@ export const PERMISSIONS = {
   create_invoices: { label: "Checkout patients and issue invoices", category: "billing" },
   manage_payments: { label: "Record payments, void invoices", category: "billing" },
 
+  manage_record_links: { label: "Start record links, add items, flag, reopen and cancel them", category: "patients" },
+  approve_record_links: { label: "Release a patient's hospital record to their WelliRecord account", category: "patients" },
+
   manage_team: { label: "Invite, suspend, and manage team members", category: "admin" },
 };
 
@@ -98,6 +101,7 @@ const ROLE_DEFAULTS = {
     "manage_appointments", "view_roster",
     "view_referrals", "create_referrals", "respond_to_referrals",
     "view_reports", "view_invoices", "create_invoices",
+    "manage_record_links", "approve_record_links",
   ],
   clinician: [
     "view_patients", "register_patients",
@@ -109,6 +113,7 @@ const ROLE_DEFAULTS = {
     "manage_appointments", "view_roster",
     "view_referrals", "create_referrals", "respond_to_referrals",
     "view_reports", "view_invoices", "create_invoices",
+    "manage_record_links", "approve_record_links",
   ],
   nurse: [
     "view_patients",
@@ -136,6 +141,7 @@ const ROLE_DEFAULTS = {
     "view_referrals",
     "view_invoices", "create_invoices", "manage_payments",
     "view_roster", "manage_roster",
+    "manage_record_links",
   ],
   insurer_agent: [
     "view_patients", "view_reports",
