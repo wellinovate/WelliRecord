@@ -160,7 +160,7 @@ export async function initiateLink({ authUser, localCustomerId, ip }) {
     throw err;
   }
   await audit(link, "initiated", staffActor(authUser), `Customer ${customer._id}`, ip);
-  return { link: summary(link), token, url: `${frontendUrl()}/link/${token}`, phoneHint: maskPhone(customer.phone) };
+  return { link: summary(link), token, url: `${frontendUrl()}/join/${token}`, phoneHint: maskPhone(customer.phone) };
 }
 
 export async function listLinks({ authUser, status, page = 1, limit = 20 }) {
