@@ -4,15 +4,33 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Fail fast when no member answers, and re-check the replica set often so a
+// failover is noticed in seconds instead of leaving a stale view of the primary.
+const OPTIONS = {
+  serverSelectionTimeoutMS: 15000,
+  heartbeatFrequencyMS: 10000,
+  socketTimeoutMS: 45000,
+  retryWrites: true,
+  retryReads: true,
+};
 
-const connectDB = async () => {
+let listening = false;
+
+const connectDB = async (attempt = 1) => {
+  if (!listening) {
+    listening = true;
+    mongoose.connection.on("disconnected", () => console.warn("[db] disconnected"));
+    mongoose.connection.on("reconnected", () => console.log("[db] reconnected"));
+    mongoose.connection.on("error", (e) => console.error("[db] error:", e?.message));
+  }
   try {
-    await mongoose. connect(process.env.DATABASE);
+    await mongoose.connect(process.env.DATABASE, OPTIONS);
     console.log("DB connected...");
-  } catch (error) { 
-    console.log(error);
-  } 
+  } catch (error) {
+    console.error(`[db] connect attempt ${attempt} failed:`, error?.message);
+    // Keep trying instead of leaving the server up with no database.
+    if (attempt < 10) setTimeout(() => connectDB(attempt + 1), Math.min(attempt * 3000, 15000));
+  }
 };
 
 export default connectDB;
- 

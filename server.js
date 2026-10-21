@@ -202,6 +202,16 @@ app.use((req, res) => {
 });
 
 // Global error handler
+function isDatabaseError(err) {
+  const name = String(err?.name || "");
+  const msg = String(err?.message || "");
+  return (
+    /^Mongo/.test(name) ||
+    name === "MongooseServerSelectionError" ||
+    /marked stale|server selection timed out|topology (was )?destroyed|ReplicaSetNoPrimary|ECONNREFUSED.*27017/i.test(msg)
+  );
+}
+
 app.use((err, req, res, next) => {
   console.error("ERROR:", err);
 
@@ -213,6 +223,17 @@ app.use((err, req, res, next) => {
       success: false,
       message: err.message || "File upload failed",
       code: err.code || "UPLOAD_ERROR",
+    });
+  }
+
+  // A database or driver failure (failover, stale topology, server selection
+  // timeout) must never reach the person as raw driver text. Log it above,
+  // tell them to retry.
+  if (isDatabaseError(err)) {
+    return res.status(503).json({
+      success: false,
+      message: "The service is briefly unavailable. Wait a moment and try again.",
+      code: "DATABASE_UNAVAILABLE",
     });
   }
 
