@@ -5,6 +5,36 @@ import { matchCustomer } from "./local_customer_matching_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { PatientOrganization } from "../organizations/patient_organization_model.js";
 import { UserProfile } from "../users/user_profile_model.js";
+import mongoose from "mongoose";
+
+// Resolve the caller's organization and find a customer that belongs to it only.
+async function ownCustomer(id, authUser) {
+  const org = authUser?.wrOrgId ? await OrganizationProfile.findOne({ wrOrgId: authUser.wrOrgId }) : null;
+  if (!org) {
+    const err = new Error("This account is not linked to an organization");
+    err.statusCode = 403;
+    throw err;
+  }
+  const customer = mongoose.isValidObjectId(id) ? await LocalCustomer.findOne({ _id: id, organizationId: org._id }) : null;
+  if (!customer) {
+    const err = new Error("Local customer not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  return customer;
+}
+
+const maskEmail = (e) => {
+  const [u, d] = String(e || "").split("@");
+  return d ? `${u.slice(0, 1)}***@${d}` : "";
+};
+const maskPhoneTail = (p) => {
+  const t = String(p || "").replace(/\D/g, "");
+  return t.length >= 4 ? `***${t.slice(-4)}` : "";
+};
+
+// Direct claim by token alone skips identity and consent. Off unless an old client still needs it.
+const legacyClaimAllowed = () => process.env.ALLOW_LEGACY_RECORD_CLAIM === "true";
 
 // ─── Normalize a raw import row into a consistent shape ───────────────────────
 function normalizeRow(row) {
@@ -303,12 +333,7 @@ export async function getLocalCustomerStatsService({ authUser }) {
 
 // ─── Confirm a possible_match ─────────────────────────────────────────────────
 export async function confirmMatchService({ id, userId, authUser }) {
-  const customer = await LocalCustomer.findById(id);
-  if (!customer) {
-    const err = new Error("Local customer not found");
-    err.statusCode = 404;
-    throw err;
-  }
+  const customer = await ownCustomer(id, authUser);
 
   customer.matchStatus      = "matched";
   customer.matchConfidence  = 100;
@@ -320,28 +345,19 @@ export async function confirmMatchService({ id, userId, authUser }) {
 }
 
 // ─── Dismiss a possible_match (treat as new) ──────────────────────────────────
-export async function dismissMatchService({ id }) {
+export async function dismissMatchService({ id, authUser }) {
+  const owned = await ownCustomer(id, authUser);
   const customer = await LocalCustomer.findByIdAndUpdate(
-    id,
+    owned._id,
     { matchStatus: "new", matchCandidates: [], matchConfidence: 0, matchedOn: [] },
     { new: true }
   );
-  if (!customer) {
-    const err = new Error("Local customer not found");
-    err.statusCode = 404;
-    throw err;
-  }
   return customer;
 }
 
 // ─── Generate single invitation ───────────────────────────────────────────────
 export async function sendInvitationService({ id, authUser }) {
-  const customer = await LocalCustomer.findById(id);
-  if (!customer) {
-    const err = new Error("Local customer not found");
-    err.statusCode = 404;
-    throw err;
-  }
+  const customer = await ownCustomer(id, authUser);
 
   const token = crypto.randomBytes(12).toString("hex");
   customer.invitationToken = token;
@@ -414,8 +430,8 @@ export async function getClaimInfoService({ token }) {
       id: customer._id,
       fullName: customer.fullName,
       firstName: customer.firstName,
-      phone: customer.phone,
-      email: customer.email,
+      phone: maskPhoneTail(customer.phone),
+      email: maskEmail(customer.email),
     },
     organization: {
       name: orgProfile?.organizationName || "Healthcare Provider",
@@ -428,6 +444,11 @@ export async function getClaimInfoService({ token }) {
 
 // ─── Claim Record by Patient ─────────────────────────────────────────────────
 export async function claimRecordService({ token, authUser }) {
+  if (!legacyClaimAllowed()) {
+    const err = new Error("Linking now needs identity and consent steps. Ask the hospital for a new link.");
+    err.statusCode = 410;
+    throw err;
+  }
   const customer = await LocalCustomer.findOne({ invitationToken: token });
   if (!customer) {
     const err = new Error("Invalid or expired invitation token");

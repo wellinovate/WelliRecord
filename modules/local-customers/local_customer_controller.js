@@ -69,7 +69,7 @@ export const confirmMatchController = async (req, res, next) => {
 export const dismissMatchController = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const result = await dismissMatchService({ id });
+    const result = await dismissMatchService({ id, authUser: req.user });
     return res.status(200).json({ success: true, message: "Match dismissed", data: result });
   } catch (error) {
     next(error);
