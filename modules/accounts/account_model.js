@@ -131,6 +131,21 @@ const accountSchema = new Schema(
       index: true,
     },
 
+    // Set only on the practice account of an independent practitioner
+    // (a certified doctor, lab scientist, ... who is also a patient).
+    // Points at that person's own patient Account. The practice account
+    // owns the provider-side profile and data, exactly like an organization
+    // owner, but it has a generated email and a random password and cannot
+    // be logged into: the person reaches it from their patient login by
+    // switching context (modules/practitioners). null for every other account.
+    practiceOf: {
+      type: Schema.Types.ObjectId,
+      ref: "Account",
+      default: null,
+      unique: true,
+      sparse: true,
+    },
+
     lastLoginAt: {
       type: Date,
       default: null,
@@ -184,7 +199,7 @@ accountSchema.methods.toSafeObject = function () {
 accountSchema.statics.findByEmailWithPassword = function (email) {
   return this.findOne({ email })
     .select(
-      "+password email accountType role status isActive img phone isVerified patientIdentityId lastLoginAt passwordChangedAt createdAt updatedAt"
+      "+password email accountType role status isActive img phone isVerified patientIdentityId practiceOf lastLoginAt passwordChangedAt createdAt updatedAt"
     )
     .exec();
 };

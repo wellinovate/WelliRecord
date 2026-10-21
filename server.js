@@ -52,6 +52,8 @@ import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes
 import pharmacyInventoryRoutes from "./modules/pharmacy-inventory/pharmacy_inventory_routes.js";
 import localCustomerRoutes from "./modules/local-customers/local_customer_routes.js";
 import recordLinkRoutes from "./modules/record-links/record_link_routes.js";
+import telehealthRoutes from "./modules/telehealth/telehealth_routes.js";
+import practitionerRoutes from "./modules/practitioners/practitioner_routes.js";
 import rosterRoutes from "./modules/rosters/roster_routes.js";
 import wellipayPartnerRoutes from "./modules/wellipay/wellipay_partner_routes.js";
 import { initSocket } from "./shared/realtime/socket.js";
@@ -164,6 +166,8 @@ app.use("/api/v1/pharmacy-orders", pharmacyOrderRoutes);
 app.use("/api/v1/pharmacy-inventory", pharmacyInventoryRoutes);
 app.use("/api/v1/local-customers", localCustomerRoutes);
 app.use("/api/v1/record-links", recordLinkRoutes);
+app.use("/api/v1/practitioners", practitionerRoutes);
+app.use("/api/v1/telehealth", telehealthRoutes);
 app.use("/api/v1/procedures", procedureRoutes);
 app.use("/api/v1/immunizations", immunizationRoutes);
 app.use("/api/v1/vitals", vitalRoutes);
