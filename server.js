@@ -52,6 +52,8 @@ import pharmacyOrderRoutes from "./modules/pharmacy-orders/pharmacy_order_routes
 import pharmacyInventoryRoutes from "./modules/pharmacy-inventory/pharmacy_inventory_routes.js";
 import localCustomerRoutes from "./modules/local-customers/local_customer_routes.js";
 import recordLinkRoutes from "./modules/record-links/record_link_routes.js";
+import { mobileLinkRouter, bridgeRouter } from "./modules/mobile-bridge/mobile_bridge_routes.js";
+import mobileBookingRoutes from "./modules/mobile-booking/mobile_booking_routes.js";
 import telehealthRoutes from "./modules/telehealth/telehealth_routes.js";
 import practitionerRoutes from "./modules/practitioners/practitioner_routes.js";
 import rosterRoutes from "./modules/rosters/roster_routes.js";
@@ -168,6 +170,9 @@ app.use("/api/v1/local-customers", localCustomerRoutes);
 app.use("/api/v1/record-links", recordLinkRoutes);
 app.use("/api/v1/practitioners", practitionerRoutes);
 app.use("/api/v1/telehealth", telehealthRoutes);
+app.use("/api/v1/mobile-link", mobileLinkRouter);
+app.use("/api/v1/mobile-booking", mobileBookingRoutes);
+app.use("/api/v1/bridge", bridgeRouter);
 app.use("/api/v1/procedures", procedureRoutes);
 app.use("/api/v1/immunizations", immunizationRoutes);
 app.use("/api/v1/vitals", vitalRoutes);
