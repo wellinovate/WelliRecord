@@ -1,3 +1,4 @@
+import { mapLga } from "../../shared/utils/lga.js";
 import mongoose from "mongoose";
 import { issueWelliId } from "../../shared/utils/welliId.js";
 
@@ -50,6 +51,10 @@ const userProfileSchema = new Schema(
     registeredAt: { type: Date },
     residenceState: { type: String, trim: true, index: true },
     residenceLga: { type: String, trim: true, maxlength: 60 },
+    // Original LGA text, canonical code when confidently matched, and how sure the match is. Never part of the WelliID.
+    lgaText: { type: String, trim: true, maxlength: 60 },
+    lgaCode: { type: String, trim: true, index: true },
+    lgaMappingStatus: { type: String, enum: ["verified", "unverified", "needs_review"], index: true },
     // Set by a records officer who checked an identity document. The document number is not stored.
     identityVerifiedAt: { type: Date },
     identityVerifiedBy: { type: String, trim: true },
@@ -227,6 +232,10 @@ userProfileSchema.pre("validate", async function () {
   this.registrationState = issued.hasRegion ? issued.region.name : "";
   if (!this.residenceState && issued.hasRegion) this.residenceState = issued.region.name;
   if (!this.registeredAt) this.registeredAt = new Date();
+  if (!this.lgaMappingStatus) {
+    Object.assign(this, mapLga(issued.region.code, this.lgaText || this.residenceLga, this.lgaCode));
+    this.residenceLga = this.lgaText || undefined;
+  }
 });
 
 export const UserProfile = mongoose.model("UserProfile", userProfileSchema);

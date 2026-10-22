@@ -32,6 +32,7 @@ const personalRegisterSchema = z.object({
     .optional()
     .refine((v) => !v || resolveRegion(v) !== null, "Choose your state from the list"),
   lga: z.string().trim().max(60).optional(),
+  lgaCode: z.string().trim().max(40).optional(),
   authProvider: z.literal("local").optional(),
 });
 

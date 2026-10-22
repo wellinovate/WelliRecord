@@ -5,6 +5,7 @@ import { Account } from "../accounts/account_model.js";
 import { signAccessToken } from "../../shared/utils/helper.js";
 import { UserProfile } from "./user_profile_model.js";
 import { resolveRegion } from "../../shared/utils/nigeriaRegions.js";
+import { lgasForRegion, mapLga } from "../../shared/utils/lga.js";
 
 function getPagination(query) {
   const page = Math.max(Number(query.page) || 1, 1);
@@ -448,11 +449,11 @@ export const updateResidenceController = async (req, res) => {
     if (!accountId) return res.status(401).json({ success: false, message: "Unauthorized" });
     const region = resolveRegion(req.body?.state);
     if (!region) return res.status(400).json({ success: false, message: "Choose a state from the list." });
-    const lga = String(req.body?.lga ?? "").replace(/[^\p{L}\p{N} .,'()/-]/gu, "").trim().slice(0, 60);
+    const lga = mapLga(region.code, req.body?.lga, req.body?.lgaCode);
     const profile = await UserProfile.findOneAndUpdate(
       { accountId },
-      { $set: { residenceState: region.name, residenceLga: lga } },
-      { new: true, projection: "wrId registrationState residenceState residenceLga" },
+      { $set: { residenceState: region.name, residenceLga: lga.lgaText, ...lga } },
+      { new: true, projection: "wrId registrationState residenceState residenceLga lgaText lgaCode lgaMappingStatus" },
     ).lean();
     if (!profile) return res.status(404).json({ success: false, message: "Profile not found." });
     return res.json({
@@ -462,10 +463,20 @@ export const updateResidenceController = async (req, res) => {
         registrationState: profile.registrationState || "",
         residenceState: profile.residenceState,
         residenceLga: profile.residenceLga || "",
+        lgaText: profile.lgaText || "",
+        lgaCode: profile.lgaCode || "",
+        lgaMappingStatus: profile.lgaMappingStatus || "unverified",
       },
     });
   } catch (error) {
     console.error("updateResidenceController:", error);
     return res.status(500).json({ success: false, message: "Could not save. Try again." });
   }
+};
+
+// The LGAs we hold for a state. Empty means the client asks for free text. Public: not personal data.
+export const listLgasController = (req, res) => {
+  const region = resolveRegion(req.query?.state);
+  if (!region) return res.status(400).json({ success: false, message: "Choose a state from the list." });
+  return res.json({ success: true, data: { state: region.name, lgas: lgasForRegion(region.code).map((l) => ({ code: l.code, name: l.name })) } });
 };

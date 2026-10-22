@@ -35,6 +35,7 @@ export const createUserProfile = async (payload, session) => {
         // Hint for the WelliID region; the model turns it into registrationRegion.
         registrationState: payload.registrationState || undefined,
         residenceLga: payload.residenceLga || undefined,
+        lgaCode: payload.lgaCode || undefined,
       },
     ],
     { session },
