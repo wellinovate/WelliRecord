@@ -177,6 +177,7 @@ export const googleLoginController = async (req, res) => {
           avatar: picture || "",
           authProvider: "google",
           profileType: profileType || "Personal",
+          registrationState: req.body?.state || undefined,
           accountType: account.accountType || "user",
           isEmailVerified: true,
         });
@@ -230,6 +231,7 @@ export const googleLoginController = async (req, res) => {
           avatar: picture || "",
           authProvider: "google",
           profileType: profileType || "Personal",
+          registrationState: req.body?.state || undefined,
           accountType: "user",
           isEmailVerified: true,
         });

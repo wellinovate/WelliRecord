@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveRegion } from "../../shared/utils/nigeriaRegions.js";
 
 const optionalString = z.preprocess(
   (val) => (val === null ? undefined : val),
@@ -24,6 +25,13 @@ const personalRegisterSchema = z.object({
     ),
   gender: z.string().trim().min(2, "Gender is required"),
   address: optionalString,
+  // State of residence at registration. Optional so older website builds still work; they register as "not stated".
+  state: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || resolveRegion(v) !== null, "Choose your state from the list"),
+  lga: z.string().trim().max(60).optional(),
   authProvider: z.literal("local").optional(),
 });
 
