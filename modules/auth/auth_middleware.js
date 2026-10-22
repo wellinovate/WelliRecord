@@ -1,6 +1,22 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
+
+// Remember when a signed-in patient last used the website, at most every six hours, for the active-patient count.
+const ACTIVE_WRITE_EVERY_MS = 6 * 60 * 60 * 1000;
+const lastActiveWrite = new Map();
+function touchActive(decoded) {
+  if (decoded?.accountType !== "user" || !decoded?.sub) return;
+  const now = Date.now();
+  const key = String(decoded.sub);
+  const last = lastActiveWrite.get(key);
+  if (last !== undefined && now - last < ACTIVE_WRITE_EVERY_MS) return;
+  lastActiveWrite.set(key, now);
+  if (lastActiveWrite.size > 50000) lastActiveWrite.clear();
+  import("../users/user_profile_model.js")
+    .then(({ UserProfile }) => UserProfile.updateOne({ accountId: key }, { $set: { lastActiveAt: new Date(now) } }))
+    .catch(() => {});
+}
 export const protect = (req, res, next) => {
   try {
     // const token = req.cookies?.accessToken;
@@ -30,6 +46,7 @@ export const protect = (req, res, next) => {
       audience: "wellirecord-client",
     });
     req.user = decoded;
+    touchActive(decoded);
 
     next();
   } catch (error) {

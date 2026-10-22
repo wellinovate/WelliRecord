@@ -102,6 +102,8 @@ export const registerUserAccount = async (payload) => {
         phone: payload.phone,
         gender: payload.gender,
         homeAddress: payload.address,
+        registrationState: payload.state,
+        residenceLga: payload.lga,
       },
       session,
     );

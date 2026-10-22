@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { issueWelliId } from "../../shared/utils/welliId.js";
 
 const { Schema } = mongoose;
 
@@ -41,6 +42,19 @@ const userProfileSchema = new Schema(
       sparse: true,
       index: true,
     },
+
+    // Where the person registered (fixed when the WelliID is issued) and where they live now (editable).
+    // The WelliID never changes when they move.
+    registrationRegion: { type: String, trim: true, index: true },
+    registrationState: { type: String, trim: true },
+    registeredAt: { type: Date },
+    residenceState: { type: String, trim: true, index: true },
+    residenceLga: { type: String, trim: true, maxlength: 60 },
+    // Set by a records officer who checked an identity document. The document number is not stored.
+    identityVerifiedAt: { type: Date },
+    identityVerifiedBy: { type: String, trim: true },
+    identityVerifiedMethod: { type: String, trim: true },
+    lastActiveAt: { type: Date, index: true },
 
     fullName: {
       type: String,
@@ -198,26 +212,21 @@ const userProfileSchema = new Schema(
 
 userProfileSchema.index({ fullName: "text", username: "text" });
 
-const generateWelliRecordId = () => {
-  const part1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const part2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `WR-${part1}-${part2}`;
-};
-
+// A new profile gets a WelliID like WR-ABJ1-2RWR. The state to use is the registrationState hint set by
+// the signup code; with none, the ID carries the "not stated" region (UNK). The unique index on wrId is
+// what stops two profiles sharing an ID; the lookup here only makes a clash unlikely.
 userProfileSchema.pre("validate", async function () {
   if (this.wrId) return;
 
-  let exists = true;
-
-  while (exists) {
-    const wrId = generateWelliRecordId();
-    const existingProfile = await this.constructor.findOne({ wrId });
-
-    if (!existingProfile) {
-      this.wrId = wrId;
-      exists = false;
-    }
-  }
+  const issued = await issueWelliId({
+    state: this.registrationState || this.residenceState,
+    exists: async (id) => Boolean(await this.constructor.exists({ wrId: id })),
+  });
+  this.wrId = issued.id;
+  this.registrationRegion = issued.region.code;
+  this.registrationState = issued.hasRegion ? issued.region.name : "";
+  if (!this.residenceState && issued.hasRegion) this.residenceState = issued.region.name;
+  if (!this.registeredAt) this.registeredAt = new Date();
 });
 
 export const UserProfile = mongoose.model("UserProfile", userProfileSchema);

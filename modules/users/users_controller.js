@@ -3,6 +3,8 @@ import { resolvePatientAccessContext } from "../vitals/vital_service.js";
 import * as medicalHistoryService from "./users_services.js";
 import { Account } from "../accounts/account_model.js";
 import { signAccessToken } from "../../shared/utils/helper.js";
+import { UserProfile } from "./user_profile_model.js";
+import { resolveRegion } from "../../shared/utils/nigeriaRegions.js";
 
 function getPagination(query) {
   const page = Math.max(Number(query.page) || 1, 1);
@@ -437,5 +439,33 @@ export const uploadAvatarController = async (req, res) => {
       success: false,
       message: statusCode === 500 ? "Failed to upload avatar" : error.message,
     });
+  }
+};
+
+export const updateResidenceController = async (req, res) => {
+  try {
+    const accountId = req.user?.sub;
+    if (!accountId) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const region = resolveRegion(req.body?.state);
+    if (!region) return res.status(400).json({ success: false, message: "Choose a state from the list." });
+    const lga = String(req.body?.lga ?? "").replace(/[^\p{L}\p{N} .,'()/-]/gu, "").trim().slice(0, 60);
+    const profile = await UserProfile.findOneAndUpdate(
+      { accountId },
+      { $set: { residenceState: region.name, residenceLga: lga } },
+      { new: true, projection: "wrId registrationState residenceState residenceLga" },
+    ).lean();
+    if (!profile) return res.status(404).json({ success: false, message: "Profile not found." });
+    return res.json({
+      success: true,
+      data: {
+        wrId: profile.wrId,
+        registrationState: profile.registrationState || "",
+        residenceState: profile.residenceState,
+        residenceLga: profile.residenceLga || "",
+      },
+    });
+  } catch (error) {
+    console.error("updateResidenceController:", error);
+    return res.status(500).json({ success: false, message: "Could not save. Try again." });
   }
 };

@@ -40,6 +40,8 @@ router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailContro
 
 router.get("/me", protect, medicalHistoryController.fetchUserProfile);
 router.put("/update/profile", protect, medicalHistoryController.updateUserProfileController);
+// Where the person lives now. Never changes the WelliID or the region they registered in.
+router.patch("/residence", protect, medicalHistoryController.updateResidenceController);
 router.post(
   "/avatar",
   protect,
