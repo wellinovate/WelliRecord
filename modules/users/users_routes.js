@@ -13,6 +13,8 @@ import { getMyProceduresController } from "../procedure/procedure_controller.js"
 
 const router = express.Router();
 
+router.get("/lgas", medicalHistoryController.listLgasController);
+
 const avatarUpload = createUpload({ maxSizeMB: 5, allowedMimeTypes: IMAGE_MIME_TYPES, maxFiles: 1 });
 
 
