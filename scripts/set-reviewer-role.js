@@ -5,8 +5,8 @@
  *   node scripts/set-reviewer-role.js person@example.com senior_reviewer
  *   roles: reviewer | senior_reviewer | compliance_admin | patient
  *
- * Run it as a Render one-off job. It refuses organisation accounts. There is no second sign-in step on the website yet, so
- * give these roles only to people whose account has a strong, unique password.
+ * Run it as a Render one-off job. It refuses organisation accounts. Reviewer routes also need the second sign-in step
+ * (authenticator app); the person sets it up the first time they open the reviewer tools.
  */
 import dotenv from "dotenv";
 dotenv.config();

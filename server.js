@@ -172,6 +172,7 @@ app.use("/api/v1/local-customers", localCustomerRoutes);
 app.use("/api/v1/record-links", recordLinkRoutes);
 app.use("/api/v1/practitioners", practitionerRoutes);
 const providerVerification = buildProviderVerification();
+app.use("/api/v1", providerVerification.mfaRouter);
 app.use("/api/v1", providerVerification.router);
 startVerificationSweep(providerVerification);
 setWebGate(providerVerification);
