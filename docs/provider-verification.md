@@ -36,3 +36,12 @@ Without storage, uploads return 503 and nobody can be approved. Without `CLAMD_H
 - Admin dashboard page, provider onboarding screen, regulator adapters, resumable upload, MDCN scraping, patient-facing badge (held for legal review).
 - Needs review: registration level terms, the imaging-requires-specialist rule, provider terms wording (`PROVIDER_TERMS_VERSION` draft-1), document retention.
 - Never run against live storage, ClamAV or a restricted Mongo user from this repo.
+
+## Gate on the website's own routes
+
+`PROVIDER_VERIFICATION_ENFORCE_WEB=true` turns on the eligibility check (`start_consultation`) for the provider side of `POST /telehealth/appointments/:id/token` and for `POST /mobile-booking/visits/:id/video-token`. Code: `modules/provider-verification/web_gate.js`.
+
+- Default is off, so doctors already using video visits are not locked out when this deploys. Turn it on after each clinician has applied and been approved.
+- The person is matched by their account id (`sub`) against `pv_providers.staffUserId` or `linkedStaffIds`. Denial returns 403 `PROVIDER_NOT_VERIFIED`; every consultation start and denial is written to the audit log by `canPerform`.
+- With the flag on and the gate not wired, the route returns 503 (fails closed). `PROVIDER_VERIFICATION_ENFORCE=false` still turns the whole gate off.
+- Patients are never gated. Not gated: other clinician reads and writes on the website.
