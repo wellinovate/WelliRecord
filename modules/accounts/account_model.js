@@ -23,6 +23,10 @@ const accountSchema = new Schema(
         "staff",
         "admin",
         "provider_admin",
+        // Provider verification reviewers. Promote an existing account with scripts/set-reviewer-role.js.
+        "reviewer",
+        "senior_reviewer",
+        "compliance_admin",
       ],
       required: function () {
         return this.accountType === "user";
