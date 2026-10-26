@@ -54,6 +54,7 @@ import localCustomerRoutes from "./modules/local-customers/local_customer_routes
 import recordLinkRoutes from "./modules/record-links/record_link_routes.js";
 import { mobileLinkRouter, bridgeRouter } from "./modules/mobile-bridge/mobile_bridge_routes.js";
 import { buildProviderVerification, startVerificationSweep } from "./modules/provider-verification/verification_routes.js";
+import { setWebGate } from "./modules/provider-verification/web_gate.js";
 import mobileBookingRoutes from "./modules/mobile-booking/mobile_booking_routes.js";
 import telehealthRoutes from "./modules/telehealth/telehealth_routes.js";
 import practitionerRoutes from "./modules/practitioners/practitioner_routes.js";
@@ -171,8 +172,10 @@ app.use("/api/v1/local-customers", localCustomerRoutes);
 app.use("/api/v1/record-links", recordLinkRoutes);
 app.use("/api/v1/practitioners", practitionerRoutes);
 const providerVerification = buildProviderVerification();
+app.use("/api/v1", providerVerification.mfaRouter);
 app.use("/api/v1", providerVerification.router);
 startVerificationSweep(providerVerification);
+setWebGate(providerVerification);
 app.use("/api/v1/telehealth", telehealthRoutes);
 app.use("/api/v1/mobile-link", mobileLinkRouter);
 app.use("/api/v1/mobile-booking", mobileBookingRoutes);

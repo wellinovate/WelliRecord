@@ -13,7 +13,7 @@ Code: `modules/provider-verification/`
 - A provider is a website account of type `user` with role `doctor`, `provider_admin` or `provider`. Organisation accounts cannot apply.
 - Reviewers use the new `Account.role` values `reviewer`, `senior_reviewer`, `compliance_admin`. Promote an existing account: `node scripts/set-reviewer-role.js <email> <role>` (Render one-off job).
 - Only `senior_reviewer` or `compliance_admin` can approve, never their own case or one assigned to them, and a check by another person must exist.
-- **No second sign-in step exists on the website.** Reviewers sign in with a password only. Add a second step before giving these roles to anyone beyond a small trusted group.
+- **Reviewers have a second sign-in step** (see "Reviewer second step" below). Not run against a real authenticator app and database from this repo.
 
 ## States
 `application_pending`, `further_evidence_required`, `verified_active`, `renewal_due`, `expired`, `on_hold`. `verified_active` and `renewal_due` grant clinical functions. Rejection is a case decision. Every transition writes an audit row.
@@ -36,3 +36,25 @@ Without storage, uploads return 503 and nobody can be approved. Without `CLAMD_H
 - Admin dashboard page, provider onboarding screen, regulator adapters, resumable upload, MDCN scraping, patient-facing badge (held for legal review).
 - Needs review: registration level terms, the imaging-requires-specialist rule, provider terms wording (`PROVIDER_TERMS_VERSION` draft-1), document retention.
 - Never run against live storage, ClamAV or a restricted Mongo user from this repo.
+
+## Gate on the website's own routes
+
+`PROVIDER_VERIFICATION_ENFORCE_WEB=true` turns on the eligibility check (`start_consultation`) for the provider side of `POST /telehealth/appointments/:id/token` and for `POST /mobile-booking/visits/:id/video-token`. Code: `modules/provider-verification/web_gate.js`.
+
+- Default is off, so doctors already using video visits are not locked out when this deploys. Turn it on after each clinician has applied and been approved.
+- The person is matched by their account id (`sub`) against `pv_providers.staffUserId` or `linkedStaffIds`. Denial returns 403 `PROVIDER_NOT_VERIFIED`; every consultation start and denial is written to the audit log by `canPerform`.
+- With the flag on and the gate not wired, the route returns 503 (fails closed). `PROVIDER_VERIFICATION_ENFORCE=false` still turns the whole gate off.
+- Patients are never gated. Not gated: other clinician reads and writes on the website.
+
+## Reviewer second step
+
+Reviewer roles (`reviewer`, `senior_reviewer`, `compliance_admin`) need an authenticator-app code on top of the normal login. Code: `reviewer_totp.js` (RFC 6238, port of the mobile backend's), `reviewer_mfa.js`, `requireStaff` in `verification_routes.js`. Model `pv_mfa`.
+
+- The website login is not changed. After signing in, the reviewer proves the second factor and gets a step-up token (2 hours), sent on every reviewer request as `x-step-up-token`. `requireStaff` refuses reviewer routes without it: 403 `mfa_enrol_required` (never set up) or `mfa_required` (not proved this session). Applicant routes are unaffected.
+- Routes (reviewer role, no step-up needed): `GET /staff/verification/mfa/status`, `POST .../mfa/setup` (returns the secret and an `otpauth://` link once), `POST .../mfa/enable {code}` (returns 8 recovery codes once and a step-up token), `POST .../mfa/verify {code}` or `{recoveryCode}`. `POST .../mfa/reset/:accountId` needs a compliance admin with the step-up token and cannot be used on yourself.
+- Secrets are sealed with AES-256-GCM using `MFA_SECRET_KEY` (falls back to `JWT_SECRET_KEY`). Set `MFA_SECRET_KEY` before anyone enrols and do not change it: changing it locks every reviewer out of their second step. The step-up token is signed with a key derived from `JWT_SECRET_KEY`, separate from login tokens.
+- Five wrong codes lock that person for 15 minutes. A used code step cannot be replayed. Recovery codes are single-use and stored as HMACs. Setup is refused once on; a reset deletes the record, so tokens from before it stop working.
+- Lost phone and no recovery codes: another compliance admin calls the reset route, or run `node scripts/reset-reviewer-mfa.js <email>` as a Render one-off job. The first compliance admin has no one to reset them, so use the script.
+- `REVIEWER_MFA_REQUIRED=false` turns the requirement off. It exists only so the first reviewer can be promoted and enrol on a fresh deploy without being locked out; there is none needed after that. Boot warns while it is set.
+- Setup start, enable, verify and reset are written to `pv_audit`. Failed codes are not.
+- Website page: `/reviewer` in `wellinovate/wellirecords` (`ReviewerStepUpGate`, `reviewerApi`) does setup, the code prompt, and sends `x-step-up-token`. The token is kept in `sessionStorage`. It shows a read-only case queue only. Not built there: screens for case detail, assign, checks, evidence requests, approve, reject, documents and restrictions. Not run against a real authenticator app.

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { AccessToken } from "livekit-server-sdk";
 import { AppError } from "../../shared/errors/AppError.js";
 import { Appointment } from "../appointments/appointment_model.js";
+import { assertProviderEligible } from "../provider-verification/web_gate.js";
 import { joinState, roomNameFor, sideFor } from "./telehealth_logic.js";
 
 export const joinTokenService = async ({ appointmentId, authUser, nowMs = Date.now() }) => {
@@ -14,6 +15,7 @@ export const joinTokenService = async ({ appointmentId, authUser, nowMs = Date.n
   if (!appt) throw new AppError("Appointment not found", 404, "NOT_FOUND");
 
   const side = sideFor(appt, authUser);
+  if (side === "provider") await assertProviderEligible(authUser, "start_consultation", { appointmentId: String(appointmentId) });
   const state = joinState(appt, side, nowMs);
   if (!state.ok) {
     const err = new AppError(state.message, state.status, state.code);

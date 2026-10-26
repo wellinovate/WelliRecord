@@ -1,3 +1,4 @@
+import { assertProviderEligible } from "../provider-verification/web_gate.js";
 import mongoose from "mongoose";
 import { AppError } from "../../shared/errors/AppError.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
@@ -64,6 +65,7 @@ export const visitActionService = async ({ authUser, id, action, body }) => {
     return unwrap(await callMobile("POST", `${base(facilityId)}/visits/${vid}/hmo`, { decision, approvalCode: String(body?.approvalCode || "").slice(0, 60), decidedBy: authUser.fullName || "" }));
   }
   if (action === "video-token") {
+    await assertProviderEligible(authUser, "start_consultation", { facilityId });
     const r = unwrap(await callMobile("POST", `${base(facilityId)}/visits/${vid}/video-token`, { who: { id: String(authUser.sub), name: authUser.fullName || "" } }));
     return { url: r.url, token: r.token, room: r.room };
   }
