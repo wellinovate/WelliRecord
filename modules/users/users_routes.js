@@ -10,6 +10,7 @@ import { getMyDiagnosesController } from "../diagnoses/diagnoses_controller.js";
 import { getMyLabResultsController } from "../lab/lab_result_controller.js";
 import { getMyImmunizationsController } from "../immunizations/immunization_controller.js";
 import { getMyProceduresController } from "../procedure/procedure_controller.js";
+import ninRoutes from "../nin-verification/nin_routes.js";
 
 const router = express.Router();
 
@@ -37,6 +38,9 @@ router.get("/medical-history/procedures", protect, getMyProceduresController);
 router.get("/medical-history/encounter", protect, getMyEncountersController);
 router.get("/medical-history/encounter/provider/:patientId", protect, getuserEncountersControllerByOrganiazation);
 router.get("/medical-history/encounter/:id", protect, getMyEncounterDetailController);
+
+// NIN identity check: POST /identity/nin, GET /identity/nin/status
+router.use("/identity", ninRoutes);
 
 router.get("/me", protect, medicalHistoryController.fetchUserProfile);
 router.put("/update/profile", protect, medicalHistoryController.updateUserProfileController);

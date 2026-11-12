@@ -110,18 +110,6 @@ export function encryptAndSaveV(vcObj, did) {
   return filename;
 }
 
-// Simulate NIN verification
-export async function verifyNINWithGovernment(nin, fullName, dob) {
-  await new Promise((r) => setTimeout(r, 300));
-  if (nin && nin.length >= 5) {
-    return {
-      success: true,
-      data: { fullName: fullName || "John Doe", dob: dob || "1990-01-01", nin },
-    };
-  }
-  return { success: false, error: "NIN not found" };
-}
-
 // // Create a Verifiable Credential
 // export function createVC({ did, fullName = null, dob = null, nin = null, issuerDid }) {
 //   const issuanceDate = new Date().toISOString();
