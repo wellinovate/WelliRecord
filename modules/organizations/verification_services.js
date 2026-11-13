@@ -2,6 +2,7 @@ import { OrganizationProfile } from "./organizations_model.js";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import cloudinary from "../../shared/config/cloudinary.js";
 import { AppError } from "../../shared/errors/AppError.js";
+import { sendNewProviderSignupNotificationEmail } from "../../shared/utils/resend.js";
 
 const ALLOWED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -63,6 +64,19 @@ export const uploadVerificationDocumentService = async ({ accountId, file }) => 
   profile.verificationDocumentUploadedAt = new Date();
   profile.verificationStatus = "pending";
   await profile.save();
+
+  // Tell the admin inbox there is something to approve. A failed email never blocks the upload.
+  sendNewProviderSignupNotificationEmail({
+    organizationName: profile.organizationName,
+    organizationType: profile.organizationType,
+    contactPersonName: profile.contactPersonName,
+    contactPersonRole: profile.contactPersonRole,
+    email: profile.email,
+    phone: profile.phone,
+    registrationNumber: profile.registrationNumber,
+    licenseNumber: profile.licenseNumber,
+    stage: "documents",
+  }).catch((err) => console.error("Documents-submitted admin notification failed:", err));
 
   return profile;
 };

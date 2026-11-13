@@ -535,16 +535,21 @@ export const sendNewProviderSignupNotificationEmail = async ({
   phone,
   registrationNumber,
   licenseNumber,
+  stage = "signup",
 }) => {
   const recipient = process.env.ADMIN_NOTIFICATION_EMAIL || "inquiry@wellirecord.com";
   const reviewUrl = `${process.env.FRONTEND_URL}/admin/verifications`;
 
+  // Values come from the provider's own signup form, so escape them.
+  const esc = (v) =>
+    String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const docsReady = stage === "documents";
   const detailRow = (label, value) =>
     value
       ? `
         <tr>
           <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600; width: 160px; vertical-align: top;">${label}</td>
-          <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 600;">${value}</td>
+          <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 600;">${esc(value)}</td>
         </tr>
       `
       : "";
@@ -553,7 +558,9 @@ export const sendNewProviderSignupNotificationEmail = async ({
     const response = await resend.emails.send({
       from: "WelliRecord <noreply@send.wellirecord.com>",
       to: recipient,
-      subject: `New provider signup — ${organizationName || "Unnamed organization"} needs review`,
+      subject: docsReady
+        ? `Ready for approval — ${organizationName || "Unnamed organization"} submitted documents`
+        : `New provider signup — ${organizationName || "Unnamed organization"}`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 20px; color: #1e293b;">
           <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
@@ -567,11 +574,13 @@ export const sendNewProviderSignupNotificationEmail = async ({
             <!-- Main Content -->
             <div style="padding: 36px 32px;">
               <h2 style="color: #0f172a; font-size: 20px; font-weight: 800; margin-top: 0; margin-bottom: 16px;">
-                New provider signup needs review
+                ${docsReady ? "Provider documents are ready for approval" : "New provider signup"}
               </h2>
 
               <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-bottom: 24px;">
-                A new organization registered on WelliRecord. Their identity & licence verification is not submitted yet — this is just to flag the new account. You'll see it move to "Pending" in the admin queue once they upload a document.
+                ${docsReady
+                  ? "This provider uploaded their identity and licence document. The case is now Pending in the admin queue. Open it to approve, decline or ask for more information."
+                  : "A new organization registered on WelliRecord. No document is uploaded yet. You will get a second email when they submit one."}
               </p>
 
               <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
