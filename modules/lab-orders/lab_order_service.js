@@ -156,7 +156,7 @@ export const getAllLabOrdersService = async ({ page = 1, limit = 20, authUser })
   const [items, total] = await Promise.all([
     labOrderModel
       .find(filter)
-      .populate("patientId", "firstName fullName lastName email")
+      .populate("patientId", "firstName fullName lastName email wrId phone")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
