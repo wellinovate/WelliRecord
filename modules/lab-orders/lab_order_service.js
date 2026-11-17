@@ -202,6 +202,20 @@ export const updateLabOrderStatusService = async ({ id, status, reason, authUser
   return serialized;
 };
 
+// Runs the entered values through the engine without saving, so the form can show flags and
+// calculated values as the person types. Same checks and permissions as saving.
+export const previewLabOrderResultService = async ({ id, payload, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const order = await findScopedOrder(id, scope.organizationIds);
+  const def = order.testKey ? STRUCTURED_TESTS.find((t) => t.key === order.testKey) : GENERIC_TEST;
+  if (!def) throw httpError("This order's test is no longer in the catalog.", 409);
+  const profile = await UserProfile.findById(order.patientId).select("gender dateOfBirth").lean();
+  const out = processResults(def, payload.results || [], patientContext(profile || {}));
+  // "Enter at least one result" is not an error while the form is still empty.
+  const errors = out.errors.filter((e) => e !== "Enter at least one result.");
+  return { results: out.results, isCritical: out.isCritical, errors };
+};
+
 export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
   const scope = await resolveLabScope(authUser);
   const order = await findScopedOrder(id, scope.organizationIds);

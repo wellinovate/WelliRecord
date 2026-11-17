@@ -45,7 +45,9 @@ export const syncStructuredCatalog = async () => {
   }
 };
 
-export const getCatalogTestService = async (id) => LabTestCatalog.findById(id).lean();
+// Accepts the row id or the stable test key.
+export const getCatalogTestService = async (idOrKey) =>
+  /^[0-9a-f]{24}$/i.test(idOrKey) ? LabTestCatalog.findById(idOrKey).lean() : LabTestCatalog.findOne({ key: idOrKey }).lean();
 
 
 // Idempotent — only seeds if the collection is genuinely empty, so
