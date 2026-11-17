@@ -6,16 +6,9 @@ import {
 
 const { Schema } = mongoose;
 
-const WORKFLOW_STAGES = [
-  "requested",
-  "collected",
-  "received",
-  "processing",
-  "quality-control",
-  "verified",
-  "released",
-  "delivered",
-];
+import { STAGES } from "./lab_order_rules.js";
+
+const WORKFLOW_STAGES = STAGES;
 
 const labOrderSchema = new Schema(
   {
@@ -136,6 +129,28 @@ const labOrderSchema = new Schema(
       type: String,
       trim: true,
       maxlength: 200,
+    },
+
+    // Set by the server from the signed-in user, never from the request.
+    enteredBy: { type: String, trim: true },
+    enteredByName: { type: String, trim: true, maxlength: 200 },
+    enteredAt: { type: Date },
+    verifiedByUserId: { type: String, trim: true },
+    verifiedAt: { type: Date },
+    selfVerified: { type: Boolean, default: false },
+    rejectionReason: { type: String, trim: true, maxlength: 300 },
+
+    stageHistory: {
+      type: [
+        {
+          _id: false,
+          status: { type: String, required: true },
+          at: { type: Date, required: true },
+          byUserId: { type: String },
+          byName: { type: String, maxlength: 200 },
+        },
+      ],
+      default: [],
     },
   },
   { timestamps: true },

@@ -3,6 +3,7 @@ import {
   getAllLabOrdersService,
   updateLabOrderStatusService,
   enterLabOrderResultService,
+  verifyLabOrderResultService,
 } from "./lab_order_service.js";
 import { getLabOrdersQuerySchema } from "./lab_order_validation.js";
 
@@ -37,8 +38,8 @@ export const getAllLabOrdersController = async (req, res, next) => {
 export const updateLabOrderStatusController = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.validated;
-    const result = await updateLabOrderStatusService({ id, status });
+    const { status, reason } = req.validated;
+    const result = await updateLabOrderStatusService({ id, status, reason, authUser: req.user });
     return res.status(200).json({
       success: true,
       message: "Lab order status updated",
@@ -53,10 +54,24 @@ export const enterLabOrderResultController = async (req, res, next) => {
   try {
     const { id } = req.params;
     const payload = req.validated;
-    const result = await enterLabOrderResultService({ id, payload });
+    const result = await enterLabOrderResultService({ id, payload, authUser: req.user });
     return res.status(200).json({
       success: true,
       message: "Lab order result saved",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyLabOrderResultController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await verifyLabOrderResultService({ id, authUser: req.user });
+    return res.status(200).json({
+      success: true,
+      message: "Lab result verified",
       data: result,
     });
   } catch (error) {

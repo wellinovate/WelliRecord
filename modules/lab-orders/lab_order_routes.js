@@ -1,7 +1,7 @@
 import express from "express";
 import { protect } from "../auth/auth_middleware.js";
 import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
-import { requirePermission } from "../team/require_permission_middleware.js";
+import { requirePermission, requireAnyPermission } from "../team/require_permission_middleware.js";
 import { requireWriteConsent } from "../access/require_write_consent_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
 import {
@@ -9,6 +9,7 @@ import {
   getAllLabOrdersController,
   updateLabOrderStatusController,
   enterLabOrderResultController,
+  verifyLabOrderResultController,
 } from "./lab_order_controller.js";
 import {
   createLabOrderSchema,
@@ -40,7 +41,7 @@ router.patch(
   "/:id/status",
   protect,
   restrictClinicalScope("lab-orders"),
-  requirePermission("view_lab_orders"),
+  requireAnyPermission("create_lab_orders", "write_lab_results"),
   validate(updateLabOrderStatusSchema),
   updateLabOrderStatusController,
 );
@@ -52,6 +53,14 @@ router.patch(
   requirePermission("write_lab_results"),
   validate(enterLabOrderResultSchema),
   enterLabOrderResultController,
+);
+
+router.patch(
+  "/:id/verify",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requirePermission("write_lab_results"),
+  verifyLabOrderResultController,
 );
 
 export default router;

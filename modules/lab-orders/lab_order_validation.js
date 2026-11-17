@@ -39,6 +39,7 @@ export const createLabOrderSchema = z.object({
 
 export const updateLabOrderStatusSchema = z.object({
   status: z.enum(LAB_ORDER_WORKFLOW_STAGES),
+  reason: z.string().trim().min(1).max(300).optional(),
 });
 
 export const enterLabOrderResultSchema = z.object({
@@ -46,7 +47,7 @@ export const enterLabOrderResultSchema = z.object({
   normalRange: z.string().trim().max(200).optional(),
   interpretation: z.string().trim().max(500).optional(),
   isCritical: z.boolean().optional(),
-  verifiedBy: z.string().trim().max(200).optional(),
+  // Who entered or verified a result is taken from the signed-in user, not from the request.
 });
 
 export const getLabOrdersQuerySchema = z.object({
