@@ -11,6 +11,7 @@ export const createLabOrderSchema = z.object({
   encounterId: objectIdSchema.optional(),
 
   testName: z.string().trim().min(1).max(250),
+  testKey: z.string().trim().max(60).optional(),
   category: z
     .enum([
       "hematology",
@@ -47,6 +48,18 @@ export const enterLabOrderResultSchema = z.object({
   normalRange: z.string().trim().max(200).optional(),
   interpretation: z.string().trim().max(500).optional(),
   isCritical: z.boolean().optional(),
+  // Structured entries: one per analyte. The server computes flags, critical status and calculated values.
+  results: z
+    .array(
+      z.object({
+        code: z.string().trim().min(1).max(40),
+        value: z.union([z.string().max(500), z.number()]).optional(),
+        unit: z.string().trim().max(30).optional(),
+        rows: z.array(z.object({ antibiotic: z.string().max(80), result: z.string().max(4) })).max(60).optional(),
+      }),
+    )
+    .max(80)
+    .optional(),
   // Who entered or verified a result is taken from the signed-in user, not from the request.
 });
 

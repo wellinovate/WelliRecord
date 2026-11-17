@@ -51,10 +51,23 @@ const labTestCatalogSchema = new Schema(
       type: String,
       default: "",
     },
+
+    // Structured definition (see lab_test_catalog_v2.js). Rows without a
+    // key are the older flat names and have no analytes.
+    key: { type: String, trim: true },
+    specimen: { type: String, default: "" },
+    container: { type: String, default: "" },
+    fastingRequired: { type: Boolean, default: false },
+    turnaroundHours: { type: Number },
+    analytes: { type: [Schema.Types.Mixed], default: [] },
+    // Reference ranges are defaults and have not been clinically reviewed.
+    reviewStatus: { type: String, default: "" },
+    catalogVersion: { type: String, default: "" },
   },
   { timestamps: true },
 );
 
+labTestCatalogSchema.index({ key: 1 }, { unique: true, partialFilterExpression: { key: { $type: "string" } } });
 labTestCatalogSchema.index({ name: "text", aliases: "text" });
 labTestCatalogSchema.index({ category: 1, name: 1 }, { unique: true });
 

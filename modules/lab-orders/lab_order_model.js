@@ -28,6 +28,12 @@ const labOrderSchema = new Schema(
       index: true,
     },
 
+    // Key of the structured test in the catalog (lab_test_catalog_v2.js). Empty for older orders.
+    testKey: { type: String, trim: true, maxlength: 60, index: true },
+
+    // Entered values with unit, reference text and flag, produced by lab_result_engine.js.
+    results: { type: [Schema.Types.Mixed], default: undefined },
+
     category: {
       type: String,
       enum: [

@@ -4,6 +4,8 @@ import { resolvePatientAccessContext, resolveActorContext } from "../vitals/vita
 import { UserProfile } from "../users/user_profile_model.js";
 import { canTransition, canEnterResult, canVerify, isSelfVerified, generateBarcode } from "./lab_order_rules.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
+import { STRUCTURED_TESTS } from "../lab-tests-catalog/lab_test_catalog_v2.js";
+import { processResults, patientContext, summarise, summariseRanges, GENERIC_TEST } from "../lab-tests-catalog/lab_result_engine.js";
 import { getIO } from "../../shared/realtime/socket.js";
 
 const broadcast = (operationType, order) => {
@@ -21,6 +23,8 @@ const serializeOrder = (item) => ({
   patientId: item.patientId,
   organizationId: item.organizationId,
   testName: item.testName,
+  testKey: item.testKey,
+  results: item.results,
   category: item.category,
   status: item.status,
   priority: item.priority,
@@ -85,6 +89,9 @@ const pushHistory = (order, status, scope) => {
 };
 
 export const createLabOrderService = async ({ payload, authUser }) => {
+  if (payload.testKey && !STRUCTURED_TESTS.some((t) => t.key === payload.testKey)) {
+    throw httpError("That test is not in the catalog.", 400);
+  }
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -119,6 +126,7 @@ export const createLabOrderService = async ({ payload, authUser }) => {
           createdContext: "facility-chart",
 
           testName: payload.testName,
+          testKey: payload.testKey || undefined,
           category: payload.category || "other",
           priority: payload.priority || "routine",
           sampleType: payload.sampleType || undefined,
@@ -202,11 +210,25 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
     throw httpError(`Results can be entered while an order is processing or in quality control, not ${order.status}.`, 409);
   }
 
+  // Structured entry: flags, critical status and calculated values come from the server.
+  if (payload.results) {
+    const def = order.testKey ? STRUCTURED_TESTS.find((t) => t.key === order.testKey) : GENERIC_TEST;
+    if (!def) throw httpError("This order's test is no longer in the catalog. Use the plain result fields.", 409);
+    const profile = await UserProfile.findById(order.patientId).select("gender dateOfBirth").lean();
+    const out = processResults(def, payload.results, patientContext(profile || {}));
+    if (out.errors.length) throw httpError(out.errors.join(" "), 400);
+    order.results = out.results;
+    order.measuredValue = summarise(out.results);
+    order.normalRange = summariseRanges(out.results);
+    order.isCritical = out.isCritical;
+    if (payload.interpretation !== undefined) order.interpretation = payload.interpretation;
+  }
+
   // Only these fields come from the request. Who entered it comes from the token.
-  if (payload.measuredValue !== undefined) order.measuredValue = payload.measuredValue;
-  if (payload.normalRange !== undefined) order.normalRange = payload.normalRange;
-  if (payload.interpretation !== undefined) order.interpretation = payload.interpretation;
-  if (payload.isCritical !== undefined) order.isCritical = payload.isCritical;
+  if (!payload.results && payload.measuredValue !== undefined) order.measuredValue = payload.measuredValue;
+  if (!payload.results && payload.normalRange !== undefined) order.normalRange = payload.normalRange;
+  if (!payload.results && payload.interpretation !== undefined) order.interpretation = payload.interpretation;
+  if (!payload.results && payload.isCritical !== undefined) order.isCritical = payload.isCritical;
 
   order.enteredBy = scope.userId;
   order.enteredByName = scope.userName;
