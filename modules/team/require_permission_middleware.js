@@ -70,3 +70,35 @@ export const requirePermission = (permissionKey) => async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Passes when the caller holds at least one of the listed permissions.
+ * Same rules as requirePermission for patients, owners and accounts without a membership.
+ */
+export const requireAnyPermission = (...permissionKeys) => async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+    if (req.user.role === "patient" || req.user.accountType === "organization" || !req.user.profileId) {
+      return next();
+    }
+    const membership = await OrganizationMembership.findOne({
+      userId: req.user.profileId,
+      isActive: true,
+    }).select("membershipRole permissionOverrides");
+    if (!membership) return next();
+
+    const effective = getEffectivePermissions(membership.membershipRole, membership.permissionOverrides);
+    if (!permissionKeys.some((k) => effective.includes(k))) {
+      return res.status(403).json({
+        success: false,
+        message: "Your role doesn't have access to this action.",
+        code: "PERMISSION_DENIED",
+      });
+    }
+    return next();
+  } catch (error) {
+    next(error);
+  }
+};
