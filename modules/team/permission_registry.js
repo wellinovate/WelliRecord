@@ -47,6 +47,7 @@ export const PERMISSIONS = {
   view_lab_orders: { label: "View lab orders", category: "lab" },
   create_lab_orders: { label: "Create lab orders", category: "lab" },
   write_lab_results: { label: "Enter lab results", category: "lab" },
+  approve_lab_results: { label: "Review and approve lab results before they are released to the patient", category: "lab" },
 
   view_radiology_orders: { label: "View radiology orders", category: "radiology" },
   create_radiology_orders: { label: "Create radiology orders", category: "radiology" },

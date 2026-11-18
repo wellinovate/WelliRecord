@@ -2,7 +2,11 @@ import mongoose from "mongoose";
 import { labOrderModel } from "./lab_order_model.js";
 import { resolvePatientAccessContext, resolveActorContext } from "../vitals/vital_service.js";
 import { UserProfile } from "../users/user_profile_model.js";
-import { canTransition, canEnterResult, canVerify, isSelfVerified, generateBarcode } from "./lab_order_rules.js";
+import { canTransition, canEnterResult, canVerify, isSelfVerified, generateBarcode, canReview, reviewerConflict, canRelease, canEditPatientNote, cleanReview, cleanPatientNote, buildPatientRecords } from "./lab_order_rules.js";
+import { createLabResultService } from "../lab/lab_result_service.js";
+import { notifyLabOrderReleased } from "../lab/lab_notifications.js";
+import { OrganizationMembership } from "../memberships/organization_membership_model.js";
+import { getEffectivePermissions } from "../team/permission_registry.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { STRUCTURED_TESTS } from "../lab-tests-catalog/lab_test_catalog_v2.js";
 import { processResults, patientContext, summarise, summariseRanges, GENERIC_TEST } from "../lab-tests-catalog/lab_result_engine.js";
@@ -32,6 +36,11 @@ const serializeOrder = (item) => ({
   testKey: item.testKey,
   results: item.results,
   deltaFlags: item.deltaFlags,
+  approval: item.approval,
+  reviewLog: item.reviewLog,
+  returnReason: item.returnReason,
+  patientNote: item.patientNote,
+  transmittedAt: item.transmittedAt,
   reagentShortfalls: item.reagentShortfalls,
   instrumentResults: item.instrumentResults,
   category: item.category,
@@ -262,6 +271,7 @@ export const getAllLabOrdersService = async ({ page = 1, limit = 20, authUser })
   return {
     items: items.map(serializeOrder),
     pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    viewer: { userId: scope.userId, canApprove: await callerCanApprove(authUser) },
   };
 };
 
@@ -271,6 +281,9 @@ export const updateLabOrderStatusService = async ({ id, status, reason, authUser
 
   if (status === "verified") {
     throw httpError("A result is verified with the verify step, not by changing the stage.", 409);
+  }
+  if (status === "released") {
+    throw httpError("Results are released to the patient with the release step, after a senior has approved them.", 409);
   }
   if (!canTransition(order.status, status)) {
     throw httpError(`An order in ${order.status} cannot move to ${status}.`, 409);
@@ -340,6 +353,8 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
   order.verifiedByUserId = undefined;
   order.verifiedAt = undefined;
   order.selfVerified = false;
+  order.approval = undefined;
+  order.returnReason = undefined;
   order.status = "quality-control";
   pushHistory(order, "quality-control", scope);
   await order.save();
@@ -378,4 +393,100 @@ export const verifyLabOrderResultService = async ({ id, authUser }) => {
   const serialized = serializeOrder(order);
   broadcast("update", serialized);
   return serialized;
+};
+
+// ---------- senior review, patient note, release ----------
+// Whether the caller may approve results. The organisation owner can. A team member needs the
+// permission through their role or an override. Unlike the route checks, this does not fail open.
+export const callerCanApprove = async (authUser) => {
+  if (authUser?.accountType === "organization") return true;
+  if (!authUser?.profileId) return false;
+  const m = await OrganizationMembership.findOne({ userId: authUser.profileId, isActive: true }).select("membershipRole permissionOverrides").lean();
+  if (!m) return false;
+  return getEffectivePermissions(m.membershipRole, m.permissionOverrides).includes("approve_lab_results");
+};
+
+export const reviewLabOrderService = async ({ id, payload, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  if (!(await callerCanApprove(authUser))) throw httpError("You do not have permission to approve lab results.", 403);
+  const order = await findScopedOrder(id, scope.organizationIds);
+  if (!canReview(order)) throw httpError("Only a verified result that has not been approved can be reviewed.", 409);
+  if (reviewerConflict(order, scope.userId)) throw httpError("The person who entered or verified a result cannot approve it. Ask another senior to review.", 403);
+  const { decision, comment } = (() => {
+    const c = cleanReview(payload || {});
+    if (c.errors.length) throw httpError(c.errors.join(" "), 400);
+    return c.value;
+  })();
+
+  const entry = { decision, comment, byUserId: scope.userId, byName: scope.userName, at: new Date() };
+  order.reviewLog = [...(order.reviewLog || []), entry];
+  if (decision === "approve") {
+    order.approval = { status: "approved", byUserId: scope.userId, byName: scope.userName, at: entry.at, comment };
+    order.returnReason = undefined;
+  } else {
+    // Back to the bench: the result is corrected and verified again.
+    order.approval = undefined;
+    order.returnReason = comment;
+    order.verifiedBy = undefined;
+    order.verifiedByUserId = undefined;
+    order.verifiedAt = undefined;
+    order.selfVerified = false;
+    order.status = "quality-control";
+    pushHistory(order, "quality-control", scope);
+  }
+  await order.save();
+  const serialized = serializeOrder(order);
+  broadcast("update", serialized);
+  return serialized;
+};
+
+export const setPatientNoteService = async ({ id, payload, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const order = await findScopedOrder(id, scope.organizationIds);
+  if (!canEditPatientNote(order)) throw httpError("The note cannot be changed after the result is released.", 409);
+  const c = cleanPatientNote(payload || {});
+  if (c.errors.length) throw httpError(c.errors.join(" "), 400);
+  const wasApproved = order.approval?.status === "approved";
+  order.patientNote = c.value.text ? { text: c.value.text, issueType: c.value.issueType, byUserId: scope.userId, byName: scope.userName, at: new Date() } : undefined;
+  if (wasApproved) {
+    // What the patient will read has changed, so the senior has to approve again.
+    order.approval = undefined;
+    order.reviewLog = [...(order.reviewLog || []), { decision: "approval_withdrawn", comment: "The patient note was changed.", byUserId: scope.userId, byName: scope.userName, at: new Date() }];
+  }
+  await order.save();
+  const serialized = serializeOrder(order);
+  broadcast("update", serialized);
+  return serialized;
+};
+
+// Sends an approved result to the patient's record and tells them once.
+export const releaseLabOrderService = async ({ id, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const order = await findScopedOrder(id, scope.organizationIds);
+  if (order.transmittedAt) throw httpError("This result has already been released.", 409);
+  if (!canRelease(order)) throw httpError("A senior must approve the result before it is released to the patient.", 409);
+  if (!order.results?.length) throw httpError("There are no structured results to send. Enter the result in the result form first.", 409);
+
+  const records = buildPatientRecords(order);
+  const collected = (order.stageHistory || []).find((h) => h.status === "collected")?.at || null;
+  const ids = [];
+  for (const rec of records) {
+    const created = await createLabResultService({
+      payload: { ...rec, patientId: String(order.patientId), specimen: order.sampleType || undefined, collectedAt: collected, resultedAt: order.enteredAt || new Date(), verificationStatus: "lab-verified", source: "lab", skipNotify: true },
+      authUser,
+    });
+    if (created?.id) ids.push(String(created.id));
+  }
+
+  order.transmittedAt = new Date();
+  order.transmittedBy = scope.userName;
+  order.transmittedResultIds = ids;
+  order.status = "released";
+  pushHistory(order, "released", scope);
+  await order.save();
+
+  const dispatch = await notifyLabOrderReleased({ patientId: order.patientId, testName: order.testName, isCritical: Boolean(order.isCritical), link: "/vault" });
+  const serialized = serializeOrder(order);
+  broadcast("update", serialized);
+  return { order: serialized, recordsCreated: ids.length, dispatch };
 };

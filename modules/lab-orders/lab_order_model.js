@@ -39,6 +39,15 @@ const labOrderSchema = new Schema(
     reagentShortfalls: { type: [Schema.Types.Mixed], default: undefined },
     // Values posted by an instrument, waiting for a person to load and save them.
     instrumentResults: { type: Schema.Types.Mixed, default: undefined },
+    // Senior review before release to the patient.
+    approval: { type: Schema.Types.Mixed, default: undefined },
+    reviewLog: { type: [Schema.Types.Mixed], default: undefined },
+    returnReason: { type: String, default: undefined },
+    // A note for the patient from the laboratory, shown with the released results.
+    patientNote: { type: Schema.Types.Mixed, default: undefined },
+    transmittedAt: Date,
+    transmittedBy: { type: String },
+    transmittedResultIds: { type: [String], default: undefined },
     deltaFlags: { type: [Schema.Types.Mixed], default: undefined },
 
     category: {

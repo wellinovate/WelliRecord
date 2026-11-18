@@ -134,7 +134,8 @@ export const createLabResultService = async ({ payload, authUser }) => {
     await session.commitTransaction();
     session.endSession();
 
-    notifyLabResultReady(created._id); // deliberately not awaited
+    // A caller that creates many rows for one report sends a single notification itself.
+    if (!payload.skipNotify) notifyLabResultReady(created._id); // deliberately not awaited
 
     return {
       id: created._id,
