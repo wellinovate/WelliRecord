@@ -66,7 +66,7 @@ const httpError = (message, statusCode) => {
 // touch lab orders; a patient token passes the permission middleware, so it is
 // refused here. Orders created through this module store the organisation account id,
 // older listing code used the organisation profile id, so both are accepted.
-const resolveLabScope = async (authUser) => {
+export const resolveLabScope = async (authUser) => {
   const actor = await resolveActorContext(authUser);
   if (!actor.isOrganizationActor || !actor.organizationId) {
     throw httpError("Lab access requires an organisation account", 403);
