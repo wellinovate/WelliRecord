@@ -19,7 +19,9 @@ const paymentSchema = new Schema(
 const subscriptionSchema = new Schema(
   {
     organizationId: { type: Schema.Types.ObjectId, required: true, unique: true, index: true },
+    planKey: { type: String, default: "" },
     plan: { type: String, default: "" },
+    trial: { type: Boolean, default: false }, // true until the first payment
     amountKobo: { type: Number, default: 0 },
     periodEnd: { type: Date, required: true },
     graceDays: { type: Number, default: 5, min: 3, max: 5 },

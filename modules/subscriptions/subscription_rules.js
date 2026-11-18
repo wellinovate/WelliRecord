@@ -29,12 +29,13 @@ export const subscriptionState = (sub, now = new Date()) => {
 
 export const describeSubscription = (sub, now = new Date()) => {
   const state = subscriptionState(sub, now);
-  if (state === "none") return { state, periodEnd: sub?.periodEnd || null, graceEndsAt: null, daysLeft: null };
+  if (state === "none") return { state, trial: false, periodEnd: sub?.periodEnd || null, graceEndsAt: null, daysLeft: null };
   const end = new Date(sub.periodEnd);
   const gEnd = graceEndsAt(sub);
   const target = state === "active" ? end : gEnd;
   return {
     state,
+    trial: Boolean(sub.trial),
     periodEnd: end,
     graceEndsAt: gEnd,
     // Whole days until the period ends (active) or the grace period ends (grace). 0 once suspended.
@@ -75,7 +76,11 @@ export const noticesDue = (sub, now = new Date()) => {
 export const cleanSubscriptionInput = (b = {}) => {
   const errors = [];
   const out = {};
-  if (b.plan !== undefined) out.plan = String(b.plan).trim().slice(0, 80);
+  if (b.planKey !== undefined) {
+    if (!PLANS[b.planKey]) errors.push("Unknown plan.");
+    else { out.planKey = b.planKey; out.plan = PLANS[b.planKey].name; if (b.amountKobo === undefined) out.amountKobo = PLANS[b.planKey].amountKobo; }
+  }
+  if (b.plan !== undefined && b.planKey === undefined) out.plan = String(b.plan).trim().slice(0, 80);
   if (b.amountKobo !== undefined) {
     const a = Number(b.amountKobo);
     if (!Number.isInteger(a) || a < 0 || a > 100_000_000_00) errors.push("Amount must be a whole number of kobo, 0 or more.");
@@ -93,4 +98,30 @@ export const cleanSubscriptionInput = (b = {}) => {
   }
   if (b.exempt !== undefined) out.exempt = Boolean(b.exempt);
   return { value: out, errors };
+};
+
+// ---------- plans ----------
+// Prices are flat, per year, in kobo. Change them here only.
+export const PLANS = {
+  laboratory: { key: "laboratory", name: "Laboratory (annual)", amountKobo: 10_000_000, months: 12, trialDays: 0 }, // NGN 100,000
+  standard: { key: "standard", name: "Provider (annual)", amountKobo: 5_000_000, months: 12, trialDays: 30 }, // NGN 50,000 after a 30-day trial
+};
+
+// Organisation types that pay. Insurers, government, NGOs, vendors and the like do not get a subscription.
+const PAYING_TYPES = new Set(["healthcare_provider", "diagnostic", "pharmacy", "individaul_provider"]);
+
+export const planForOrgType = (organizationType) => {
+  if (!PAYING_TYPES.has(organizationType)) return null;
+  return organizationType === "diagnostic" ? PLANS.laboratory : PLANS.standard;
+};
+
+export const trialSubscriptionFields = (plan, now = new Date()) => {
+  if (!plan || plan.trialDays <= 0) return null;
+  return {
+    planKey: plan.key,
+    plan: plan.name,
+    amountKobo: plan.amountKobo,
+    trial: true,
+    periodEnd: new Date(now.getTime() + plan.trialDays * DAY),
+  };
 };

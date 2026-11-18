@@ -66,3 +66,41 @@ test("admin input is validated", () => {
   assert.equal(ok.errors.length, 0);
   assert.equal(ok.value.plan, "Clinic");
 });
+
+import { PLANS, planForOrgType, trialSubscriptionFields } from "../subscription_rules.js";
+
+test("prices are flat per year in kobo", () => {
+  assert.equal(PLANS.laboratory.amountKobo, 10_000_000);
+  assert.equal(PLANS.standard.amountKobo, 5_000_000);
+  assert.equal(PLANS.laboratory.months, 12);
+  assert.equal(PLANS.standard.months, 12);
+});
+
+test("labs get the laboratory plan, other providers the standard plan, non-providers none", () => {
+  assert.equal(planForOrgType("diagnostic").key, "laboratory");
+  for (const t of ["healthcare_provider", "pharmacy", "individaul_provider"]) assert.equal(planForOrgType(t).key, "standard");
+  for (const t of ["insurance", "government", "ngo", "vendor", "other", "healthtech", "telehealth"]) assert.equal(planForOrgType(t), null);
+});
+
+test("standard providers get a 30-day trial; labs start on first payment", () => {
+  const now = new Date("2026-11-18T00:00:00Z");
+  const t = trialSubscriptionFields(PLANS.standard, now);
+  assert.equal(t.periodEnd.toISOString(), "2026-12-18T00:00:00.000Z");
+  assert.equal(t.trial, true);
+  assert.equal(trialSubscriptionFields(PLANS.laboratory, now), null);
+  assert.equal(trialSubscriptionFields(null, now), null);
+});
+
+test("a plan key sets the name and price unless the amount is given", () => {
+  const r = cleanSubscriptionInput({ planKey: "laboratory" });
+  assert.equal(r.value.amountKobo, 10_000_000);
+  assert.ok(cleanSubscriptionInput({ planKey: "gold" }).errors.length);
+});
+
+test("a trial lapses like any subscription: 30 days, then grace, then suspended", () => {
+  const t = trialSubscriptionFields(PLANS.standard, new Date("2026-11-18T00:00:00Z"));
+  const s = { ...t, graceDays: 5 };
+  assert.equal(subscriptionState(s, new Date("2026-12-10T00:00:00Z")), "active");
+  assert.equal(subscriptionState(s, new Date("2026-12-20T00:00:00Z")), "grace");
+  assert.equal(subscriptionState(s, new Date("2026-12-24T00:00:00Z")), "suspended");
+});

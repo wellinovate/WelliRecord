@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { Subscription } from "./subscription_model.js";
-import { subscriptionState, describeSubscription, nextPeriodEnd, noticesDue, graceEndsAt } from "./subscription_rules.js";
+import { subscriptionState, describeSubscription, nextPeriodEnd, noticesDue, graceEndsAt, PLANS, planForOrgType, trialSubscriptionFields } from "./subscription_rules.js";
 import { Account } from "../accounts/account_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
@@ -56,6 +56,8 @@ const notify = async (organizationId, kind, sub, extra = {}) => {
     periodEndOn: sub.periodEnd,
     graceEndsOn: graceEndsAt(sub),
     newPeriodEndOn: sub.periodEnd,
+    trial: Boolean(sub.trial),
+    amountKobo: sub.amountKobo,
     ...extra,
   };
   const titles = {
@@ -106,19 +108,27 @@ export const runSubscriptionSweep = async (now = new Date()) => {
 
 // Called when money is received: from an admin now, from a payment gateway webhook later.
 // Extends the period, clears the suspension and tells both sides. A repeated reference is ignored.
-export const recordSubscriptionPayment = async ({ organizationId, months = 1, amountKobo, reference, source = "manual", recordedBy = "", now = new Date() }) => {
+export const recordSubscriptionPayment = async ({ organizationId, months, amountKobo, reference, source = "manual", recordedBy = "", now = new Date() }) => {
   if (!mongoose.Types.ObjectId.isValid(organizationId)) throw Object.assign(new Error("Unknown organisation."), { status: 400 });
   const ref = String(reference || "").trim();
   if (!ref) throw Object.assign(new Error("A payment reference is required."), { status: 400 });
-  const sub = await Subscription.findOne({ organizationId });
-  if (!sub) throw Object.assign(new Error("This organisation has no subscription. Create one first."), { status: 404 });
+  let sub = await Subscription.findOne({ organizationId });
+  if (!sub) {
+    // First payment for an organisation with no subscription yet (for example a laboratory that has just joined).
+    const profile = await OrganizationProfile.findOne({ accountId: organizationId }).select("organizationType").lean();
+    const plan = planForOrgType(profile?.organizationType);
+    if (!plan) throw Object.assign(new Error("This organisation type does not have a subscription."), { status: 400 });
+    sub = new Subscription({ organizationId, planKey: plan.key, plan: plan.name, amountKobo: plan.amountKobo, periodEnd: now });
+  }
   if (sub.payments.some((p) => p.reference === ref)) return { duplicate: true, subscription: sub };
+  if (months == null) months = PLANS[sub.planKey]?.months ?? 12;
 
   const wasState = subscriptionState(sub, now);
   const end = nextPeriodEnd(sub, months, now);
   sub.payments.push({ reference: ref, amountKobo: Number.isFinite(Number(amountKobo)) ? Number(amountKobo) : sub.amountKobo, months, source, recordedBy, paidAt: now, periodEndAfter: end });
   sub.periodEnd = end;
   sub.status = "active";
+  sub.trial = false;
   if (wasState === "suspended") sub.resumedAt = now;
   await sub.save();
   await OrganizationProfile.updateOne({ accountId: organizationId }, { $set: { subscriptionSuspended: false } });
@@ -142,4 +152,28 @@ export const startSubscriptionScheduler = () => {
     if (hour < SEND_HOUR_LAGOS || hour >= SEND_HOUR_LAGOS + 6) return;
     runSubscriptionSweep().catch((e) => console.error("Subscription sweep failed:", e));
   }, POLL_MS).unref();
+};
+
+// Starts the free trial when a provider is approved. Labs have no trial: their subscription starts
+// with the first payment. Never throws, so an approval cannot fail because of this.
+export const startTrialForProfile = async (profile, now = new Date()) => {
+  try {
+    const fields = trialSubscriptionFields(planForOrgType(profile?.organizationType), now);
+    if (!fields) return null;
+    const exists = await Subscription.findOne({ organizationId: profile.accountId }).select("_id").lean();
+    if (exists) return null;
+    return await Subscription.create({ organizationId: profile.accountId, ...fields });
+  } catch (e) {
+    console.error("Starting the subscription trial failed:", e?.message);
+    return null;
+  }
+};
+
+// For providers approved before subscriptions existed: starts their trial from today.
+export const startTrialsForApproved = async ({ dryRun = true, now = new Date() } = {}) => {
+  const profiles = await OrganizationProfile.find({ verificationStatus: "approved" }).select("accountId organizationType organizationName").lean();
+  const have = new Set((await Subscription.find({ organizationId: { $in: profiles.map((p) => p.accountId) } }).select("organizationId").lean()).map((s) => String(s.organizationId)));
+  const todo = profiles.filter((p) => !have.has(String(p.accountId)) && trialSubscriptionFields(planForOrgType(p.organizationType), now));
+  if (!dryRun) for (const p of todo) await startTrialForProfile(p, now);
+  return { dryRun, count: todo.length, organisations: todo.map((p) => p.organizationName) };
 };

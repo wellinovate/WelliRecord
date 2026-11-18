@@ -3,7 +3,7 @@ import { protect, requireAdmin } from "../auth/auth_middleware.js";
 import { Subscription } from "./subscription_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { cleanSubscriptionInput, describeSubscription, DEFAULT_GRACE_DAYS } from "./subscription_rules.js";
-import { describeForOrganization, recordSubscriptionPayment, resolveOrganizationAccountId, runSubscriptionSweep } from "./subscription_service.js";
+import { describeForOrganization, recordSubscriptionPayment, resolveOrganizationAccountId, runSubscriptionSweep, startTrialsForApproved } from "./subscription_service.js";
 
 const router = express.Router();
 
@@ -51,7 +51,7 @@ router.post("/:organizationId/payments", protect, requireAdmin, async (req, res,
   try {
     const out = await recordSubscriptionPayment({
       organizationId: req.params.organizationId,
-      months: req.body?.months ?? 1,
+      months: req.body?.months,
       amountKobo: req.body?.amountKobo,
       reference: req.body?.reference,
       source: "manual",
@@ -63,6 +63,11 @@ router.post("/:organizationId/payments", protect, requireAdmin, async (req, res,
     if (/Months must/.test(e.message)) return res.status(400).json({ success: false, message: e.message });
     next(e);
   }
+});
+
+// Starts the free trial, from today, for approved providers that have no subscription. Preview first: { "dryRun": true }.
+router.post("/start-trials", protect, requireAdmin, async (req, res, next) => {
+  try { res.json({ success: true, data: await startTrialsForApproved({ dryRun: req.body?.dryRun !== false }) }); } catch (e) { next(e); }
 });
 
 // Lets an admin run the daily check now.
