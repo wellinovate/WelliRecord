@@ -9,6 +9,7 @@ import {
   getAllLabOrdersController,
   updateLabOrderStatusController,
   enterLabOrderResultController,
+  previewLabOrderResultController,
   verifyLabOrderResultController,
 } from "./lab_order_controller.js";
 import {
@@ -53,6 +54,15 @@ router.patch(
   requirePermission("write_lab_results"),
   validate(enterLabOrderResultSchema),
   enterLabOrderResultController,
+);
+
+router.post(
+  "/:id/result/preview",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requirePermission("write_lab_results"),
+  validate(enterLabOrderResultSchema),
+  previewLabOrderResultController,
 );
 
 router.patch(

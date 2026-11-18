@@ -3,6 +3,7 @@ import {
   getAllLabOrdersService,
   updateLabOrderStatusService,
   enterLabOrderResultService,
+  previewLabOrderResultService,
   verifyLabOrderResultService,
 } from "./lab_order_service.js";
 import { getLabOrdersQuerySchema } from "./lab_order_validation.js";
@@ -74,6 +75,15 @@ export const verifyLabOrderResultController = async (req, res, next) => {
       message: "Lab result verified",
       data: result,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const previewLabOrderResultController = async (req, res, next) => {
+  try {
+    const data = await previewLabOrderResultService({ id: req.params.id, payload: req.validated, authUser: req.user });
+    return res.status(200).json({ success: true, message: "Result preview", data });
   } catch (error) {
     next(error);
   }
