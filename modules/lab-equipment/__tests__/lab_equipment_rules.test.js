@@ -119,3 +119,33 @@ test("maps instrument codes to result fields and reports the rest", () => {
   // A mapping to a field the test does not have is not used.
   assert.deepEqual(mapInstrumentResults(observations, [{ instrumentCode: "HGB", analyteCode: "hb" }], ["wbc"]).entries, []);
 });
+
+import { buildStockDigest, shouldSendDigest } from "../lab_equipment_rules.js";
+
+test("stock digest lists problems and ignores healthy items", () => {
+  const now = new Date("2026-11-18T08:00:00Z");
+  const d = buildStockDigest(
+    [
+      { _id: "1", name: "Glucose reagent", quantity: 2, unit: "kit", reorderLevel: 5 },
+      { _id: "2", name: "CBC diluent", quantity: 0, lotNumber: "L9" },
+      { _id: "3", name: "Healthy", quantity: 50, reorderLevel: 5 },
+      { _id: "4", name: "Retired", quantity: 0, isActive: false },
+    ],
+    [{ _id: "a1", name: "Mindray", lastCalibrationAt: "2026-01-01", calibrationIntervalDays: 90 }],
+    now,
+  );
+  assert.equal(d.items.length, 3);
+  assert.equal(d.urgent, 2);
+  assert.ok(d.items.some((i) => /Glucose reagent is low: 2 kit left/.test(i.text)));
+  assert.ok(d.items.some((i) => /Mindray: calibration is overdue/.test(i.text)));
+});
+
+test("digest is sent when new or changed, weekly when unchanged, never when empty", () => {
+  const now = new Date("2026-11-18T08:00:00Z");
+  const d = { items: [{}], signature: "a" };
+  assert.equal(shouldSendDigest(d, null, now), true);
+  assert.equal(shouldSendDigest(d, { signature: "a", sentAt: "2026-11-17T08:00:00Z" }, now), false);
+  assert.equal(shouldSendDigest(d, { signature: "b", sentAt: "2026-11-17T08:00:00Z" }, now), true);
+  assert.equal(shouldSendDigest(d, { signature: "a", sentAt: "2026-11-10T08:00:00Z" }, now), true);
+  assert.equal(shouldSendDigest({ items: [], signature: "" }, null, now), false);
+});

@@ -197,3 +197,38 @@ export const mapInstrumentResults = (observations, codeMap, analyteCodes) => {
   }
   return { entries, unmapped };
 };
+
+// What needs attention in a lab's register: reagents that are empty, low, expired or expiring,
+// and analysers whose calibration is overdue or due soon. `signature` changes only when the list does.
+export const buildStockDigest = (reagents = [], analyzers = [], now = new Date()) => {
+  const items = [];
+  for (const r of reagents) {
+    if (r.isActive === false) continue;
+    const s = reagentStatus(r, now);
+    if (s === "ok") continue;
+    const unit = r.unit ? ` ${r.unit}` : "";
+    const text = {
+      expired: `${r.name} (lot ${r.lotNumber || "-"}) has expired`,
+      empty: `${r.name} (lot ${r.lotNumber || "-"}) is finished`,
+      low: `${r.name} is low: ${r.quantity}${unit} left, reorder level ${r.reorderLevel}`,
+      expiring: `${r.name} (lot ${r.lotNumber || "-"}) expires soon`,
+    }[s];
+    items.push({ key: `r:${r._id}:${s}`, kind: "reagent", status: s, text });
+  }
+  for (const a of analyzers) {
+    if (a.isActive === false) continue;
+    const s = calibrationStatus(a, now);
+    if (s !== "overdue" && s !== "due_soon") continue;
+    items.push({ key: `a:${a._id}:${s}`, kind: "analyzer", status: s, text: `${a.name}: calibration ${s === "overdue" ? "is overdue" : "is due soon"}` });
+  }
+  const urgent = items.filter((i) => ["empty", "expired", "overdue"].includes(i.status)).length;
+  return { items, urgent, signature: items.map((i) => i.key).sort().join("|") };
+};
+
+// Send when the list is new or has changed, or as a weekly reminder while it stays the same.
+export const shouldSendDigest = (digest, last, now = new Date()) => {
+  if (!digest.items.length) return false;
+  if (!last) return true;
+  if (last.signature !== digest.signature) return true;
+  return now.getTime() - new Date(last.sentAt).getTime() >= 7 * DAY;
+};
