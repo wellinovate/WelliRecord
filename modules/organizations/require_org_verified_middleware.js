@@ -1,5 +1,6 @@
 import { OrganizationProfile } from "./organizations_model.js";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
+import { suspensionFor } from "../subscriptions/subscription_service.js";
 
 /**
  * Must run after `protect`. Blocks provider-side patient/staff endpoints
@@ -67,6 +68,9 @@ export const requireOrgVerified = async (req, res, next) => {
         verificationStatus: profile.verificationStatus,
       });
     }
+
+    const suspended = await suspensionFor(req.user);
+    if (suspended) return res.status(402).json(suspended);
 
     next();
   } catch (error) {

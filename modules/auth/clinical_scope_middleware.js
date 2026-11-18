@@ -1,3 +1,4 @@
+import { suspensionFor } from "../subscriptions/subscription_service.js";
 import { OrganizationMembership } from "../memberships/organization_membership_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 
@@ -41,6 +42,10 @@ export const restrictClinicalScope = (category) => async (req, res, next) => {
     if (req.user.role === "patient") {
       return next();
     }
+
+    // A provider whose subscription has lapsed past the grace period is suspended.
+    const suspended = await suspensionFor(req.user);
+    if (suspended) return res.status(402).json(suspended);
 
     // BUGFIX: the JWT payload signed at login (shared/utils/helper.js,
     // signAccessToken) only ever sets `sub` (Account._id) and
