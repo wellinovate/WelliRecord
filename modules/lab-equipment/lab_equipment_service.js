@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
-import { LabAnalyzer, LabAnalyzerEvent, LabReagent, LabReagentMovement, LabReagentUsage } from "./lab_equipment_models.js";
+import { LabAnalyzer, LabAnalyzerEvent, LabReagent, LabReagentMovement, LabReagentUsage, LabQcRun } from "./lab_equipment_models.js";
 import { newIngestKey } from "./lab_equipment_automation.js";
 import { STRUCTURED_TESTS } from "../lab-tests-catalog/lab_test_catalog_v2.js";
 import { calibrationStatus, nextCalibrationDue, reagentStatus, cleanUsage, cleanCodeMap, cleanAnalyzer, cleanReagent, cleanMovement, cleanEvent } from "./lab_equipment_rules.js";
+import { cleanQcRun, evaluateQc, qcGate, RULE_TEXT } from "./lab_qc_rules.js";
 import { resolveLabScope } from "../lab-orders/lab_order_service.js";
 
 const httpError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
@@ -187,4 +188,30 @@ export const removeUsageService = async ({ id, authUser }) => {
   if (!validId(id)) throw httpError("Not found", 404);
   await LabReagentUsage.deleteOne({ _id: id, ...orgFilter(scope) });
   return { removed: true };
+};
+
+// ---------- daily quality control ----------
+export const addQcRunService = async ({ id, payload, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const a = await findAnalyzer(id, scope);
+  const v = check(cleanQcRun(payload || {}));
+  const history = await LabQcRun.find({ analyzerId: a._id, controlName: v.controlName, analyte: v.analyte, runAt: { $lt: v.runAt } })
+    .sort({ runAt: -1 }).limit(12).select("z").lean();
+  const verdict = evaluateQc(v, history);
+  const run = await LabQcRun.create({ ...v, ...verdict, organizationId: a.organizationId, analyzerId: a._id, byName: scope.userName });
+  if (!a.lastQcAt || v.runAt >= a.lastQcAt) {
+    a.lastQcAt = v.runAt;
+    a.lastQcResult = verdict.status === "fail" ? "fail" : "pass";
+    await a.save();
+  }
+  return { run: run.toObject(), explanation: verdict.violations.map((x) => RULE_TEXT[x]).filter(Boolean), analyzer: decorateAnalyzer(a.toObject()) };
+};
+
+export const listQcRunsService = async ({ id, query, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const a = await findAnalyzer(id, scope);
+  const days = Math.min(Math.max(Number(query?.days) || 30, 1), 180);
+  const since = new Date(Date.now() - days * 86400000);
+  const runs = await LabQcRun.find({ analyzerId: a._id, runAt: { $gte: since } }).sort({ runAt: 1 }).limit(1000).lean();
+  return { runs, gate: qcGate(runs) };
 };
