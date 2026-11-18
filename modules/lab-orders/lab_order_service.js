@@ -9,6 +9,7 @@ import { processResults, patientContext, summarise, summariseRanges, GENERIC_TES
 import { loadOverrides } from "../lab-ranges/lab_range_service.js";
 import { applyOverrides } from "../lab-ranges/lab_range_rules.js";
 import { deltaChecks } from "./lab_delta_rules.js";
+import { deductReagentsForOrder } from "../lab-equipment/lab_equipment_automation.js";
 import { LabCriticalAlert } from "./lab_critical_model.js";
 import { sendSms } from "../../shared/utils/termii.js";
 import { getIO } from "../../shared/realtime/socket.js";
@@ -31,6 +32,8 @@ const serializeOrder = (item) => ({
   testKey: item.testKey,
   results: item.results,
   deltaFlags: item.deltaFlags,
+  reagentShortfalls: item.reagentShortfalls,
+  instrumentResults: item.instrumentResults,
   category: item.category,
   status: item.status,
   priority: item.priority,
@@ -340,6 +343,12 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
   order.status = "quality-control";
   pushHistory(order, "quality-control", scope);
   await order.save();
+
+  await deductReagentsForOrder(order, `Automatic (${scope.userName})`);
+  if (order.instrumentResults && payload.results) await labOrderModel.updateOne({ _id: order._id }, { $set: { "instrumentResults.status": "used" } });
+  const fresh = await labOrderModel.findById(order._id).select("reagentShortfalls instrumentResults reagentsDeductedAt").lean();
+  order.reagentShortfalls = fresh?.reagentShortfalls;
+  order.instrumentResults = fresh?.instrumentResults;
 
   const pr = await UserProfile.findById(order.patientId).select("fullName firstName lastName").lean();
   await recordCritical(order, pr?.fullName || [pr?.firstName, pr?.lastName].filter(Boolean).join(" "));

@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
-import { LabAnalyzer, LabAnalyzerEvent, LabReagent, LabReagentMovement } from "./lab_equipment_models.js";
-import { calibrationStatus, nextCalibrationDue, reagentStatus, cleanAnalyzer, cleanReagent, cleanMovement, cleanEvent } from "./lab_equipment_rules.js";
+import { LabAnalyzer, LabAnalyzerEvent, LabReagent, LabReagentMovement, LabReagentUsage } from "./lab_equipment_models.js";
+import { newIngestKey } from "./lab_equipment_automation.js";
+import { STRUCTURED_TESTS } from "../lab-tests-catalog/lab_test_catalog_v2.js";
+import { calibrationStatus, nextCalibrationDue, reagentStatus, cleanUsage, cleanCodeMap, cleanAnalyzer, cleanReagent, cleanMovement, cleanEvent } from "./lab_equipment_rules.js";
 import { resolveLabScope } from "../lab-orders/lab_order_service.js";
 
 const httpError = (message, statusCode) => Object.assign(new Error(message), { statusCode });
@@ -9,8 +11,9 @@ const orgFilter = (scope) => ({ organizationId: { $in: scope.organizationIds } }
 const validId = (id) => mongoose.Types.ObjectId.isValid(id);
 const check = ({ value, errors }) => { if (errors.length) throw httpError(errors.join(" "), 400); return value; };
 
-const decorateAnalyzer = (a, now = new Date()) => ({
+const decorateAnalyzer = ({ ingestKeyHash, ...a }, now = new Date()) => ({
   ...a,
+  ingestEnabled: Boolean(a.ingestKeySetAt),
   calibrationStatus: calibrationStatus(a, now),
   nextCalibrationDue: nextCalibrationDue(a),
 });
@@ -46,6 +49,7 @@ export const updateAnalyzerService = async ({ id, payload, authUser }) => {
   const scope = await resolveLabScope(authUser);
   const a = await findAnalyzer(id, scope);
   const value = check(cleanAnalyzer(payload || {}, { partial: true }));
+  if (payload?.codeMap !== undefined) value.codeMap = check(cleanCodeMap(payload.codeMap));
   a.set(value);
   await a.save();
   return decorateAnalyzer(a.toObject());
@@ -142,4 +146,45 @@ export const equipmentSummaryService = async (authUser) => {
     analyzers: { total: analyzers.length, overdue: count(analyzers, "calibrationStatus", "overdue"), dueSoon: count(analyzers, "calibrationStatus", "due_soon"), outOfService: count(analyzers, "status", "out_of_service"), qcFailed: analyzers.filter((a) => a.lastQcResult === "fail").length },
     reagents: { total: reagents.length, expired: count(reagents, "stockStatus", "expired"), expiring: count(reagents, "stockStatus", "expiring"), low: count(reagents, "stockStatus", "low"), empty: count(reagents, "stockStatus", "empty") },
   };
+};
+
+// Makes a new key for the analyzer's instrument interface. The key is shown once and only a hash is kept.
+export const createIngestKeyService = async ({ id, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const a = await findAnalyzer(id, scope);
+  const { key, hash } = newIngestKey(String(a._id));
+  await LabAnalyzer.updateOne({ _id: a._id }, { $set: { ingestKeyHash: hash, ingestKeySetAt: new Date() } });
+  return { key };
+};
+
+export const revokeIngestKeyService = async ({ id, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const a = await findAnalyzer(id, scope);
+  await LabAnalyzer.updateOne({ _id: a._id }, { $set: { ingestKeyHash: "" }, $unset: { ingestKeySetAt: 1 } });
+  return { revoked: true };
+};
+
+export const listUsageService = async (authUser) => {
+  const scope = await resolveLabScope(authUser);
+  return LabReagentUsage.find(orgFilter(scope)).sort({ testKey: 1, reagentName: 1 }).lean();
+};
+
+export const setUsageService = async ({ payload, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const v = check(cleanUsage(payload || {}));
+  if (!STRUCTURED_TESTS.some((t) => t.key === v.testKey)) throw httpError("That test is not in the catalog.", 404);
+  const exists = await LabReagent.exists({ ...orgFilter(scope), isActive: true, name: new RegExp(`^${v.reagentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") });
+  if (!exists) throw httpError("Add the reagent to the list first.", 404);
+  return LabReagentUsage.findOneAndUpdate(
+    { organizationId: orgOf(scope), testKey: v.testKey, reagentName: v.reagentName },
+    { $set: { quantityPerRun: v.quantityPerRun, note: v.note } },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  ).lean();
+};
+
+export const removeUsageService = async ({ id, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  if (!validId(id)) throw httpError("Not found", 404);
+  await LabReagentUsage.deleteOne({ _id: id, ...orgFilter(scope) });
+  return { removed: true };
 };

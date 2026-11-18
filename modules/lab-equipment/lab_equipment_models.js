@@ -19,6 +19,10 @@ const analyzerSchema = new Schema(
     lastQcAt: Date,
     lastQcResult: { type: String, enum: ["pass", "fail", ""], default: "" },
     notes: { type: String, default: "" },
+    // Instrument import: how the machine's result codes map to result fields, and a key it posts with.
+    codeMap: { type: [Schema.Types.Mixed], default: [] },
+    ingestKeyHash: { type: String, default: "", select: false },
+    ingestKeySetAt: Date,
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true },
@@ -68,10 +72,24 @@ const movementSchema = new Schema(
     balanceAfter: { type: Number, required: true },
     note: { type: String, default: "" },
     byName: { type: String, default: "" },
+    orderId: { ...oid, default: null },
   },
   { timestamps: true },
 );
 
+const usageSchema = new Schema(
+  {
+    organizationId: { ...oid, required: true, index: true },
+    testKey: { type: String, required: true, trim: true },
+    reagentName: { type: String, required: true, trim: true },
+    quantityPerRun: { type: Number, required: true, min: 0 },
+    note: { type: String, default: "" },
+  },
+  { timestamps: true },
+);
+usageSchema.index({ organizationId: 1, testKey: 1, reagentName: 1 }, { unique: true });
+
+export const LabReagentUsage = mongoose.models.LabReagentUsage || mongoose.model("LabReagentUsage", usageSchema);
 export const LabAnalyzer = mongoose.models.LabAnalyzer || mongoose.model("LabAnalyzer", analyzerSchema);
 export const LabAnalyzerEvent = mongoose.models.LabAnalyzerEvent || mongoose.model("LabAnalyzerEvent", eventSchema);
 export const LabReagent = mongoose.models.LabReagent || mongoose.model("LabReagent", reagentSchema);

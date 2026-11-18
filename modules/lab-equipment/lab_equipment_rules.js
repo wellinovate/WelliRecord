@@ -100,3 +100,100 @@ export const cleanEvent = (input) => {
   else if (on.getTime() > Date.now() + DAY) errors.push("Date cannot be in the future.");
   return { value: { type: input?.type, result, performedAt: on, note: str(input?.note, 500), lotNumber: str(input?.lotNumber, 60) }, errors };
 };
+
+// ---------- automatic stock deduction ----------
+// lots: reagents with the same name. Takes from the earliest-expiring lot first and skips expired lots.
+// Returns the amount to take from each lot and any shortfall. Nothing is taken beyond what is in stock.
+export const planDeduction = (lots, qty, now = new Date()) => {
+  const usable = (lots || [])
+    .filter((l) => (l.quantity ?? 0) > 0 && !(l.expiresOn && new Date(l.expiresOn).getTime() < startOfDay(now)))
+    .sort((a, b) => (a.expiresOn ? new Date(a.expiresOn).getTime() : Infinity) - (b.expiresOn ? new Date(b.expiresOn).getTime() : Infinity));
+  let left = qty;
+  const allocations = [];
+  for (const l of usable) {
+    if (left <= 1e-9) break;
+    const take = Math.min(l.quantity, left);
+    allocations.push({ reagentId: l._id, take: Math.round(take * 1e6) / 1e6 });
+    left -= take;
+  }
+  return { allocations, shortfall: left > 1e-9 ? Math.round(left * 1e6) / 1e6 : 0 };
+};
+
+export const cleanUsage = (input) => {
+  const errors = [];
+  const testKey = str(input?.testKey, 60);
+  const reagentName = str(input?.reagentName, 120);
+  const quantityPerRun = Number(input?.quantityPerRun);
+  if (!testKey) errors.push("Choose a test.");
+  if (!reagentName) errors.push("Choose a reagent.");
+  if (!(Number.isFinite(quantityPerRun) && quantityPerRun > 0 && quantityPerRun <= 1e4)) errors.push("Amount per test must be more than zero.");
+  return { value: { testKey, reagentName, quantityPerRun, note: str(input?.note, 200) }, errors };
+};
+
+// ---------- instrument results ----------
+// Instrument code to result field code. map: [{instrumentCode, analyteCode}]
+export const cleanCodeMap = (map) => {
+  const errors = [];
+  if (!Array.isArray(map)) return { value: [], errors: ["Code map must be a list."] };
+  if (map.length > 300) return { value: [], errors: ["Too many mappings."] };
+  const seen = new Set();
+  const value = [];
+  for (const m of map) {
+    const instrumentCode = str(m?.instrumentCode, 40);
+    const analyteCode = str(m?.analyteCode, 40);
+    if (!instrumentCode || !analyteCode) { errors.push("Each mapping needs both codes."); continue; }
+    if (seen.has(instrumentCode.toUpperCase())) { errors.push(`${instrumentCode} is mapped twice.`); continue; }
+    seen.add(instrumentCode.toUpperCase());
+    value.push({ instrumentCode, analyteCode, unit: str(m?.unit, 30) });
+  }
+  return { value, errors };
+};
+
+// HL7 v2 ORU^R01. Reads the sample id (OBR-3, else OBR-2) and numeric or text observations (OBX).
+// Only final or corrected results are kept. Returns { barcode, observations, errors }.
+export const parseHl7Oru = (text) => {
+  const errors = [];
+  if (typeof text !== "string" || !text.startsWith("MSH") || text.length > 200000) return { barcode: "", observations: [], errors: ["Not an HL7 message."] };
+  const fieldSep = text[3];
+  const segs = text.split(/\r\n|\r|\n/).filter(Boolean);
+  const msh = segs[0].split(fieldSep);
+  const msgType = (msh[8] || "").split(msh[1]?.[0] || "^")[0];
+  if (msgType && msgType !== "ORU") errors.push("Only ORU result messages are accepted.");
+  const comp = (msh[1] || "^~\\&")[0];
+  let barcode = "";
+  const observations = [];
+  for (const seg of segs.slice(1)) {
+    const f = seg.split(fieldSep);
+    if (f[0] === "OBR" && !barcode) barcode = (f[3] || f[2] || "").split(comp)[0].trim();
+    if (f[0] === "OBX") {
+      const type = (f[2] || "").trim();
+      const code = (f[3] || "").split(comp)[0].trim();
+      const status = (f[11] || "F").trim();
+      if (!code || !["NM", "ST", "SN", "TX", "CE"].includes(type) || !["F", "C", ""].includes(status)) continue;
+      let value = (f[5] || "").trim();
+      if (type === "SN") value = value.split(comp).slice(-1)[0];
+      if (type === "CE") value = value.split(comp)[1] || value.split(comp)[0];
+      if (value === "") continue;
+      observations.push({ code, value, unit: (f[6] || "").split(comp)[0].trim() });
+    }
+  }
+  if (!barcode) errors.push("No sample id in the message.");
+  if (!observations.length) errors.push("No results in the message.");
+  return { barcode, observations, errors };
+};
+
+// Maps instrument codes to the order's result fields. Unknown codes are returned, not guessed.
+export const mapInstrumentResults = (observations, codeMap, analyteCodes) => {
+  const by = new Map((codeMap || []).map((m) => [m.instrumentCode.toUpperCase(), m]));
+  const entries = [];
+  const unmapped = [];
+  const allowed = new Set(analyteCodes);
+  for (const o of observations || []) {
+    const m = by.get(String(o.code).toUpperCase());
+    if (!m || !allowed.has(m.analyteCode)) { unmapped.push(o.code); continue; }
+    // The unit set in the mapping wins: instruments write units like 10*9/L that the catalog does not use.
+    const unit = m.unit || o.unit;
+    entries.push({ code: m.analyteCode, value: String(o.value), ...(unit ? { unit } : {}) });
+  }
+  return { entries, unmapped };
+};
