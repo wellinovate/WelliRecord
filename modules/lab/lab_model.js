@@ -45,6 +45,9 @@ const labResultEntrySchema = new Schema(
       maxlength: 100,
     },
 
+    // Plain-words note from the laboratory, shown to the patient with the result.
+    labNote: { type: String, trim: true, maxlength: 600 },
+
     resultValue: {
       type: String,
       trim: true,
