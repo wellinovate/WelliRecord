@@ -26,6 +26,9 @@ router.delete("/analyzers/:id", ...write, h((r) => svc.retireAnalyzerService({ i
 router.get("/analyzers/:id/events", ...read, h((r) => svc.listAnalyzerEventsService({ id: r.params.id, authUser: u(r) })));
 router.post("/analyzers/:id/events", ...write, h((r) => svc.addAnalyzerEventService({ id: r.params.id, payload: r.body, authUser: u(r) })));
 
+router.get("/analyzers/:id/qc", ...read, h((r) => svc.listQcRunsService({ id: r.params.id, query: r.query, authUser: u(r) })));
+router.post("/analyzers/:id/qc", ...write, h((r) => svc.addQcRunService({ id: r.params.id, payload: r.body, authUser: u(r) })));
+
 router.post("/analyzers/:id/ingest-key", ...write, h((r) => svc.createIngestKeyService({ id: r.params.id, authUser: u(r) })));
 router.delete("/analyzers/:id/ingest-key", ...write, h((r) => svc.revokeIngestKeyService({ id: r.params.id, authUser: u(r) })));
 

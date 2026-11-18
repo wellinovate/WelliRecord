@@ -38,6 +38,8 @@ const labOrderSchema = new Schema(
     reagentsDeductedAt: Date,
     reagentShortfalls: { type: [Schema.Types.Mixed], default: undefined },
     // Values posted by an instrument, waiting for a person to load and save them.
+    // The analyser that produced the result, if any. Used to check its daily quality control.
+    analyzerId: { type: Schema.Types.ObjectId, ref: "LabAnalyzer", default: undefined },
     instrumentResults: { type: Schema.Types.Mixed, default: undefined },
     // Senior review before release to the patient.
     approval: { type: Schema.Types.Mixed, default: undefined },
