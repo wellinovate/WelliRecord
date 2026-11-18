@@ -4,6 +4,9 @@ import {
   updateRadiologyOrderStatusService,
   uploadRadiologyImageService,
   publishRadiologyReportService,
+  reviewRadiologyReportService,
+  setRadiologyNoteService,
+  releaseRadiologyReportService,
 } from "./radiology_order_service.js";
 import { getRadiologyOrdersQuerySchema } from "./radiology_order_validation.js";
 
@@ -39,7 +42,7 @@ export const updateRadiologyOrderStatusController = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.validated;
-    const result = await updateRadiologyOrderStatusService({ id, status });
+    const result = await updateRadiologyOrderStatusService({ id, status, authUser: req.user });
     return res.status(200).json({
       success: true,
       message: "Radiology order status updated",
@@ -86,3 +89,25 @@ export const publishRadiologyReportController = async (req, res, next) => {
     next(error);
   }
 };
+
+const wrap = (fn, message) => async (req, res, next) => {
+  try {
+    const data = await fn(req);
+    return res.status(200).json({ success: true, message, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reviewRadiologyReportController = wrap(
+  (req) => reviewRadiologyReportService({ id: req.params.id, payload: req.body || {}, authUser: req.user }),
+  "Review saved",
+);
+export const setRadiologyNoteController = wrap(
+  (req) => setRadiologyNoteService({ id: req.params.id, payload: req.body || {}, authUser: req.user }),
+  "Note saved",
+);
+export const releaseRadiologyReportController = wrap(
+  (req) => releaseRadiologyReportService({ id: req.params.id, authUser: req.user }),
+  "Report released",
+);
