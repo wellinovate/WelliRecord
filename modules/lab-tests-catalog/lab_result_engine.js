@@ -224,6 +224,7 @@ export const processResults = (testDef, entries, ctx = {}) => {
         value,
         dp: a.dp ?? 1,
         refText: rangeText(range, a.unit) || a.refNote || "",
+        rangeSource: a.overridden ? "lab" : "default",
         flag: ev.flag,
         critical: ev.critical,
         abnormal: ev.flag != null && ev.flag !== "N",

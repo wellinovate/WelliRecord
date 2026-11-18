@@ -33,6 +33,8 @@ const labOrderSchema = new Schema(
 
     // Entered values with unit, reference text and flag, produced by lab_result_engine.js.
     results: { type: [Schema.Types.Mixed], default: undefined },
+    // Large changes from the same patient's previous result of this test (see lab_delta_rules.js).
+    deltaFlags: { type: [Schema.Types.Mixed], default: undefined },
 
     category: {
       type: String,

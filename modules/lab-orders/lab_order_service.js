@@ -6,6 +6,11 @@ import { canTransition, canEnterResult, canVerify, isSelfVerified, generateBarco
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { STRUCTURED_TESTS } from "../lab-tests-catalog/lab_test_catalog_v2.js";
 import { processResults, patientContext, summarise, summariseRanges, GENERIC_TEST } from "../lab-tests-catalog/lab_result_engine.js";
+import { loadOverrides } from "../lab-ranges/lab_range_service.js";
+import { applyOverrides } from "../lab-ranges/lab_range_rules.js";
+import { deltaChecks } from "./lab_delta_rules.js";
+import { LabCriticalAlert } from "./lab_critical_model.js";
+import { sendSms } from "../../shared/utils/termii.js";
 import { getIO } from "../../shared/realtime/socket.js";
 
 const broadcast = (operationType, order) => {
@@ -25,6 +30,7 @@ const serializeOrder = (item) => ({
   testName: item.testName,
   testKey: item.testKey,
   results: item.results,
+  deltaFlags: item.deltaFlags,
   category: item.category,
   status: item.status,
   priority: item.priority,
@@ -86,6 +92,84 @@ const findScopedOrder = async (id, organizationIds) => {
 
 const pushHistory = (order, status, scope) => {
   order.stageHistory.push({ status, at: new Date(), byUserId: scope.userId, byName: scope.userName });
+};
+
+
+// The test definition for an order with the lab's own ranges applied, and the same patient's
+// last verified result of this test (for the delta check).
+const definitionFor = async (order) => {
+  if (!order.testKey) return GENERIC_TEST;
+  const base = STRUCTURED_TESTS.find((t) => t.key === order.testKey);
+  if (!base) return null;
+  return applyOverrides(base, await loadOverrides(order.organizationId, order.testKey));
+};
+
+const deltasFor = async (order, rows) => {
+  if (!order.testKey || !rows?.length) return [];
+  const prev = await labOrderModel
+    .findOne({
+      _id: { $ne: order._id }, patientId: order.patientId, organizationId: order.organizationId, testKey: order.testKey,
+      status: { $in: ["verified", "released", "delivered"] }, recordStatus: "active", "results.0": { $exists: true },
+    })
+    .sort({ verifiedAt: -1 })
+    .select("results verifiedAt")
+    .lean();
+  return prev ? deltaChecks(rows, prev.results, prev.verifiedAt) : [];
+};
+
+// Writes the critical value to the log and tries to text the requesting doctor. A failed
+// text never blocks saving the result; the log shows it and someone has to phone instead.
+const recordCritical = async (order, patientName) => {
+  if (!order.isCritical) {
+    await LabCriticalAlert.deleteOne({ orderId: order._id, status: "open" });
+    return;
+  }
+  const values = (order.results || []).filter((r) => r.critical).map((r) => ({ name: r.name, value: r.value, unit: r.unit, flag: r.flag }));
+  const existing = await LabCriticalAlert.findOne({ orderId: order._id });
+  if (existing?.sms === "sent" && existing.status === "open") {
+    existing.values = values;
+    await existing.save();
+    return;
+  }
+  let sms = "no_phone";
+  let smsError = "";
+  if (order.doctorPhone) {
+    try {
+      await sendSms({ phoneNumber: order.doctorPhone, message: `CRITICAL LAB VALUE: ${patientName || "A patient"} - ${order.testName}. Check WelliRecord or call the lab now.` });
+      sms = "sent";
+    } catch (e) {
+      sms = "failed";
+      smsError = String(e?.message || "SMS failed").slice(0, 200);
+    }
+  }
+  await LabCriticalAlert.findOneAndUpdate(
+    { orderId: order._id },
+    {
+      $set: { organizationId: order.organizationId, patientId: order.patientId, patientName: patientName || "", testName: order.testName, values, enteredByName: order.enteredByName || "", doctorName: order.doctorName || "", sms, smsError },
+      $setOnInsert: { status: "open" },
+    },
+    { upsert: true },
+  );
+};
+
+export const listCriticalAlertsService = async ({ status, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  const filter = { organizationId: { $in: scope.organizationIds } };
+  if (status === "open" || status === "acknowledged") filter.status = status;
+  return LabCriticalAlert.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+};
+
+export const acknowledgeCriticalAlertService = async ({ id, payload, authUser }) => {
+  const scope = await resolveLabScope(authUser);
+  if (!mongoose.Types.ObjectId.isValid(id)) throw httpError("Alert not found", 404);
+  const alert = await LabCriticalAlert.findOne({ _id: id, organizationId: { $in: scope.organizationIds } });
+  if (!alert) throw httpError("Alert not found", 404);
+  const notifiedTo = String(payload?.notifiedTo || "").trim();
+  if (!notifiedTo) throw httpError("Say who was told.", 400);
+  if (!["phone", "sms", "in_person", "other"].includes(payload?.method)) throw httpError("Say how they were told.", 400);
+  Object.assign(alert, { status: "acknowledged", notifiedTo: notifiedTo.slice(0, 200), method: payload.method, note: String(payload.note || "").slice(0, 500), acknowledgedBy: scope.userName, acknowledgedAt: new Date() });
+  await alert.save();
+  return alert.toObject();
 };
 
 export const createLabOrderService = async ({ payload, authUser }) => {
@@ -207,13 +291,13 @@ export const updateLabOrderStatusService = async ({ id, status, reason, authUser
 export const previewLabOrderResultService = async ({ id, payload, authUser }) => {
   const scope = await resolveLabScope(authUser);
   const order = await findScopedOrder(id, scope.organizationIds);
-  const def = order.testKey ? STRUCTURED_TESTS.find((t) => t.key === order.testKey) : GENERIC_TEST;
+  const def = await definitionFor(order);
   if (!def) throw httpError("This order's test is no longer in the catalog.", 409);
   const profile = await UserProfile.findById(order.patientId).select("gender dateOfBirth").lean();
   const out = processResults(def, payload.results || [], patientContext(profile || {}));
   // "Enter at least one result" is not an error while the form is still empty.
   const errors = out.errors.filter((e) => e !== "Enter at least one result.");
-  return { results: out.results, isCritical: out.isCritical, errors };
+  return { results: out.results, isCritical: out.isCritical, errors, deltaFlags: await deltasFor(order, out.results) };
 };
 
 export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
@@ -226,7 +310,7 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
 
   // Structured entry: flags, critical status and calculated values come from the server.
   if (payload.results) {
-    const def = order.testKey ? STRUCTURED_TESTS.find((t) => t.key === order.testKey) : GENERIC_TEST;
+    const def = await definitionFor(order);
     if (!def) throw httpError("This order's test is no longer in the catalog. Use the plain result fields.", 409);
     const profile = await UserProfile.findById(order.patientId).select("gender dateOfBirth").lean();
     const out = processResults(def, payload.results, patientContext(profile || {}));
@@ -235,6 +319,7 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
     order.measuredValue = summarise(out.results);
     order.normalRange = summariseRanges(out.results);
     order.isCritical = out.isCritical;
+    order.deltaFlags = await deltasFor(order, out.results);
     if (payload.interpretation !== undefined) order.interpretation = payload.interpretation;
   }
 
@@ -255,6 +340,9 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
   order.status = "quality-control";
   pushHistory(order, "quality-control", scope);
   await order.save();
+
+  const pr = await UserProfile.findById(order.patientId).select("fullName firstName lastName").lean();
+  await recordCritical(order, pr?.fullName || [pr?.firstName, pr?.lastName].filter(Boolean).join(" "));
 
   const serialized = serializeOrder(order);
   broadcast("update", serialized);

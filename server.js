@@ -43,6 +43,7 @@ import { startFollowUpReminderScheduler } from "./modules/encounter/encounter_no
 import { startPreventiveCareScheduler } from "./modules/preventive-care/preventive_care_notifications.js";
 import { startMedicationReminderScheduler } from "./modules/medications/medication_notifications.js";
 import http from "http";
+import labRangeRoutes from "./modules/lab-ranges/lab_range_routes.js";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import radiologyOrderRoutes from "./modules/radiology-orders/radiology_order_routes.js";
 import billingRoutes from "./modules/billing/billing_routes.js";
@@ -162,6 +163,7 @@ app.use("/api/v1/diagnoses", diagnosisRoutes);
 app.use("/api/v1/lab-results", labResultRoutes);
 app.use("/api/v1/lab-documents", labDocumentProxyRoutes);
 app.use("/api/v1/lab-orders", labOrderRoutes);
+app.use("/api/v1/lab-ranges", labRangeRoutes);
 app.use("/api/v1/radiology-orders", radiologyOrderRoutes);
 app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/lab-tests-catalog", labTestCatalogRoutes);
