@@ -14,6 +14,8 @@ import { loadOverrides } from "../lab-ranges/lab_range_service.js";
 import { applyOverrides } from "../lab-ranges/lab_range_rules.js";
 import { deltaChecks } from "./lab_delta_rules.js";
 import { deductReagentsForOrder } from "../lab-equipment/lab_equipment_automation.js";
+import { LabPrice } from "../lab-prices/lab_price_model.js";
+import { resolvePrice } from "../lab-prices/lab_price_rules.js";
 import { LabAnalyzer, LabQcRun } from "../lab-equipment/lab_equipment_models.js";
 import { qcGate } from "../lab-equipment/lab_qc_rules.js";
 import { LabCriticalAlert } from "./lab_critical_model.js";
@@ -212,6 +214,10 @@ export const createLabOrderService = async ({ payload, authUser }) => {
 
     const organizationId = actor.isOrganizationActor ? actor.organizationId : null;
 
+    // An order with no price takes the lab's own price for the test, if it has one.
+    const priceList = organizationId && !(Number(payload.price) > 0) ? await LabPrice.find({ organizationId }).select("key price").lean() : [];
+    const orderPrice = resolvePrice(payload.price, priceList, payload.testKey, payload.testName);
+
     const docs = await labOrderModel.create(
       [
         {
@@ -233,7 +239,7 @@ export const createLabOrderService = async ({ payload, authUser }) => {
           doctorName: payload.doctorName || undefined,
           doctorPhone: payload.doctorPhone || undefined,
           collector: payload.collector || undefined,
-          price: payload.price || 0,
+          price: orderPrice,
           paymentStatus: payload.paymentStatus || "pending",
           notes: payload.notes || undefined,
         },
