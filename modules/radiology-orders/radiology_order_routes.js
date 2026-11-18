@@ -10,6 +10,9 @@ import {
   updateRadiologyOrderStatusController,
   uploadRadiologyImageController,
   publishRadiologyReportController,
+  reviewRadiologyReportController,
+  setRadiologyNoteController,
+  releaseRadiologyReportController,
 } from "./radiology_order_controller.js";
 import { createUpload, RADIOLOGY_MIME_TYPES } from "../../shared/middlewares/upload.js";
 import {
@@ -66,6 +69,30 @@ router.patch(
   requirePermission("write_radiology_reports"),
   validate(publishRadiologyReportSchema),
   publishRadiologyReportController,
+);
+
+router.post(
+  "/:id/review",
+  protect,
+  restrictClinicalScope("radiology"),
+  requirePermission("approve_radiology_reports"),
+  reviewRadiologyReportController,
+);
+
+router.put(
+  "/:id/patient-note",
+  protect,
+  restrictClinicalScope("radiology"),
+  requirePermission("write_radiology_reports"),
+  setRadiologyNoteController,
+);
+
+router.post(
+  "/:id/release",
+  protect,
+  restrictClinicalScope("radiology"),
+  requirePermission("write_radiology_reports"),
+  releaseRadiologyReportController,
 );
 
 export default router;
