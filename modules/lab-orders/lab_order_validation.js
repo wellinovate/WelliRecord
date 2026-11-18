@@ -48,6 +48,7 @@ export const enterLabOrderResultSchema = z.object({
   normalRange: z.string().trim().max(200).optional(),
   interpretation: z.string().trim().max(500).optional(),
   isCritical: z.boolean().optional(),
+  analyzerId: z.string().trim().max(40).optional(),
   // Structured entries: one per analyte. The server computes flags, critical status and calculated values.
   results: z
     .array(
