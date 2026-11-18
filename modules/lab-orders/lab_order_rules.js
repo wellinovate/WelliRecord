@@ -89,8 +89,24 @@ const PREFIXED_TESTS = new Set(["urinalysis", "semen", "stool_re"]);
 // One patient record per result row, so the vault can show trends. Numeric rows keep the plain
 // analyte name; text and choice rows, and tests whose names would collide, carry the test name.
 export const buildPatientRecords = (order) => {
-  const note = order?.patientNote?.text ? `Note from the laboratory: ${order.patientNote.text}` : undefined;
-  return (order?.results || []).map((r) => {
+  const labNote = order?.patientNote?.text ? String(order.patientNote.text).slice(0, 600) : undefined;
+  const rows = order?.results || [];
+  if (!rows.length) {
+    // Older orders hold one free-text value. It goes out as a single record.
+    const value = String(order?.measuredValue || "").trim();
+    if (!value) return [];
+    const text = String(order?.interpretation || "").trim();
+    return [{
+      testName: String(order.testName || "Lab result").slice(0, 250),
+      category: order.category || "other",
+      resultValue: value.slice(0, 200),
+      referenceRange: order.normalRange ? { text: String(order.normalRange).slice(0, 100) } : undefined,
+      interpretation: order.isCritical ? "critical" : "unknown",
+      notes: text ? `Laboratory comment: ${text}`.slice(0, 1500) : undefined,
+      labNote,
+    }];
+  }
+  return rows.map((r) => {
     const numeric = r.type === "numeric" || r.type === "calculated";
     const prefix = !numeric || PREFIXED_TESTS.has(order.testKey);
     const testName = (prefix ? `${order.testName}: ${r.name}` : r.name).slice(0, 250);
@@ -104,7 +120,7 @@ export const buildPatientRecords = (order) => {
       unit: numeric ? r.unit || undefined : undefined,
       referenceRange: r.refText ? { text: String(r.refText).slice(0, 100) } : undefined,
       interpretation: r.type === "sensitivity" ? "unknown" : FLAG_TO_INTERPRETATION[r.flag] || "unknown",
-      notes: note,
+      labNote,
     };
   });
 };

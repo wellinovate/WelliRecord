@@ -465,9 +465,8 @@ export const releaseLabOrderService = async ({ id, authUser }) => {
   const order = await findScopedOrder(id, scope.organizationIds);
   if (order.transmittedAt) throw httpError("This result has already been released.", 409);
   if (!canRelease(order)) throw httpError("A senior must approve the result before it is released to the patient.", 409);
-  if (!order.results?.length) throw httpError("There are no structured results to send. Enter the result in the result form first.", 409);
-
   const records = buildPatientRecords(order);
+  if (!records.length) throw httpError("There is no result to send. Enter the result first.", 409);
   const collected = (order.stageHistory || []).find((h) => h.status === "collected")?.at || null;
   const ids = [];
   for (const rec of records) {

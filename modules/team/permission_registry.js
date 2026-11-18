@@ -129,6 +129,14 @@ const ROLE_DEFAULTS = {
     "view_radiology_orders", "create_radiology_orders", "write_radiology_reports",
     "view_roster",
   ],
+  // Everything a lab technician can do, plus review and approval of results before release.
+  lab_senior: [
+    "view_patients",
+    "view_lab_orders", "create_lab_orders", "write_lab_results", "approve_lab_results",
+    "view_radiology_orders", "create_radiology_orders", "write_radiology_reports",
+    "view_reports",
+    "view_roster",
+  ],
   pharmacist: [
     "view_patients",
     "view_prescriptions", "dispense_medications",

@@ -123,6 +123,7 @@ export const createLabResultService = async ({ payload, authUser }) => {
 
           verificationStatus: payload.verificationStatus || "provider-reviewed",
           notes: payload.notes || undefined,
+          labNote: payload.labNote || undefined,
           attachments: payload.attachments || [],
         },
       ],
@@ -152,6 +153,7 @@ export const createLabResultService = async ({ payload, authUser }) => {
       verificationStatus: created.verificationStatus,
       attachments: created.attachments || [],
       notes: created.notes,
+      labNote: created.labNote || null,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
     };
@@ -218,6 +220,7 @@ const access = await resolveConsentAccess({
       verificationStatus: item.verificationStatus || null,
       attachments: item.attachments || [],
       notes: item.notes || null,
+      labNote: item.labNote || null,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     })),
@@ -291,6 +294,7 @@ export const getAllPatientLabResultsService = async ({
       verificationStatus: item.verificationStatus || null,
       attachments: item.attachments || [],
       notes: item.notes || null,
+      labNote: item.labNote || null,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     })),

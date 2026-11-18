@@ -60,7 +60,17 @@ test("patient records: one per row, plain names for numbers, prefixed for text, 
   assert.equal(recs[0].unit, "g/dL");
   assert.equal(recs[2].unit, undefined);
   assert.equal(recs[3].resultValue, "Ciprofloxacin S; Gentamicin R");
-  assert.ok(recs.every((r) => r.notes === "Note from the laboratory: Please repeat in 2 weeks."));
+  assert.ok(recs.every((r) => r.labNote === "Please repeat in 2 weeks."));
   const urine = buildPatientRecords({ testKey: "urinalysis", testName: "Urinalysis", results: [{ type: "numeric", name: "pH", value: 6, unit: "" }] });
   assert.equal(urine[0].testName, "Urinalysis: pH");
+});
+
+test("an order with only free text is sent as one record, critical flag kept", () => {
+  const recs = buildPatientRecords({ testName: "Widal", category: "serology", measuredValue: "Positive 1:160", normalRange: "Negative", interpretation: "Possible recent infection", isCritical: false, patientNote: { text: "Come back for review." } });
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].resultValue, "Positive 1:160");
+  assert.equal(recs[0].labNote, "Come back for review.");
+  assert.match(recs[0].notes, /Possible recent infection/);
+  assert.equal(buildPatientRecords({ testName: "X", isCritical: true, measuredValue: "9" })[0].interpretation, "critical");
+  assert.deepEqual(buildPatientRecords({ testName: "X" }), []);
 });

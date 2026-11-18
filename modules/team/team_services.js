@@ -53,7 +53,7 @@ export const getRoleCatalogService = async ({ organizationId }) => {
 // come from the role default versus ones the admin explicitly granted.
 export const getPermissionRegistryService = () => {
   const roles = [
-    "provider_admin", "doctor", "clinician", "nurse", "lab_tech",
+    "provider_admin", "doctor", "clinician", "nurse", "lab_tech", "lab_senior",
     "pharmacist", "frontdesk", "insurer_agent", "support_staff",
   ];
   const roleDefaults = Object.fromEntries(
