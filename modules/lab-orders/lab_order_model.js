@@ -34,6 +34,11 @@ const labOrderSchema = new Schema(
     // Entered values with unit, reference text and flag, produced by lab_result_engine.js.
     results: { type: [Schema.Types.Mixed], default: undefined },
     // Large changes from the same patient's previous result of this test (see lab_delta_rules.js).
+    // Reagent stock is deducted once, when the first result is entered (see lab_equipment_automation.js).
+    reagentsDeductedAt: Date,
+    reagentShortfalls: { type: [Schema.Types.Mixed], default: undefined },
+    // Values posted by an instrument, waiting for a person to load and save them.
+    instrumentResults: { type: Schema.Types.Mixed, default: undefined },
     deltaFlags: { type: [Schema.Types.Mixed], default: undefined },
 
     category: {
