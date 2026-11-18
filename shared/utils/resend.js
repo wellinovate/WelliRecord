@@ -642,3 +642,26 @@ export const sendWellipayCodeEmail = async ({ email, text }) => {
   }
   return response;
 };
+
+export const sendLabStockAlertEmail = async ({ email, items = [], urgent = 0 }) => {
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const list = items.slice(0, 50).map((t) => `<li style="margin:4px 0;">${esc(t)}</li>`).join("");
+  const response = await resend.emails.send({
+    from: "WelliRecord <noreply@send.wellirecord.com>",
+    to: email,
+    subject: urgent ? "Lab stock needs attention now" : "Lab stock to reorder or check",
+    html: `
+      <div style="font-family: Arial;">
+        <h2>Reagents and analysers</h2>
+        <p>These items in your register need attention:</p>
+        <ul>${list}</ul>
+        <p>Open Orders &gt; Labs &gt; Analyzers &amp; Reagents to update stock or calibration dates. You get this message when the list changes, and once a week while it stays the same.</p>
+      </div>
+    `,
+  });
+  if (response.error) {
+    console.error("Resend rejected the lab stock email:", response.error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+  return response;
+};

@@ -42,6 +42,7 @@ import { startAppointmentReminderScheduler } from "./modules/appointments/appoin
 import { startFollowUpReminderScheduler } from "./modules/encounter/encounter_notifications.js";
 import { startPreventiveCareScheduler } from "./modules/preventive-care/preventive_care_notifications.js";
 import { startMedicationReminderScheduler } from "./modules/medications/medication_notifications.js";
+import { startLabStockScheduler } from "./modules/lab-equipment/lab_stock_alerts.js";
 import http from "http";
 import labInstrumentRoutes from "./modules/lab-equipment/lab_instrument_routes.js";
 import labEquipmentRoutes from "./modules/lab-equipment/lab_equipment_routes.js";
@@ -286,4 +287,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   startFollowUpReminderScheduler();
   startPreventiveCareScheduler();
   startMedicationReminderScheduler();
+  startLabStockScheduler();
 });
