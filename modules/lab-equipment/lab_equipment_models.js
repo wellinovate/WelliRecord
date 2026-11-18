@@ -94,3 +94,26 @@ export const LabAnalyzer = mongoose.models.LabAnalyzer || mongoose.model("LabAna
 export const LabAnalyzerEvent = mongoose.models.LabAnalyzerEvent || mongoose.model("LabAnalyzerEvent", eventSchema);
 export const LabReagent = mongoose.models.LabReagent || mongoose.model("LabReagent", reagentSchema);
 export const LabReagentMovement = mongoose.models.LabReagentMovement || mongoose.model("LabReagentMovement", movementSchema);
+
+const qcRunSchema = new Schema(
+  {
+    organizationId: { ...oid, required: true, index: true },
+    analyzerId: { ...oid, ref: "LabAnalyzer", required: true, index: true },
+    controlName: { type: String, required: true },
+    lotNumber: { type: String, default: "" },
+    analyte: { type: String, required: true },
+    unit: { type: String, default: "" },
+    value: { type: Number, required: true },
+    mean: { type: Number, required: true },
+    sd: { type: Number, required: true },
+    z: { type: Number, required: true },
+    status: { type: String, enum: ["pass", "warn", "fail"], required: true },
+    violations: { type: [String], default: [] },
+    runAt: { type: Date, required: true, index: true },
+    note: { type: String, default: "" },
+    byName: { type: String, default: "" },
+  },
+  { timestamps: true },
+);
+qcRunSchema.index({ analyzerId: 1, controlName: 1, analyte: 1, runAt: -1 });
+export const LabQcRun = mongoose.models.LabQcRun || mongoose.model("LabQcRun", qcRunSchema);

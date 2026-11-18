@@ -16,6 +16,8 @@ import { deltaChecks } from "./lab_delta_rules.js";
 import { deductReagentsForOrder } from "../lab-equipment/lab_equipment_automation.js";
 import { LabPrice } from "../lab-prices/lab_price_model.js";
 import { resolvePrice } from "../lab-prices/lab_price_rules.js";
+import { LabAnalyzer, LabQcRun } from "../lab-equipment/lab_equipment_models.js";
+import { qcGate } from "../lab-equipment/lab_qc_rules.js";
 import { LabCriticalAlert } from "./lab_critical_model.js";
 import { sendSms } from "../../shared/utils/termii.js";
 import { getIO } from "../../shared/realtime/socket.js";
@@ -38,6 +40,7 @@ const serializeOrder = (item) => ({
   testKey: item.testKey,
   results: item.results,
   deltaFlags: item.deltaFlags,
+  analyzerId: item.analyzerId,
   approval: item.approval,
   reviewLog: item.reviewLog,
   returnReason: item.returnReason,
@@ -351,6 +354,17 @@ export const enterLabOrderResultService = async ({ id, payload, authUser }) => {
   if (!payload.results && payload.interpretation !== undefined) order.interpretation = payload.interpretation;
   if (!payload.results && payload.isCritical !== undefined) order.isCritical = payload.isCritical;
 
+  if (payload.analyzerId === undefined && !order.analyzerId && order.instrumentResults?.analyzerId) order.analyzerId = order.instrumentResults.analyzerId;
+  if (payload.analyzerId !== undefined) {
+    if (!payload.analyzerId) order.analyzerId = undefined;
+    else {
+      if (!mongoose.Types.ObjectId.isValid(payload.analyzerId)) throw httpError("Choose an analyser from the list.", 400);
+      const an = await LabAnalyzer.findOne({ _id: payload.analyzerId, organizationId: { $in: scope.organizationIds }, isActive: true }).select("_id").lean();
+      if (!an) throw httpError("That analyser is not in your register.", 400);
+      order.analyzerId = an._id;
+    }
+  }
+
   order.enteredBy = scope.userId;
   order.enteredByName = scope.userName;
   order.enteredAt = new Date();
@@ -385,6 +399,15 @@ export const verifyLabOrderResultService = async ({ id, authUser }) => {
 
   if (!canVerify(order)) {
     throw httpError("Only an entered result waiting in quality control can be verified.", 409);
+  }
+
+  if (order.analyzerId) {
+    const runs = await LabQcRun.find({ analyzerId: order.analyzerId, runAt: { $gte: new Date(Date.now() - 24 * 3600 * 1000) } }).select("controlName analyte status runAt").lean();
+    const gate = qcGate(runs);
+    if (gate.blocked) {
+      const names = gate.failing.map((r) => `${r.controlName} (${r.analyte})`).join(", ");
+      throw httpError(`The analyser's quality control is failing: ${names}. Fix it and run the control again before verifying results from it.`, 409);
+    }
   }
 
   order.verifiedBy = scope.userName;
