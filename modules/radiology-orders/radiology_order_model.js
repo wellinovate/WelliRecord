@@ -137,6 +137,20 @@ const radiologyOrderSchema = new Schema(
       reportedBy: { type: Schema.Types.ObjectId, ref: "Account", default: null },
       reportedAt: { type: Date, default: null },
     },
+
+    // Senior review before the patient sees the report.
+    review: {
+      state: { type: String, enum: ["approved", "returned"], default: undefined },
+      byName: { type: String, default: undefined },
+      byUserId: { type: String, default: undefined },
+      at: { type: Date, default: undefined },
+      comment: { type: String, default: undefined },
+    },
+    reviewLog: { type: [Schema.Types.Mixed], default: [] },
+    returnReason: { type: String, trim: true, maxlength: 1000 },
+    patientNote: { type: Schema.Types.Mixed, default: undefined },
+    releasedAt: { type: Date },
+    releasedBy: { type: String, trim: true },
   },
   { timestamps: true },
 );
