@@ -101,10 +101,10 @@ export const cleanSubscriptionInput = (b = {}) => {
 };
 
 // ---------- plans ----------
-// Prices are flat, per year, in kobo. Change them here only.
+// Flat prices in kobo for each billing period of `months`. Laboratories pay per year, other providers per month. Change them here only.
 export const PLANS = {
   laboratory: { key: "laboratory", name: "Laboratory (annual)", amountKobo: 10_000_000, months: 12, trialDays: 0 }, // NGN 100,000
-  standard: { key: "standard", name: "Provider (annual)", amountKobo: 5_000_000, months: 12, trialDays: 30 }, // NGN 50,000 after a 30-day trial
+  standard: { key: "standard", name: "Provider (monthly)", amountKobo: 5_000_000, months: 1, trialDays: 30 }, // NGN 50,000 per month after a 30-day trial
 };
 
 // Organisation types that pay. Insurers, government, NGOs, vendors and the like do not get a subscription.

@@ -69,11 +69,11 @@ test("admin input is validated", () => {
 
 import { PLANS, planForOrgType, trialSubscriptionFields } from "../subscription_rules.js";
 
-test("prices are flat per year in kobo", () => {
+test("laboratories pay N100,000 a year, other providers N50,000 a month", () => {
   assert.equal(PLANS.laboratory.amountKobo, 10_000_000);
   assert.equal(PLANS.standard.amountKobo, 5_000_000);
   assert.equal(PLANS.laboratory.months, 12);
-  assert.equal(PLANS.standard.months, 12);
+  assert.equal(PLANS.standard.months, 1);
 });
 
 test("labs get the laboratory plan, other providers the standard plan, non-providers none", () => {
@@ -103,4 +103,9 @@ test("a trial lapses like any subscription: 30 days, then grace, then suspended"
   assert.equal(subscriptionState(s, new Date("2026-12-10T00:00:00Z")), "active");
   assert.equal(subscriptionState(s, new Date("2026-12-20T00:00:00Z")), "grace");
   assert.equal(subscriptionState(s, new Date("2026-12-24T00:00:00Z")), "suspended");
+});
+
+test("a monthly provider who pays continues month by month from the old end date", () => {
+  const s = { periodEnd: new Date("2026-12-18T00:00:00Z"), graceDays: 5 };
+  assert.equal(nextPeriodEnd(s, PLANS.standard.months, new Date("2026-12-20T00:00:00Z")).toISOString(), "2027-01-18T00:00:00.000Z");
 });

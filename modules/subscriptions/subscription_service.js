@@ -58,6 +58,7 @@ const notify = async (organizationId, kind, sub, extra = {}) => {
     newPeriodEndOn: sub.periodEnd,
     trial: Boolean(sub.trial),
     amountKobo: sub.amountKobo,
+    periodMonths: PLANS[sub.planKey]?.months ?? 12,
     ...extra,
   };
   const titles = {
@@ -125,7 +126,7 @@ export const recordSubscriptionPayment = async ({ organizationId, months, amount
 
   const wasState = subscriptionState(sub, now);
   const end = nextPeriodEnd(sub, months, now);
-  sub.payments.push({ reference: ref, amountKobo: Number.isFinite(Number(amountKobo)) ? Number(amountKobo) : sub.amountKobo, months, source, recordedBy, paidAt: now, periodEndAfter: end });
+  sub.payments.push({ reference: ref, amountKobo: Number.isFinite(Number(amountKobo)) ? Number(amountKobo) : Math.round((sub.amountKobo * months) / (PLANS[sub.planKey]?.months || months)), months, source, recordedBy, paidAt: now, periodEndAfter: end });
   sub.periodEnd = end;
   sub.status = "active";
   sub.trial = false;

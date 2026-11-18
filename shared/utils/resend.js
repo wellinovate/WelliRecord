@@ -667,7 +667,7 @@ export const sendLabStockAlertEmail = async ({ email, items = [], urgent = 0 }) 
 };
 
 // Subscription notices. kind: ended | suspended | resumed | admin-ended | admin-suspended | admin-resumed
-export const sendSubscriptionNoticeEmail = async ({ email, kind, organizationName, graceEndsOn, periodEndOn, newPeriodEndOn, trial = false, amountKobo = 0 }) => {
+export const sendSubscriptionNoticeEmail = async ({ email, kind, organizationName, graceEndsOn, periodEndOn, newPeriodEndOn, trial = false, amountKobo = 0, periodMonths = 12 }) => {
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const org = esc(organizationName || "your organisation");
   const fmt = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Lagos" }) : "");
@@ -675,7 +675,7 @@ export const sendSubscriptionNoticeEmail = async ({ email, kind, organizationNam
   const texts = {
     ended: {
       subject: trial ? "Your WelliRecord free trial has ended" : "Your WelliRecord subscription has ended",
-      body: `<p>The WelliRecord ${trial ? "free trial" : "subscription"} for <b>${org}</b> ended on ${fmt(periodEndOn)}.${trial && price ? ` To continue, pay the annual subscription of ${price}.` : ""}</p><p>You have until <b>${fmt(graceEndsOn)}</b> to renew. Everything keeps working until then. If we do not receive payment by that date, your provider profile is suspended until you pay.</p>`,
+      body: `<p>The WelliRecord ${trial ? "free trial" : "subscription"} for <b>${org}</b> ended on ${fmt(periodEndOn)}.${trial && price ? ` To continue, pay the subscription of ${price} ${periodMonths === 1 ? "per month" : periodMonths === 12 ? "per year" : `for ${periodMonths} months`}.` : ""}</p><p>You have until <b>${fmt(graceEndsOn)}</b> to renew. Everything keeps working until then. If we do not receive payment by that date, your provider profile is suspended until you pay.</p>`,
     },
     suspended: {
       subject: "Your WelliRecord provider profile is suspended",
