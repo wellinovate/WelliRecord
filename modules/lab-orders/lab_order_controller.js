@@ -4,6 +4,8 @@ import {
   updateLabOrderStatusService,
   enterLabOrderResultService,
   previewLabOrderResultService,
+  listCriticalAlertsService,
+  acknowledgeCriticalAlertService,
   verifyLabOrderResultService,
 } from "./lab_order_service.js";
 import { getLabOrdersQuerySchema } from "./lab_order_validation.js";
@@ -87,4 +89,16 @@ export const previewLabOrderResultController = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+export const listCriticalAlertsController = async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await listCriticalAlertsService({ status: req.query.status, authUser: req.user }) });
+  } catch (error) { next(error); }
+};
+
+export const acknowledgeCriticalAlertController = async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await acknowledgeCriticalAlertService({ id: req.params.id, payload: req.body, authUser: req.user }) });
+  } catch (error) { next(error); }
 };

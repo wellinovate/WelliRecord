@@ -10,6 +10,8 @@ import {
   updateLabOrderStatusController,
   enterLabOrderResultController,
   previewLabOrderResultController,
+  listCriticalAlertsController,
+  acknowledgeCriticalAlertController,
   verifyLabOrderResultController,
 } from "./lab_order_controller.js";
 import {
@@ -36,6 +38,22 @@ router.post(
   validate(createLabOrderSchema),
   requireWriteConsent("lab-results"),
   createLabOrderController,
+);
+
+router.get(
+  "/critical-alerts",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requireAnyPermission("view_lab_orders", "write_lab_results"),
+  listCriticalAlertsController,
+);
+
+router.patch(
+  "/critical-alerts/:id/acknowledge",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requirePermission("write_lab_results"),
+  acknowledgeCriticalAlertController,
 );
 
 router.patch(
