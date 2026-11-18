@@ -14,7 +14,7 @@ test("a revoke removes approval from a senior", () => {
 });
 
 test("labs and hospitals can invite the role, with a clear label", () => {
-  const lab = getRoleCatalog({ organizationType: "lab" });
+  const lab = getRoleCatalog({ organizationType: "diagnostic" });
   assert.ok(JSON.stringify(lab).includes("lab_senior"));
   assert.ok(JSON.stringify(lab).includes("Senior Lab Scientist"));
 });
