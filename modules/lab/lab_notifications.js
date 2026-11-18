@@ -98,3 +98,52 @@ export const notifyLabResultReady = async (labResultId) => {
     console.error("notifyLabResultReady failed:", err);
   }
 };
+
+// One notification for a whole released lab order, however many result rows it created.
+export const notifyLabOrderReleased = async ({ patientId, testName, isCritical, link }) => {
+  const out = { inApp: "skipped", sms: "skipped" };
+  try {
+    const patient = await UserProfile.findById(patientId).select("fullName phone accountId").lean();
+    if (!patient) return out;
+    if (patient.accountId) {
+      try {
+        await createNotification({
+          recipientAccountId: patient.accountId,
+          type: isCritical ? "critical_alert" : "lab_result",
+          title: isCritical ? "Critical lab result" : "Lab result ready",
+          body: isCritical
+            ? `A critical result for ${testName} has been released to your WelliRecord.`
+            : `Your ${testName} result is now available in your WelliRecord.`,
+          link: link || "/vault",
+        });
+        out.inApp = "sent";
+      } catch (err) {
+        console.error("Lab release in-app notification failed:", err);
+        out.inApp = "failed";
+      }
+    }
+    if (!patient.phone) return out;
+    const context = isCritical ? "critical_lab_alert" : "lab_result_ready";
+    try {
+      if (isCritical) {
+        await sendCriticalAlertSmsService({ phoneNumber: patient.phone, message: "Urgent: a critical lab result has been released to your WelliRecord. Log in now." });
+      } else {
+        const resolved = await resolveTemplatedMessage({ name: "Lab Result Ready", channel: "sms", variables: { link: link || "/vault" } });
+        if (!resolved.send) {
+          await DeliveryLog.create({ channel: "sms", status: "skipped", recipient: patient.phone, context, errorMessage: `Not sent: ${resolved.reason}` });
+          return out;
+        }
+        const { sendSms } = await import("../../shared/utils/termii.js");
+        await sendSms({ phoneNumber: patient.phone, message: resolved.body });
+      }
+      await DeliveryLog.create({ channel: "sms", status: "sent", recipient: patient.phone, context });
+      out.sms = "sent";
+    } catch (err) {
+      await DeliveryLog.create({ channel: "sms", status: "failed", recipient: patient.phone, context, errorMessage: err?.message || "Unknown error" });
+      out.sms = "failed";
+    }
+  } catch (err) {
+    console.error("notifyLabOrderReleased failed:", err);
+  }
+  return out;
+};

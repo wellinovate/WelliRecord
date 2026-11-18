@@ -10,6 +10,9 @@ import {
   updateLabOrderStatusController,
   enterLabOrderResultController,
   previewLabOrderResultController,
+  reviewLabOrderController,
+  setPatientNoteController,
+  releaseLabOrderController,
   listCriticalAlertsController,
   acknowledgeCriticalAlertController,
   verifyLabOrderResultController,
@@ -81,6 +84,30 @@ router.post(
   requirePermission("write_lab_results"),
   validate(enterLabOrderResultSchema),
   previewLabOrderResultController,
+);
+
+router.post(
+  "/:id/review",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requirePermission("approve_lab_results"),
+  reviewLabOrderController,
+);
+
+router.put(
+  "/:id/patient-note",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requirePermission("write_lab_results"),
+  setPatientNoteController,
+);
+
+router.post(
+  "/:id/release",
+  protect,
+  restrictClinicalScope("lab-orders"),
+  requirePermission("write_lab_results"),
+  releaseLabOrderController,
 );
 
 router.patch(

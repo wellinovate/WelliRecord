@@ -4,6 +4,9 @@ import {
   updateLabOrderStatusService,
   enterLabOrderResultService,
   previewLabOrderResultService,
+  reviewLabOrderService,
+  setPatientNoteService,
+  releaseLabOrderService,
   listCriticalAlertsService,
   acknowledgeCriticalAlertService,
   verifyLabOrderResultService,
@@ -102,3 +105,14 @@ export const acknowledgeCriticalAlertController = async (req, res, next) => {
     res.json({ success: true, data: await acknowledgeCriticalAlertService({ id: req.params.id, payload: req.body, authUser: req.user }) });
   } catch (error) { next(error); }
 };
+
+const wrap = (fn) => async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await fn(req) });
+  } catch (error) {
+    next(error);
+  }
+};
+export const reviewLabOrderController = wrap((r) => reviewLabOrderService({ id: r.params.id, payload: r.body, authUser: r.user }));
+export const setPatientNoteController = wrap((r) => setPatientNoteService({ id: r.params.id, payload: r.body, authUser: r.user }));
+export const releaseLabOrderController = wrap((r) => releaseLabOrderService({ id: r.params.id, authUser: r.user }));
