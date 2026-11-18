@@ -121,6 +121,8 @@ const organizationProfileSchema = new Schema(
       trim: true,
       default: null,
     },
+    // Set by the subscription sweep and cleared when payment resumes the profile.
+    subscriptionSuspended: { type: Boolean, default: false, index: true },
     verificationStatus: {
       type: String,
       enum: [

@@ -665,3 +665,50 @@ export const sendLabStockAlertEmail = async ({ email, items = [], urgent = 0 }) 
   }
   return response;
 };
+
+// Subscription notices. kind: ended | suspended | resumed | admin-ended | admin-suspended | admin-resumed
+export const sendSubscriptionNoticeEmail = async ({ email, kind, organizationName, graceEndsOn, periodEndOn, newPeriodEndOn, trial = false, amountKobo = 0, periodMonths = 12 }) => {
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const org = esc(organizationName || "your organisation");
+  const fmt = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Lagos" }) : "");
+  const price = amountKobo ? `\u20a6${(amountKobo / 100).toLocaleString("en-NG")}` : "";
+  const texts = {
+    ended: {
+      subject: trial ? "Your WelliRecord free trial has ended" : "Your WelliRecord subscription has ended",
+      body: `<p>The WelliRecord ${trial ? "free trial" : "subscription"} for <b>${org}</b> ended on ${fmt(periodEndOn)}.${trial && price ? ` To continue, pay the subscription of ${price} ${periodMonths === 1 ? "per month" : periodMonths === 12 ? "per year" : `for ${periodMonths} months`}.` : ""}</p><p>You have until <b>${fmt(graceEndsOn)}</b> to renew. Everything keeps working until then. If we do not receive payment by that date, your provider profile is suspended until you pay.</p>`,
+    },
+    suspended: {
+      subject: "Your WelliRecord provider profile is suspended",
+      body: `<p>The grace period for <b>${org}</b> ended on ${fmt(graceEndsOn)} and no payment was received. Your provider profile is suspended.</p><p>Your patients' records are not deleted. Access is restored automatically once your subscription is paid.</p>`,
+    },
+    resumed: {
+      subject: "Your WelliRecord provider profile is active again",
+      body: `<p>We received your payment. <b>${org}</b> is active again and your subscription runs to <b>${fmt(newPeriodEndOn)}</b>.</p>`,
+    },
+    "admin-ended": {
+      subject: `Subscription ended: ${organizationName}`,
+      body: `<p><b>${org}</b> subscription ended on ${fmt(periodEndOn)}. Grace period runs to ${fmt(graceEndsOn)}, then the profile is suspended automatically.</p>`,
+    },
+    "admin-suspended": {
+      subject: `Provider suspended: ${organizationName}`,
+      body: `<p><b>${org}</b> did not renew within the grace period (ended ${fmt(graceEndsOn)}) and is now suspended. It resumes automatically when a payment is recorded.</p>`,
+    },
+    "admin-resumed": {
+      subject: `Provider resumed: ${organizationName}`,
+      body: `<p><b>${org}</b> has paid and is active again until ${fmt(newPeriodEndOn)}.</p>`,
+    },
+  };
+  const t = texts[kind];
+  if (!t) throw new Error("Unknown subscription notice");
+  const response = await resend.emails.send({
+    from: "WelliRecord <noreply@send.wellirecord.com>",
+    to: email,
+    subject: t.subject,
+    html: `<div style="font-family: Arial;"><h2>${esc(t.subject)}</h2>${t.body}</div>`,
+  });
+  if (response.error) {
+    console.error("Resend rejected the subscription email:", response.error);
+    throw new Error("EMAIL_SEND_FAILED");
+  }
+  return response;
+};

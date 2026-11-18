@@ -1,3 +1,4 @@
+import { startTrialForProfile } from "../subscriptions/subscription_service.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { AppError } from "../../shared/errors/AppError.js";
 
@@ -74,6 +75,8 @@ const applyDecision = async ({ id, reviewerId, status, note, setLicensed }) => {
   }
 
   await profile.save();
+
+  if (status === "approved") await startTrialForProfile(profile);
 
   return toVerificationRequest(profile.toObject());
 };

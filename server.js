@@ -48,6 +48,8 @@ import labInstrumentRoutes from "./modules/lab-equipment/lab_instrument_routes.j
 import labEquipmentRoutes from "./modules/lab-equipment/lab_equipment_routes.js";
 import labRangeRoutes from "./modules/lab-ranges/lab_range_routes.js";
 import labPriceRoutes from "./modules/lab-prices/lab_price_routes.js";
+import subscriptionRoutes from "./modules/subscriptions/subscription_routes.js";
+import { startSubscriptionScheduler } from "./modules/subscriptions/subscription_service.js";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import radiologyOrderRoutes from "./modules/radiology-orders/radiology_order_routes.js";
 import billingRoutes from "./modules/billing/billing_routes.js";
@@ -169,6 +171,7 @@ app.use("/api/v1/lab-documents", labDocumentProxyRoutes);
 app.use("/api/v1/lab-orders", labOrderRoutes);
 app.use("/api/v1/lab-ranges", labRangeRoutes);
 app.use("/api/v1/lab-prices", labPriceRoutes);
+app.use("/api/v1/subscriptions", subscriptionRoutes);
 app.use("/api/v1/lab-equipment", labEquipmentRoutes);
 app.use("/api/v1/lab-instruments", labInstrumentRoutes);
 app.use("/api/v1/radiology-orders", radiologyOrderRoutes);
@@ -290,4 +293,5 @@ httpServer.listen(PORT, "0.0.0.0", () => {
   startPreventiveCareScheduler();
   startMedicationReminderScheduler();
   startLabStockScheduler();
+  startSubscriptionScheduler();
 });
