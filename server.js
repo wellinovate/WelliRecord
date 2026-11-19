@@ -49,6 +49,7 @@ import labEquipmentRoutes from "./modules/lab-equipment/lab_equipment_routes.js"
 import labRangeRoutes from "./modules/lab-ranges/lab_range_routes.js";
 import labPriceRoutes from "./modules/lab-prices/lab_price_routes.js";
 import subscriptionRoutes from "./modules/subscriptions/subscription_routes.js";
+import { subscriptionWebhook, subscriptionCheckout } from "./modules/subscriptions/subscription_paystack.js";
 import { startSubscriptionScheduler } from "./modules/subscriptions/subscription_service.js";
 import labOrderRoutes from "./modules/lab-orders/lab_order_routes.js";
 import radiologyOrderRoutes from "./modules/radiology-orders/radiology_order_routes.js";
@@ -108,6 +109,8 @@ const corsOptions = {
 // WelliPay partner API. Mounted first: it needs the raw body for signature checks
 // and is called server to server, so browser CORS rules do not apply.
 app.use("/wellipay/v1", wellipayPartnerRoutes);
+// Paystack subscription webhook: raw body for the signature check, so it comes before express.json.
+app.use(subscriptionWebhook);
 
 // app use
 app.use(helmet());
@@ -171,6 +174,7 @@ app.use("/api/v1/lab-documents", labDocumentProxyRoutes);
 app.use("/api/v1/lab-orders", labOrderRoutes);
 app.use("/api/v1/lab-ranges", labRangeRoutes);
 app.use("/api/v1/lab-prices", labPriceRoutes);
+app.use("/api/v1/subscriptions", subscriptionCheckout);
 app.use("/api/v1/subscriptions", subscriptionRoutes);
 app.use("/api/v1/lab-equipment", labEquipmentRoutes);
 app.use("/api/v1/lab-instruments", labInstrumentRoutes);
