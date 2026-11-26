@@ -1,5 +1,5 @@
 import { resolveActorContext } from "../vitals/vital_service.js";
-import { findActiveAccessGrant } from "./access_grant_service.js";
+import { findActiveAccessGrant, hasOrgPatientLink } from "./access_grant_service.js";
 
 // Must run after `protect` and after `validate` (needs
 // req.validated.patientId — the parsed body, not the raw one).
@@ -44,11 +44,15 @@ export const requireWriteConsent = (category) => async (req, res, next) => {
       return next();
     }
 
-    if (actor.isOrgOwner) {
+    const patientId = req.validated?.patientId || req.body?.patientId;
+
+    if (
+      actor.isOrgOwner &&
+      patientId &&
+      (await hasOrgPatientLink({ patientId, organizationId: actor.organizationId }))
+    ) {
       return next();
     }
-
-    const patientId = req.validated?.patientId || req.body?.patientId;
 
     if (!patientId) {
       // No patientId to check consent against. Let the validator/

@@ -3,6 +3,9 @@ import { accessGrantModel } from "./access_grant_model.js";
 import { OrganizationProfile } from "../organizations/organizations_model.js";
 import { Encounter } from "../encounter/encounter_model.js";
 import { ActivityLog } from "../analytics/activity_log_model.js";
+import { labOrderModel } from "../lab-orders/lab_order_model.js";
+import { pharmacyOrderModel } from "../pharmacy-orders/pharmacy_order_model.js";
+import { PatientOrganization } from "../organizations/patient_organization_model.js";
 
 // Builds the right Mongo query for whichever ID format was submitted.
 // Patients only ever see the WR-XXXX-XXXX form (wrOrgId), so that has
@@ -453,6 +456,23 @@ export const buildClinicalAccessFilter = ({ grant, patientId, category }) => {
 // OrganizationMembership). Faking a check against data that doesn't
 // exist would just be a differently-shaped version of the problem
 // this function exists to close.
+export const hasOrgPatientLink = async ({ patientId, organizationId }) => {
+  if (!patientId || !organizationId) return false;
+  const { organizationIds } = await resolveGranteeIds({ organizationId });
+  const q = { patientId, organizationId: { $in: organizationIds } };
+  const hits = await Promise.all([
+    Encounter.exists(q),
+    labOrderModel.exists(q),
+    pharmacyOrderModel.exists(q),
+    PatientOrganization.exists({
+      organizationId: { $in: organizationIds },
+      $or: [{ patientId }, { patientIdentity: patientId }],
+      status: "active",
+    }),
+  ]);
+  return hits.some(Boolean);
+};
+
 export const resolvePatientRecordAccess = async ({
   actor,
   patientId,
@@ -464,7 +484,9 @@ export const resolvePatientRecordAccess = async ({
   }
 
   if (actor.isOrgOwner || actor.role === "provider_admin") {
-    return { allowed: true, reason: "admin" };
+    if (await hasOrgPatientLink({ patientId, organizationId: actor.organizationId })) {
+      return { allowed: true, reason: "admin" };
+    }
   }
 
   const hasEncounter = await Encounter.exists({
