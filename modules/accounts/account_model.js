@@ -146,8 +146,6 @@ const accountSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Account",
       default: null,
-      unique: true,
-      sparse: true,
     },
 
     lastLoginAt: {
@@ -207,5 +205,12 @@ accountSchema.statics.findByEmailWithPassword = function (email) {
     )
     .exec();
 };
+
+// A sparse unique index still counts an explicit null as a value, so only one
+// account could ever have practiceOf: null. Index it only when it holds an id.
+accountSchema.index(
+  { practiceOf: 1 },
+  { unique: true, partialFilterExpression: { practiceOf: { $type: "objectId" } } },
+);
 
 export const Account = mongoose.model("Account", accountSchema);
