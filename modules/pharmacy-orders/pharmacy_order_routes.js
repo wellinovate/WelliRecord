@@ -3,6 +3,7 @@ import { protect } from "../auth/auth_middleware.js";
 import { restrictClinicalScope } from "../auth/clinical_scope_middleware.js";
 import { requirePermission } from "../team/require_permission_middleware.js";
 import { validate } from "../../shared/middlewares/validator.js";
+import { requireWriteConsent } from "../access/require_write_consent_middleware.js";
 import {
   createPharmacyOrderController,
   getAllPharmacyOrdersController,
@@ -31,6 +32,7 @@ router.post(
   restrictClinicalScope("pharmacy-orders"),
   requirePermission("create_prescriptions"),
   validate(createPharmacyOrderSchema),
+  requireWriteConsent("medications"),
   createPharmacyOrderController,
 );
 
