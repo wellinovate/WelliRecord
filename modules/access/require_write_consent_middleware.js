@@ -1,5 +1,5 @@
 import { resolveActorContext } from "../vitals/vital_service.js";
-import { findActiveAccessGrant, hasOrgPatientLink } from "./access_grant_service.js";
+import { findActiveAccessGrant } from "./access_grant_service.js";
 
 // Must run after `protect` and after `validate` (needs
 // req.validated.patientId — the parsed body, not the raw one).
@@ -14,14 +14,8 @@ import { findActiveAccessGrant, hasOrgPatientLink } from "./access_grant_service
 // gated this way via resolveConsentAccess; this is the write-side
 // counterpart, using the same findActiveAccessGrant lookup.
 //
-// The org owner/admin account is exempt, same as
-// resolvePatientRecordAccess already treats it for viewing a chart —
-// a facility shouldn't be locked out of its own admin functions.
-// Staff (accountType "user", not the org owner) always need an
-// explicit grant; an active Encounter does NOT substitute for one —
-// createEncounterService has no consent check of its own, so treating
-// an encounter as sufficient would just be a second, easier path to
-// the same unconsented write this middleware exists to close.
+// No exemption: the org owner needs an active grant like staff.
+// An encounter, a past order or a patient link does not substitute.
 //
 // Usage: place after `protect`, `restrictClinicalScope`,
 // `requirePermission`, and `validate` on a write route:
@@ -45,14 +39,6 @@ export const requireWriteConsent = (category) => async (req, res, next) => {
     }
 
     const patientId = req.validated?.patientId || req.body?.patientId;
-
-    if (
-      actor.isOrgOwner &&
-      patientId &&
-      (await hasOrgPatientLink({ patientId, organizationId: actor.organizationId }))
-    ) {
-      return next();
-    }
 
     if (!patientId) {
       // No patientId to check consent against. Let the validator/
