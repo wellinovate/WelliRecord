@@ -38,9 +38,6 @@ const accessGrantSchema = new Schema(
     shareToken: {
       type: String,
       default: null,
-      unique: true,
-      sparse: true,
-      index: true,
     },
 
     // If true, the link becomes unusable after its first successful view
@@ -248,6 +245,7 @@ accessGrantSchema.pre("validate", function () {
   }
 });
 
+accessGrantSchema.index({ shareToken: 1 }, { unique: true, partialFilterExpression: { shareToken: { $type: "string" } } });
 accessGrantSchema.index({
   patientId: 1,
   granteeUserId: 1,
