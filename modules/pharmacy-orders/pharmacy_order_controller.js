@@ -38,7 +38,7 @@ export const updatePharmacyOrderStatusController = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.validated;
-    const result = await updatePharmacyOrderStatusService({ id, status });
+    const result = await updatePharmacyOrderStatusService({ id, status, authUser: req.user });
     return res.status(200).json({
       success: true,
       message: "Pharmacy order status updated",
@@ -53,7 +53,7 @@ export const dispensePharmacyOrderController = async (req, res, next) => {
   try {
     const { id } = req.params;
     const payload = req.validated;
-    const result = await dispensePharmacyOrderService({ id, payload });
+    const result = await dispensePharmacyOrderService({ id, payload, authUser: req.user });
     return res.status(200).json({
       success: true,
       message: "Pharmacy order dispensed",
