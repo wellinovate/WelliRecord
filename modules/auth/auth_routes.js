@@ -1,3 +1,4 @@
+import { requestClaimController, completeClaimController } from "./claim_controller.js";
 import express from "express";
 
 // import asyncHandler from '../utils/asyncHandler';
@@ -23,6 +24,8 @@ router.post("/resend-verify-code", resendLoginOtpLimiter, resendLoginOtpControll
 router.post("/google/login", googleLoginController);
 router.post("/forgot-password", forgotPasswordLimiter, forgotPasswordController);
 router.post("/reset-password", resetPasswordLimiter, resetPasswordController);
+router.post("/claim/request", forgotPasswordLimiter, requestClaimController);
+router.post("/claim/complete", resetPasswordLimiter, completeClaimController);
 router.post("/verify-email", verifyEmailLimiter, verifyEmailController);
 router.post(
   "/resend-verification-email",
