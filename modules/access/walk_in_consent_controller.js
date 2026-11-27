@@ -6,6 +6,7 @@ export const requestWalkInConsent = async (req, res, next) => {
       authUser: req.user,
       phone: req.body?.phone,
       categories: req.body?.categories,
+      newPatient: req.body?.newPatient,
     });
     res.status(202).json({
       success: true,
