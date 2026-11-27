@@ -53,6 +53,18 @@ export const registerUserAccount = async (payload) => {
 
     if (payload.phone) {
       const existingPhone = await findAccountByPhone(payload.phone, session);
+      if (
+        existingPhone &&
+        existingPhone.status === "pending" &&
+        existingPhone.isVerified !== true &&
+        String(existingPhone.email || "").endsWith("@walkin.invalid")
+      ) {
+        throw new AppError(
+          "A record was already created for this phone number at a facility. Claim it instead of registering.",
+          409,
+          "CLAIM_REQUIRED",
+        );
+      }
       if (existingPhone) {
         throw new AppError(
           "This phone number is already registered to another account",
