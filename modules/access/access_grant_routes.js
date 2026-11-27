@@ -8,6 +8,7 @@ import {
 } from "./access_grant_controller.js";
 import { createShareLinkController } from "./bridge_controller.js";
 import { protect } from "../auth/auth_middleware.js";
+import { requestWalkInConsent, confirmWalkInConsent } from "./walk_in_consent_controller.js";
 
 const router = express.Router();
 
@@ -27,4 +28,7 @@ router.get("/organization/me", getMyGrantedAccessAsProvider);
 router.patch("/:grantId/revoke", revokeAccessGrant);
 
 router.get("/provider/patients/:patientId/vitals", getPatientVitalsForProvider);
+router.post("/walk-in/request", requestWalkInConsent);
+router.post("/walk-in/:requestId/confirm", confirmWalkInConsent);
+
 export default router;

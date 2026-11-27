@@ -525,38 +525,6 @@ export const resolvePatientAccessContext = async ({
   }
 };
 
-const hasOrganizationFullReadAccess = async ({ patientId, organizationId }) => {
-  if (!organizationId) return false;
-
-  // Replace this with your real consent/grant model
-  // Example:
-  // const grant = await ConsentGrant.findOne({
-  //   patientId,
-  //   organizationId,
-  //   status: "active",
-  //   scope: { $in: ["all-records", "vitals"] },
-  // }).lean();
-
-  // return Boolean(grant);
-
-  return false;
-};
-
-const hasOrganizationCreateAccess = async ({ patientId, organizationId }) => {
-  if (!organizationId) return false;
-
-  // Replace with your actual linkage/consent logic.
-  // Example:
-  // const relation = await PatientOrganization.findOne({
-  //   patientId,
-  //   organizationId,
-  //   status: "active",
-  // }).lean();
-  // return Boolean(relation);
-
-  return true;
-};
-
 export const getPatientVitalsForProvider = async (req, res, next) => {
   try {
     const { patientId } = req.params;
